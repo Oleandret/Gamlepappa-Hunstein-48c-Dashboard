@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: 'Space Grotesk', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  background-color: #05070d;
+  color: #e6f0ff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #05070d; }
+::-webkit-scrollbar-thumb { background: #1c2a44; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #22e6ff44; }
+
+@layer components {
+  .panel {
+    @apply relative rounded-2xl bg-panel-grad backdrop-blur-md border border-nx-line/80 shadow-panel;
+  }
+  .panel::before {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(140deg, rgba(34,230,255,0.35), rgba(34,230,255,0) 35%, rgba(125,92,255,0.18) 80%, rgba(34,230,255,0.25));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    pointer-events: none;
+  }
+  .panel-title {
+    @apply text-[11px] uppercase tracking-[0.18em] text-nx-mute font-medium;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-nx-line bg-nx-panel/70 px-2.5 py-1 text-xs text-nx-text;
+  }
+  .neon-text {
+    @apply text-nx-cyan;
+    text-shadow: 0 0 12px rgba(34,230,255,0.55);
+  }
+  .neon-divider {
+    background: linear-gradient(90deg, transparent, rgba(34,230,255,0.45), transparent);
+    height: 1px;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-nx-line/80 bg-nx-panel/60 px-3 py-2 text-sm hover:border-nx-cyan/60 hover:text-nx-cyan transition-colors;
+  }
+  .btn-primary {
+    @apply btn border-nx-cyan/50 bg-nx-cyan/10 text-nx-cyan hover:bg-nx-cyan/20;
+  }
+  .stat {
+    @apply flex items-baseline gap-1 font-mono;
+  }
+  .stat-value {
+    @apply text-2xl font-medium text-nx-text;
+  }
+  .stat-unit {
+    @apply text-xs text-nx-mute;
+  }
+}
+
+/* Decorative scanlines on background */
+.bg-scanlines {
+  background-image:
+    radial-gradient(1200px 600px at 80% -10%, rgba(34,230,255,0.10), transparent 60%),
+    radial-gradient(800px 500px at 0% 100%, rgba(125,92,255,0.10), transparent 60%),
+    repeating-linear-gradient(180deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 3px);
+}
+
+.glow-cyan {
+  box-shadow: 0 0 20px rgba(34,230,255,0.25), inset 0 0 0 1px rgba(34,230,255,0.45);
+}
