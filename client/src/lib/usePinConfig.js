@@ -1,13 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { VIEWS } from '../components/HouseView.jsx';
-
-const STORAGE_KEY = 'nexora.pinConfig.v1';
+import { useServerSyncedState } from './useServerSyncedState.js';
 
 /**
- * Pin-config er { home: Pin[], cabin: Pin[] } der hver Pin har minimum
- *   { id, kind, x, y, placement }
- * pluss kind-spesifikke felt (zoneName, deviceMatch, label).
- * Hvis ingen config er lagret, returnerer vi defaults fra HouseView.VIEWS.
+ * Pin-config { home: Pin[], cabin: Pin[] } for hovedbildene på framsiden.
+ * Server-persistert under namespace 'pinConfig' med localStorage som cache.
  */
 
 function withIds(pins) {
@@ -24,115 +21,75 @@ function defaults() {
   };
 }
 
-/**
- * Sanitiser én enkelt pin. Returnerer null hvis kind mangler (det er det
- * eneste vi virkelig trenger — alt annet kan vi gi sane defaults for).
- * Tidligere kastet vi hele arrayen hvis bare én pin var rar; nå filtrerer
- * vi den enkelte pin-en bort i stedet, så resten av brukerens config
- * overlever.
- */
 function sanitizePin(p) {
   if (!p || typeof p !== 'object') return null;
   if (typeof p.kind !== 'string' || !p.kind) return null;
-  const known = ['top', 'bottom', 'left', 'right'];
-  const out = {
+  const placements = ['top', 'bottom', 'left', 'right'];
+  return {
     ...p,
     kind: p.kind,
     x: Number.isFinite(p.x) ? Math.max(0, Math.min(100, p.x)) : 50,
     y: Number.isFinite(p.y) ? Math.max(0, Math.min(100, p.y)) : 50,
-    placement: known.includes(p.placement) ? p.placement : 'top'
+    placement: placements.includes(p.placement) ? p.placement : 'top',
+    id: typeof p.id === 'string' ? p.id : undefined
   };
-  if (typeof p.id === 'string') out.id = p.id;
-  return out;
 }
 
-function read() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaults();
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return defaults();
-    const sanitize = (arr) => Array.isArray(arr) ? arr.map(sanitizePin).filter(Boolean) : null;
-    const homePins  = sanitize(parsed.home);
-    const cabinPins = sanitize(parsed.cabin);
-    return {
-      home:  homePins  != null ? withIds(homePins)  : defaults().home,
-      cabin: cabinPins != null ? withIds(cabinPins) : defaults().cabin
-    };
-  } catch {
-    return defaults();
-  }
+function sanitize(cfg) {
+  if (!cfg || typeof cfg !== 'object') return defaults();
+  const sanArr = (arr) => Array.isArray(arr) ? arr.map(sanitizePin).filter(Boolean) : null;
+  const home  = sanArr(cfg.home);
+  const cabin = sanArr(cfg.cabin);
+  return {
+    home:  home  != null ? withIds(home)  : defaults().home,
+    cabin: cabin != null ? withIds(cabin) : defaults().cabin
+  };
 }
 
-function write(cfg) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg)); }
-  catch { /* private mode etc. */ }
+function newId(kind) {
+  return `${kind}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
 }
 
 export function usePinConfig() {
-  const [config, setConfig] = useState(read);
+  const [config, setConfig] = useServerSyncedState('pinConfig', defaults);
+  const clean = sanitize(config);
 
-  // Sync på tvers av faner
-  useEffect(() => {
-    const onStorage = (e) => { if (e.key === STORAGE_KEY) setConfig(read()); };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, []);
-
-  const update = useCallback((next) => {
-    setConfig(next);
-    write(next);
-  }, []);
+  const update = useCallback((next) => setConfig(sanitize(next)), [setConfig]);
 
   const setLocation = useCallback((location, pins) => {
-    setConfig(prev => {
-      const next = { ...prev, [location]: pins };
-      write(next);
-      return next;
-    });
-  }, []);
+    setConfig(prev => ({ ...sanitize(prev), [location]: pins }));
+  }, [setConfig]);
 
   const updatePin = useCallback((location, id, patch) => {
     setConfig(prev => {
-      const list = (prev[location] || []).map(p => p.id === id ? { ...p, ...patch } : p);
-      const next = { ...prev, [location]: list };
-      write(next);
-      return next;
+      const c = sanitize(prev);
+      return { ...c, [location]: c[location].map(p => p.id === id ? { ...p, ...patch } : p) };
     });
-  }, []);
+  }, [setConfig]);
 
   const addPin = useCallback((location, pin) => {
     setConfig(prev => {
-      const id = `${pin.kind}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
-      const list = [...(prev[location] || []), { id, x: 50, y: 50, placement: 'top', ...pin }];
-      const next = { ...prev, [location]: list };
-      write(next);
-      return next;
+      const c = sanitize(prev);
+      const id = newId(pin.kind);
+      const list = [...c[location], { id, x: 50, y: 50, placement: 'top', ...pin }];
+      return { ...c, [location]: list };
     });
-  }, []);
+  }, [setConfig]);
 
   const removePin = useCallback((location, id) => {
     setConfig(prev => {
-      const list = (prev[location] || []).filter(p => p.id !== id);
-      const next = { ...prev, [location]: list };
-      write(next);
-      return next;
+      const c = sanitize(prev);
+      return { ...c, [location]: c[location].filter(p => p.id !== id) };
     });
-  }, []);
+  }, [setConfig]);
 
   const reset = useCallback((location = null) => {
     if (!location) {
-      const next = defaults();
-      setConfig(next);
-      write(next);
+      setConfig(defaults());
       return;
     }
-    setConfig(prev => {
-      const next = { ...prev, [location]: defaults()[location] };
-      write(next);
-      return next;
-    });
-  }, []);
+    setConfig(prev => ({ ...sanitize(prev), [location]: defaults()[location] }));
+  }, [setConfig]);
 
-  return { config, update, setLocation, updatePin, addPin, removePin, reset };
+  return { config: clean, update, setLocation, updatePin, addPin, removePin, reset };
 }

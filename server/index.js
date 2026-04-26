@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { homeyRoutes } from './routes/homey.js';
 import { weatherRoutes } from './routes/weather.js';
 import { systemRoutes } from './routes/system.js';
+import { configRoutes } from './routes/config.js';
 import { cfg, isDemoMode } from './config.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -41,6 +42,7 @@ app.use((req, _res, next) => {
 app.use('/api/system', systemRoutes);
 app.use('/api/homey', homeyRoutes);
 app.use('/api/weather', weatherRoutes);
+app.use('/api/config', configRoutes);
 
 // Healthcheck — Railway uses this for restart policy
 app.get('/healthz', (_req, res) =>

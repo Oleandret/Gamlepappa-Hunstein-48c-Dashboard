@@ -1,50 +1,23 @@
-import { useCallback, useEffect, useState } from 'react';
-
-const STORAGE_KEY = 'nexora.flowFavorites.v1';
+import { useCallback } from 'react';
+import { useServerSyncedState } from './useServerSyncedState.js';
 
 /**
- * Lokal stjerne-logikk for flows. Homey API eksponerer ikke en favorite-flag
- * på flow-objektet (flows er bare {id, name, enabled, folder}), så vi lagrer
- * en liste av favoritt-flow-IDer i localStorage.
+ * Lokal stjerne-logikk for flows, server-persistert.
  */
-
-function read() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr.filter(x => typeof x === 'string') : [];
-  } catch { return []; }
-}
-
-function write(ids) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ids)); }
-  catch {}
-}
-
 export function useFlowFavorites() {
-  const [ids, setIds] = useState(read);
+  const [ids, setIds] = useServerSyncedState('flowFavorites', []);
+  const safeIds = Array.isArray(ids) ? ids.filter(x => typeof x === 'string') : [];
 
-  useEffect(() => {
-    const onStorage = (e) => { if (e.key === STORAGE_KEY) setIds(read()); };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, []);
-
-  const isFavorite = useCallback((id) => ids.includes(id), [ids]);
+  const isFavorite = useCallback((id) => safeIds.includes(id), [safeIds]);
 
   const toggle = useCallback((id) => {
     setIds(prev => {
-      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
-      write(next);
-      return next;
+      const arr = Array.isArray(prev) ? prev : [];
+      return arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id];
     });
-  }, []);
+  }, [setIds]);
 
-  const clear = useCallback(() => {
-    setIds([]);
-    write([]);
-  }, []);
+  const clear = useCallback(() => setIds([]), [setIds]);
 
-  return { ids, isFavorite, toggle, clear };
+  return { ids: safeIds, isFavorite, toggle, clear };
 }

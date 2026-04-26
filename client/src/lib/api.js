@@ -32,5 +32,25 @@ export const api = {
   setCapability: (deviceId, capability, value) =>
     jpost(`/homey/devices/${encodeURIComponent(deviceId)}/capability/${encodeURIComponent(capability)}`, { value }),
   runFlow: (flowId) =>
-    jpost(`/homey/flows/${encodeURIComponent(flowId)}/run`)
+    jpost(`/homey/flows/${encodeURIComponent(flowId)}/run`),
+
+  // Config-store: server-persistert bruker-config per namespace
+  config: {
+    getAll: (signal) => jget('/config', signal),
+    get: (ns, signal) => jget(`/config/${encodeURIComponent(ns)}`, signal),
+    put: (ns, value) => fetch(`${BASE}/api/config/${encodeURIComponent(ns)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value })
+    }).then(r => {
+      if (!r.ok) throw new Error(`PUT /config/${ns} → ${r.status}`);
+      return r.json();
+    }),
+    del: (ns) => fetch(`${BASE}/api/config/${encodeURIComponent(ns)}`, {
+      method: 'DELETE'
+    }).then(r => {
+      if (!r.ok) throw new Error(`DELETE /config/${ns} → ${r.status}`);
+      return r.json();
+    })
+  }
 };

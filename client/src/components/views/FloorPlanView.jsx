@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { Home as HomeIcon, Anchor, Building2, Upload, Lock, Unlock, Camera as CameraIcon, DoorOpen, FileSpreadsheet, ZoomIn, ZoomOut, Thermometer, ShieldAlert, Lightbulb, Layers, Edit2, Plus, Wifi, Cpu, Music } from 'lucide-react';
-import { capValue, hasCap, classLabel } from '../../lib/deviceUtils.js';
+import { Home as HomeIcon, Anchor, Building2, Upload, FileSpreadsheet, ZoomIn, ZoomOut, Thermometer, ShieldAlert, Lightbulb, Layers, Edit2, Plus, Wifi, Cpu, Music } from 'lucide-react';
+import { hasCap } from '../../lib/deviceUtils.js';
 import { FloorPlanPin } from '../FloorPlanPin.jsx';
 import { RichDevicePicker } from '../RichDevicePicker.jsx';
 
@@ -189,10 +189,6 @@ export function FloorPlanView({ devices, zones, location = 'home', floorPlanPins
   const [planId, setPlanId] = useState(plansForLocation[0]?.id || 'cabinMain');
   const [viewMode, setViewMode] = useState('all');
   const [editing, setEditing] = useState(false);
-  // Auto-genererte rom-overlays (de hardkodede rektangelene fra PLANS[].rooms)
-  // er som standard SKRUDD AV nå som plantegningene er croppet — koordinatene
-  // er ikke lenger riktige. Brukeren kan slå dem på igjen via toggle om ønsket.
-  const [showAutoRooms, setShowAutoRooms] = useState(false);
 
   // Sync default når location bytter (bruker navigerer mellom hus/hytte i sidebar)
   useEffect(() => {
@@ -203,11 +199,6 @@ export function FloorPlanView({ devices, zones, location = 'home', floorPlanPins
 
   const plan = PLANS[planId] || plansForLocation[0];
   if (!plan) return null;
-
-  const roomData = useMemo(
-    () => plan.rooms.map(r => ({ ...r, status: getRoomStatus(r, devices, zones, viewMode) })),
-    [plan, devices, zones, viewMode]
-  );
 
   const locationLabel = location === 'cabin' ? 'Hytte · Halsaneset' : 'Hus · Hunstein 48c';
 
@@ -270,36 +261,21 @@ export function FloorPlanView({ devices, zones, location = 'home', floorPlanPins
               </button>
             );
           })}
-          <div className="ml-auto flex items-center gap-1.5">
+          {floorPlanPins && (
             <button
-              onClick={() => setShowAutoRooms(s => !s)}
-              aria-pressed={showAutoRooms}
-              title="Vis/skjul auto-genererte rom-rektangler (kan være feilplassert)"
+              onClick={() => setEditing(e => !e)}
+              aria-pressed={editing}
               className={[
-                'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono uppercase tracking-[0.18em] transition-colors border',
-                showAutoRooms
-                  ? 'bg-nx-cyan/15 text-nx-cyan border-nx-cyan/55'
+                'ml-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono uppercase tracking-[0.18em] transition-colors border',
+                editing
+                  ? 'bg-nx-cyan/15 text-nx-cyan border-nx-cyan/55 shadow-glow-soft'
                   : 'border-nx-line/60 text-nx-mute hover:text-nx-text hover:border-nx-cyan/40'
               ].join(' ')}
             >
-              {showAutoRooms ? 'Skjul auto-rom' : 'Vis auto-rom'}
+              <Edit2 size={11} aria-hidden="true" />
+              {editing ? 'Ferdig' : 'Rediger pins'}
             </button>
-            {floorPlanPins && (
-              <button
-                onClick={() => setEditing(e => !e)}
-                aria-pressed={editing}
-                className={[
-                  'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono uppercase tracking-[0.18em] transition-colors border',
-                  editing
-                    ? 'bg-nx-cyan/15 text-nx-cyan border-nx-cyan/55 shadow-glow-soft'
-                    : 'border-nx-line/60 text-nx-mute hover:text-nx-text hover:border-nx-cyan/40'
-                ].join(' ')}
-              >
-                <Edit2 size={11} aria-hidden="true" />
-                {editing ? 'Ferdig' : 'Rediger pins'}
-              </button>
-            )}
-          </div>
+          )}
         </div>
       )}
 
@@ -309,8 +285,6 @@ export function FloorPlanView({ devices, zones, location = 'home', floorPlanPins
           ? <ReferenceImage plan={plan} />
           : <FloorPlanCanvas
               plan={plan}
-              rooms={roomData}
-              showAutoRooms={showAutoRooms}
               pins={floorPlanPins?.getPins(plan.id) || []}
               devices={devices}
               zones={zones}
@@ -343,13 +317,6 @@ export function FloorPlanView({ devices, zones, location = 'home', floorPlanPins
         />
       )}
 
-      {plan.image && plan.kind !== 'reference' && (
-        <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-          {roomData.filter(r => r.status.hasData && r.status.matchesView !== false).map(r => (
-            <RoomStatusCard key={r.name} room={r} viewMode={viewMode} />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -400,7 +367,7 @@ function ReferenceImage({ plan }) {
   );
 }
 
-function FloorPlanCanvas({ plan, rooms, showAutoRooms = false, pins, devices, zones, editing, viewMode = 'all', floorPlanPins, onSetCapability }) {
+function FloorPlanCanvas({ plan, pins, devices, zones, editing, viewMode = 'all', floorPlanPins, onSetCapability }) {
   // Filtrer pins etter view-mode i BÅDE visning og edit. Da blir hver fane
   // ryddig — du ser kun pins som hører til den fanen du står på, og kan
   // legge til nye uten å bli forstyrret av pins fra andre kategorier.
@@ -470,12 +437,6 @@ function FloorPlanCanvas({ plan, rooms, showAutoRooms = false, pins, devices, zo
 
       {/* Hjørne-brackets */}
       <Brackets />
-
-      {/* Room hot-spots (auto-genererte rektangler) — kun hvis togglet på OG
-          ikke i edit-mode (de hadde overlappet med pin-edit-verktøyene). */}
-      {showAutoRooms && !editing && rooms.filter(r => r.status.matchesView !== false).map(r => (
-        <RoomOverlay key={r.name} room={r} />
-      ))}
 
       {/* Brukerens egne device-pins, filtrert etter view-mode */}
       {visiblePins.map(pin => (
@@ -575,122 +536,6 @@ function Brackets() {
   );
 }
 
-function RoomOverlay({ room }) {
-  const { x, y, w, h, status } = room;
-  const hasData = status.hasData;
-  const alarm = status.motion || status.openContact;
-  return (
-    <div
-      className={[
-        'absolute rounded transition-all pointer-events-none',
-        hasData ? 'border-2' : 'border border-dashed',
-        alarm ? 'border-nx-red/70 bg-nx-red/10 animate-pulseGlow'
-              : hasData ? 'border-nx-cyan/55 bg-nx-cyan/10'
-                        : 'border-nx-mute/30 bg-transparent'
-      ].join(' ')}
-      style={{
-        left: `${x}%`, top: `${y}%`,
-        width: `${w}%`, height: `${h}%`
-      }}
-      role="img"
-      aria-label={`${room.name}: ${status.summary}`}
-    >
-      {hasData && (
-        <div className="absolute inset-x-0 top-0 -translate-y-full mb-1 flex justify-center">
-          <div className={[
-            'rounded border bg-nx-bg/90 backdrop-blur-sm px-1.5 py-0.5 shadow-glow-soft text-[9px] font-mono leading-tight whitespace-nowrap flex items-center gap-1',
-            alarm ? 'border-nx-red/55' : 'border-nx-cyan/45'
-          ].join(' ')}>
-            <span className="text-nx-mute tracking-[0.18em] uppercase">{room.name}</span>
-            {status.temp != null && <span className="text-nx-cyan">{status.temp.toFixed(1)}°</span>}
-            {status.locks > 0 && (
-              status.locked === status.locks
-                ? <Lock size={9} className="text-nx-green" />
-                : <Unlock size={9} className="text-nx-amber" />
-            )}
-            {status.openContact > 0 && <DoorOpen size={9} className="text-nx-amber" />}
-            {status.motion > 0 && <span className="text-nx-red">●</span>}
-            {status.lights > 0 && (
-              <span className={status.lightsOn ? 'text-nx-amber' : 'text-nx-mute'}>
-                <Lightbulb size={9} className="inline" /> {status.lightsOn}/{status.lights}
-              </span>
-            )}
-            {status.wifi > 0 && (
-              <span className={status.wifiOffline > 0 ? 'text-nx-red' : 'text-nx-cyan'}>
-                <Wifi size={9} className="inline" /> {status.wifiOffline > 0 ? `${status.wifiOffline}!` : status.wifi}
-              </span>
-            )}
-            {status.tech > 0 && (
-              <span className="text-nx-purple">
-                <Cpu size={9} className="inline" /> {status.tech}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function RoomStatusCard({ room, viewMode = 'all' }) {
-  const s = room.status;
-  // Hva som vises i kortet styres av viewMode
-  const showTemp     = viewMode === 'all' || viewMode === 'temp';
-  const showSecurity = viewMode === 'all' || viewMode === 'security';
-  const showLight    = viewMode === 'all' || viewMode === 'light';
-  const showWifi     = viewMode === 'all' || viewMode === 'wifi';
-  const showTech     = viewMode === 'all' || viewMode === 'tech';
-
-  return (
-    <div className={[
-      'panel p-2 text-xs',
-      (showSecurity && (s.motion || s.openContact)) ? 'border-nx-red/40' : ''
-    ].join(' ')}>
-      <div className="flex items-center justify-between">
-        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-nx-mute truncate">{room.name}</span>
-        {showTemp && s.temp != null && <span className="font-mono text-nx-cyan">{s.temp.toFixed(1)}°</span>}
-      </div>
-      <div className="mt-1 flex flex-wrap gap-1.5 text-[10px]">
-        {showSecurity && s.locks > 0 && (
-          <span className={s.locked === s.locks ? 'text-nx-green' : 'text-nx-amber'}>
-            {s.locked === s.locks ? <Lock size={10} className="inline" /> : <Unlock size={10} className="inline" />}
-            {' '}{s.locked}/{s.locks}
-          </span>
-        )}
-        {showSecurity && s.cameras > 0 && (
-          <span className={s.motion ? 'text-nx-red' : 'text-nx-mute'}>
-            <CameraIcon size={10} className="inline" /> {s.cameras}
-          </span>
-        )}
-        {showSecurity && s.openContact > 0 && (
-          <span className="text-nx-amber"><DoorOpen size={10} className="inline" /> {s.openContact}</span>
-        )}
-        {showSecurity && s.motion > 0 && (
-          <span className="text-nx-red">● bevegelse</span>
-        )}
-        {showLight && s.lights > 0 && (
-          <span className={s.lightsOn ? 'text-nx-amber' : 'text-nx-mute'}>
-            <Lightbulb size={10} className="inline" /> {s.lightsOn}/{s.lights}
-          </span>
-        )}
-        {showWifi && s.wifi > 0 && (
-          <span className={s.wifiOffline > 0 ? 'text-nx-red' : 'text-nx-cyan'} title={s.wifiOffline > 0 ? `${s.wifiOffline} offline` : `${s.wifi} wifi-enheter`}>
-            <Wifi size={10} className="inline" /> {s.wifi}{s.wifiOffline > 0 ? ` (${s.wifiOffline} offline)` : ''}
-          </span>
-        )}
-        {showTech && s.tech > 0 && (
-          <span className="text-nx-purple" title={`${s.tech} tekniske enheter`}>
-            <Cpu size={10} className="inline" /> {s.tech}
-          </span>
-        )}
-        {viewMode === 'all' && s.deviceCount > 0 && !s.temp && !s.locks && !s.cameras && !s.lights && (
-          <span className="text-nx-mute">{s.deviceCount} enh</span>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function PlanPlaceholder({ plan }) {
   return (
     <div className="rounded-xl border border-dashed border-nx-line/60 bg-nx-panel/30 p-12 text-center">
@@ -703,58 +548,3 @@ function PlanPlaceholder({ plan }) {
   );
 }
 
-/**
- * Aggregate sensor status for one room rectangle by matching against zone-name regex.
- * `viewMode` påvirker `matchesView` — om dette rommet skal vises i gjeldende
- * filter (Temperatur / Sikkerhet / Lys / Alle).
- */
-function getRoomStatus(room, devices, zones, viewMode = 'all') {
-  const all = Object.values(devices || {});
-  const matchingZones = Object.values(zones || {}).filter(z => room.match.test(z.name || ''));
-  const zoneIds = new Set(matchingZones.map(z => z.id));
-  const list = all.filter(d => zoneIds.has(d.zone));
-
-  const temps = list.map(d => capValue(d, 'measure_temperature')).filter(t => Number.isFinite(t));
-  const locks = list.filter(d => d.class === 'lock');
-  const cams  = list.filter(d => d.class === 'camera');
-  const lights = list.filter(d => d.class === 'light' || hasCap(d, 'dim'));
-  const lightsOn = lights.filter(d => capValue(d, 'onoff') === true).length;
-  const motionCount = list.filter(d => capValue(d, 'alarm_motion') === true).length;
-  const openContactCount = list.filter(d => hasCap(d, 'alarm_contact') && capValue(d, 'alarm_contact') === true).length;
-  const contactDevices = list.filter(d => hasCap(d, 'alarm_contact')).length;
-  const motionDevices = list.filter(d => hasCap(d, 'alarm_motion')).length;
-  const wifiDevices = list.filter(isWifiDevice);
-  const wifiOffline = wifiDevices.filter(d => d.available === false).length;
-  const techDevices = list.filter(isTechnicalDevice);
-
-  // matchesView avgjør om rommet vises i gjeldende view-mode
-  const hasTemp     = temps.length > 0;
-  const hasSecurity = locks.length > 0 || cams.length > 0 || motionDevices > 0 || contactDevices > 0;
-  const hasLight    = lights.length > 0;
-  const hasWifi     = wifiDevices.length > 0;
-  const hasTech     = techDevices.length > 0;
-  const matchesView = viewMode === 'all'
-    || (viewMode === 'temp'     && hasTemp)
-    || (viewMode === 'security' && hasSecurity)
-    || (viewMode === 'light'    && hasLight)
-    || (viewMode === 'wifi'     && hasWifi)
-    || (viewMode === 'tech'     && hasTech);
-
-  return {
-    deviceCount: list.length,
-    hasData: list.length > 0,
-    matchesView,
-    temp: temps.length ? temps.reduce((a, b) => a + b, 0) / temps.length : null,
-    locks: locks.length,
-    locked: locks.filter(d => capValue(d, 'locked') === true).length,
-    cameras: cams.length,
-    motion: motionCount,
-    openContact: openContactCount,
-    lights: lights.length,
-    lightsOn,
-    wifi: wifiDevices.length,
-    wifiOffline,
-    tech: techDevices.length,
-    summary: list.length ? `${list.length} enheter` : 'Ingen enheter koblet'
-  };
-}
