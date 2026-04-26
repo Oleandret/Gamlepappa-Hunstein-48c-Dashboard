@@ -346,8 +346,37 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
       const roborock = findFirst(data.devices, d => d.class === 'vacuumcleaner');
       const tibber = findFirst(data.devices, d => /tibber/i.test(d.driverUri || ''));
       return wrapper(<>
-        {greetingPanel}
-        <div className="col-span-12 lg:col-span-9 panel overflow-hidden">
+        {/* Kompakt hilsen-bar tar full bredde, lavt vertikalt */}
+        <div className="col-span-12 panel px-5 py-3 flex flex-wrap items-center gap-3 justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-base font-semibold">
+              God kveld, <span className="neon-text">{system?.user || 'Ole'}</span>
+            </h1>
+            <span className="chip text-[11px]">
+              <span className="h-1.5 w-1.5 rounded-full bg-nx-green animate-pulseGlow" />
+              Hjemmemodus
+            </span>
+            <span className="chip text-[11px]">
+              <span className="h-1.5 w-1.5 rounded-full bg-nx-cyan" />
+              {system?.demo ? 'Demo' : 'Live'}
+            </span>
+            <span className="chip text-[11px]">
+              <span className="h-1.5 w-1.5 rounded-full bg-nx-purple" />
+              {counts.devices} enheter · {counts.zones} rom
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-[11px] text-nx-mute font-mono">
+            {data.weather?.now?.temp != null && (
+              <span>UTE: <span className="text-nx-cyan">{Math.round(data.weather.now.temp)}°C</span></span>
+            )}
+            {data.energy?.live?.watts != null && (
+              <span>NÅ: <span className="text-nx-cyan">{Math.round(data.energy.live.watts).toLocaleString('no-NO')} W</span></span>
+            )}
+          </div>
+        </div>
+
+        {/* Begge hus side-by-side */}
+        <div className="col-span-12 lg:col-span-6 panel overflow-hidden">
           <HouseView
             devices={data.devices || {}}
             zones={data.zones || {}}
@@ -355,10 +384,7 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
             forceLocation="home"
           />
         </div>
-        <div className="col-span-12 lg:col-span-3 panel p-5">
-          <SecurityWidget security={data.security} />
-        </div>
-        <div className="col-span-12 lg:col-span-9 panel overflow-hidden">
+        <div className="col-span-12 lg:col-span-6 panel overflow-hidden">
           <HouseView
             devices={data.devices || {}}
             zones={data.zones || {}}
@@ -366,33 +392,39 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
             forceLocation="cabin"
           />
         </div>
+
+        {/* Spesial-widgets — alltid synlige under */}
+        <div className="col-span-12 sm:col-span-6 lg:col-span-3 panel p-5">
+          <SecurityWidget security={data.security} />
+        </div>
+        {tibber && <div className="col-span-12 sm:col-span-6 lg:col-span-3"><TibberCard device={tibber} /></div>}
+        {tesla && <div className="col-span-12 sm:col-span-6 lg:col-span-3"><TeslaCard device={tesla} /></div>}
+        {roborock && <div className="col-span-12 sm:col-span-6 lg:col-span-3"><RoborockCard device={roborock} onSet={setCapability} /></div>}
+
+        {/* Innhold-rad: hurtigkontroller + energi */}
         <div className="col-span-12 lg:col-span-3 panel p-5">
           <QuickControls flows={data.flows || {}} onRun={runFlow} />
         </div>
-
-        {/* Special device cards — only render when device exists */}
-        {tibber && <div className="col-span-12 lg:col-span-4"><TibberCard device={tibber} /></div>}
-        {tesla && <div className="col-span-12 lg:col-span-4"><TeslaCard device={tesla} /></div>}
-        {roborock && <div className="col-span-12 lg:col-span-4"><RoborockCard device={roborock} onSet={setCapability} /></div>}
-
         <div className="col-span-12 lg:col-span-6 panel p-5">
           <Suspense fallback={<LoadingPanel label="LASTER GRAF..." />}>
             <EnergyWidget energy={data.energy} />
           </Suspense>
         </div>
         <div className="col-span-12 lg:col-span-3 panel p-5">
-          <ActivityFeed activity={data.activity || []} />
-        </div>
-        <div className="col-span-12 lg:col-span-3 panel p-5">
           <WeatherWidget weather={data.weather} />
         </div>
-        <div className="col-span-12 lg:col-span-3 panel p-5">
+
+        {/* Bunn-rad: temp + lys + aktiviteter + favoritter */}
+        <div className="col-span-12 sm:col-span-6 lg:col-span-3 panel p-5">
           <RoomTemps devices={data.devices || {}} zones={data.zones || {}} />
         </div>
-        <div className="col-span-12 lg:col-span-3 panel p-5">
+        <div className="col-span-12 sm:col-span-6 lg:col-span-3 panel p-5">
           <Lighting devices={data.devices || {}} onSet={setCapability} />
         </div>
-        <div className="col-span-12 lg:col-span-3 panel p-5">
+        <div className="col-span-12 sm:col-span-6 lg:col-span-3 panel p-5">
+          <ActivityFeed activity={data.activity || []} />
+        </div>
+        <div className="col-span-12 sm:col-span-6 lg:col-span-3 panel p-5">
           <FavoriteAutomations flows={data.flows || {}} onRun={runFlow} />
         </div>
       </>);
