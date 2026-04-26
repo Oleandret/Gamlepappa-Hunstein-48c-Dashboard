@@ -4,11 +4,13 @@ import { api } from './lib/api.js';
 import { usePageVisibility } from './lib/usePageVisibility.js';
 import { useFavorites } from './lib/useFavorites.js';
 import { useSidebarPinned, useLogPinned } from './lib/useSidebarState.js';
+import { usePinConfig } from './lib/usePinConfig.js';
 import { pushEvent, diffDevicesAndLog } from './lib/activityLog.js';
 import { ActivityLogPanel } from './components/ActivityLogPanel.jsx';
 import { Sidebar } from './components/Sidebar.jsx';
 import { TopBar } from './components/TopBar.jsx';
 import { HouseView } from './components/HouseView.jsx';
+import { PinEditor } from './components/PinEditor.jsx';
 import { QuickControls } from './components/QuickControls.jsx';
 import { WeatherWidget } from './components/WeatherWidget.jsx';
 import { SecurityWidget } from './components/SecurityWidget.jsx';
@@ -49,6 +51,7 @@ export default function App() {
   const favorites = useFavorites();
   const sidebar = useSidebarPinned();
   const logPin = useLogPinned();
+  const pinConfig = usePinConfig();
   const prevDevicesRef = useRef(null);
 
   useEffect(() => {
@@ -194,6 +197,7 @@ export default function App() {
               setCapability={setCapability}
               runFlow={runFlow}
               favorites={favorites}
+              pinConfig={pinConfig}
             />
           )}
 
@@ -232,7 +236,7 @@ export default function App() {
   );
 }
 
-function SectionView({ section, system, data, counts, setCapability, runFlow, favorites }) {
+function SectionView({ section, system, data, counts, setCapability, runFlow, favorites, pinConfig }) {
   const userName = system?.user || 'Ole';
   const greetingPanel = (
     <div className="col-span-12 lg:col-span-3 panel p-5">
@@ -358,7 +362,7 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
           <SecurityWidget security={data.security} />
         </div>
         <div className="col-span-12 lg:col-span-4 panel overflow-hidden">
-          <HouseView devices={data.devices || {}} zones={data.zones || {}} weather={data.weather} />
+          <HouseView devices={data.devices || {}} zones={data.zones || {}} weather={data.weather} customPins={pinConfig?.config} />
         </div>
         <div className="col-span-12 panel p-5">
           <ActivityFeed activity={data.activity || []} />
@@ -372,6 +376,9 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
         </div>
         <div className="col-span-12 lg:col-span-8 panel p-5">
           <DiscoveryPanel />
+        </div>
+        <div className="col-span-12 panel p-5">
+          <PinEditor pinConfig={pinConfig} devices={data.devices || {}} zones={data.zones || {}} />
         </div>
       </>);
 
@@ -436,10 +443,10 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
 
           {/* Hus + hytte side-by-side */}
           <div className="col-span-12 lg:col-span-6 panel overflow-hidden">
-            <HouseView devices={data.devices || {}} zones={data.zones || {}} weather={data.weather} forceLocation="home" />
+            <HouseView devices={data.devices || {}} zones={data.zones || {}} weather={data.weather} forceLocation="home" customPins={pinConfig?.config} />
           </div>
           <div className="col-span-12 lg:col-span-6 panel overflow-hidden">
-            <HouseView devices={data.devices || {}} zones={data.zones || {}} weather={data.weather} forceLocation="cabin" />
+            <HouseView devices={data.devices || {}} zones={data.zones || {}} weather={data.weather} forceLocation="cabin" customPins={pinConfig?.config} />
           </div>
 
           {/* Rad 1: Sikkerhet + 3 spesial-widgets */}

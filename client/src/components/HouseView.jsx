@@ -24,8 +24,11 @@ const IMG_VERSION = '5';
  * `placement` controls which side of the pin the badge floats on:
  *   'top' (default), 'bottom', 'left', 'right'.
  * Spread pins apart enough that the badges don't overlap visually.
+ *
+ * VIEWS er eksportert slik at PinEditor i innstillinger kan bruke samme
+ * data som default når brukeren ikke har lagret egen konfig.
  */
-const VIEWS = {
+export const VIEWS = {
   home: {
     label: 'Hjem',
     address: 'Hunstein 48c',
@@ -61,11 +64,13 @@ const VIEWS = {
   }
 };
 
-export function HouseView({ devices, zones, weather, forceLocation = null }) {
+export function HouseView({ devices, zones, weather, forceLocation = null, customPins = null }) {
   const [internalView, setInternalView] = useState('home');
   const view = forceLocation || internalView;
   const cur = VIEWS[view];
   const showToggle = !forceLocation;
+  // Hvis brukeren har overstyrt pin-config i innstillinger, bruk den; ellers default.
+  const pins = (customPins && Array.isArray(customPins[view])) ? customPins[view] : cur.pins;
 
   const outdoorTemp = Number.isFinite(weather?.now?.temp) ? `${Math.round(weather.now.temp)}°C` : '--';
   const humidity = Number.isFinite(weather?.now?.humidity) ? `${Math.round(weather.now.humidity)}%` : '--';
@@ -202,7 +207,7 @@ export function HouseView({ devices, zones, weather, forceLocation = null }) {
           ◉ {cur.address.toUpperCase()} · LIVE
         </div>
 
-        {cur.pins.map((p, i) => {
+        {pins.map((p, i) => {
           if (p.kind === 'zone') {
             const z = zoneStatus.find(s => s.name === p.zoneName);
             return <ZonePin key={i} zone={z || { name: p.zoneName, summary: '—' }} pos={p} />;
