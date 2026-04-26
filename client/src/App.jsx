@@ -206,11 +206,27 @@ export default function App() {
 
       {/* ElevenLabs ConvAI — to ulike agenter avhengig av side.
           `key` tvinger remount når man bytter mellom oversikt og andre seksjoner,
-          slik at widgeten plukker opp den nye agent-id-en. */}
+          slik at widgeten plukker opp den nye agent-id-en.
+          Skrudd av på 'avatar' siden den siden allerede er en pratebar avatar.
+          Orb-fargene matcher dashboardets nx-cyan / nx-purple. */}
       {section === 'oversikt' ? (
-        <elevenlabs-convai key="agent-oversikt" agent-id="SCOI5nAeUm2P90tPlhxJ"></elevenlabs-convai>
-      ) : (
-        <elevenlabs-convai key="agent-andre" agent-id="agent_4501kc02r47xec2s0r87f0awxdj6"></elevenlabs-convai>
+        <elevenlabs-convai
+          key="agent-oversikt"
+          agent-id="SCOI5nAeUm2P90tPlhxJ"
+          avatar-orb-color-1="#22e6ff"
+          avatar-orb-color-2="#7d5cff"
+          variant="compact"
+          placement="bottom-right"
+        ></elevenlabs-convai>
+      ) : section === 'avatar' ? null : (
+        <elevenlabs-convai
+          key="agent-andre"
+          agent-id="agent_4501kc02r47xec2s0r87f0awxdj6"
+          avatar-orb-color-1="#22e6ff"
+          avatar-orb-color-2="#7d5cff"
+          variant="compact"
+          placement="bottom-right"
+        ></elevenlabs-convai>
       )}
     </div>
   );
@@ -358,6 +374,20 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
           <DiscoveryPanel />
         </div>
       </>);
+
+    case 'avatar':
+      return wrapper(
+        <div className="panel overflow-hidden h-[calc(100vh-160px)] min-h-[480px]">
+          <iframe
+            src="https://artimis-ai-production.up.railway.app/"
+            title="Artimis AI Avatar"
+            className="w-full h-full border-0 block"
+            allow="camera; microphone; autoplay; fullscreen; clipboard-read; clipboard-write; display-capture"
+            allowFullScreen
+          />
+        </div>,
+        false
+      );
 
     case 'oversikt':
     default: {

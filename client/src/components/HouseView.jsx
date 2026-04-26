@@ -169,7 +169,7 @@ export function HouseView({ devices, zones, weather, forceLocation = null }) {
         </div>
       )}
 
-      <div className="relative mt-2 aspect-[21/9] w-full overflow-hidden rounded-xl border border-nx-line/60 bg-nx-bg">
+      <div className="relative mt-2 aspect-[16/9] w-full max-h-[260px] overflow-hidden rounded-xl border border-nx-line/60 bg-nx-bg">
         <img
           src={cur.image}
           alt={`${cur.address} sett fra droneperspektiv`}
