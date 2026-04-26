@@ -40,7 +40,7 @@ function sanitize(cfg) {
 }
 
 export function useFloorPlanPins() {
-  const [config, setConfig] = useServerSyncedState('floorPlanPins', {});
+  const [config, setConfig, sync] = useServerSyncedState('floorPlanPins', {});
   const cleanConfig = sanitize(config);
 
   const getPins = useCallback((planId) => cleanConfig[planId] || [], [cleanConfig]);
@@ -77,5 +77,5 @@ export function useFloorPlanPins() {
     });
   }, [setConfig]);
 
-  return { config: cleanConfig, getPins, addPin, updatePin, removePin, resetPlan };
+  return { config: cleanConfig, getPins, addPin, updatePin, removePin, resetPlan, sync };
 }

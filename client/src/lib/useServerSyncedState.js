@@ -33,9 +33,13 @@ export function useServerSyncedState(namespace, defaultValue, { storageKey = nul
 
   const [synced, setSynced] = useState(false);   // har vi hentet fra server?
   const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState(null);
   const debounceRef = useRef(null);
   const skipNextWriteRef = useRef(false);
   const mountedRef = useRef(true);
+  const valueRef = useRef(value);
+  valueRef.current = value;
 
   // Hent fra server på mount
   useEffect(() => {
@@ -82,6 +86,27 @@ export function useServerSyncedState(namespace, defaultValue, { storageKey = nul
     return () => window.removeEventListener('storage', onStorage);
   }, [lsKey]);
 
+  // Felles save-funksjon — flush() bruker den uten debounce, setSyncedValue
+  // bruker den via debouncet timeout.
+  const doSave = useCallback(async (next) => {
+    if (mountedRef.current) setSaving(true);
+    setError(null);
+    try {
+      await api.config.put(namespace, next);
+      if (mountedRef.current) {
+        setLastSavedAt(Date.now());
+        setSaving(false);
+      }
+    } catch (err) {
+      if (mountedRef.current) {
+        setError(err);
+        setSaving(false);
+      }
+      console.warn(`[server-sync] failed to save ${namespace}:`, err.message);
+      throw err;
+    }
+  }, [namespace]);
+
   // Sync ved hver setState
   const setSyncedValue = useCallback((updater) => {
     setValue(prev => {
@@ -94,15 +119,19 @@ export function useServerSyncedState(namespace, defaultValue, { storageKey = nul
         return next;
       }
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        api.config.put(namespace, next).catch(err => {
-          if (mountedRef.current) setError(err);
-          console.warn(`[server-sync] failed to save ${namespace}:`, err.message);
-        });
-      }, DEBOUNCE_MS);
+      debounceRef.current = setTimeout(() => { doSave(next).catch(() => {}); }, DEBOUNCE_MS);
       return next;
     });
-  }, [namespace, lsKey]);
+  }, [lsKey, doSave]);
 
-  return [value, setSyncedValue, { synced, error }];
+  // Force-flush nå (kanselerer pending debounce og PUT-er umiddelbart)
+  const flush = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    return doSave(valueRef.current);
+  }, [doSave]);
+
+  return [value, setSyncedValue, { synced, error, saving, lastSavedAt, flush }];
 }
