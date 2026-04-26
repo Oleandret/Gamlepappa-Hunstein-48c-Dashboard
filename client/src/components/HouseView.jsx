@@ -13,13 +13,18 @@ import { capValue, hasCap } from '../lib/deviceUtils.js';
  *
  * Use without `forceLocation` for a togglable single-panel view, or pass
  * `forceLocation="home"` / `"cabin"` to lock to one location (no toggle).
+ *
+ * Image URLs include a version query so browsers/CDN won't serve stale
+ * copies after we update the JPGs.
  */
+const IMG_VERSION = '4';
+
 const VIEWS = {
   home: {
     label: 'Hjem',
     address: 'Hunstein 48c',
     Icon: HomeIcon,
-    image: '/house.jpg',
+    image: `/house.jpg?v=${IMG_VERSION}`,
     pins: [
       { kind: 'zone', zoneName: 'Hovedsoverom', x: 58, y: 36, dx: 4,   dy: -16 },
       { kind: 'zone', zoneName: 'Stue',         x: 50, y: 32, dx: -8,  dy: -16 },
@@ -37,7 +42,7 @@ const VIEWS = {
     label: 'Hytte',
     address: 'Halsaneset 32',
     Icon: Anchor,
-    image: '/cabin.jpg',
+    image: `/cabin.jpg?v=${IMG_VERSION}`,
     pins: [
       { kind: 'cabinZone', zoneName: 'Halsaneset',          x: 62, y: 25, dx: -22, dy: -16 },
       { kind: 'cabinDevice', deviceMatch: 'Terasse',        x: 38, y: 42, dx: -22, dy: -16, label: 'TERRASSE' },
@@ -106,30 +111,30 @@ export function HouseView({ devices, zones, weather, forceLocation = null }) {
   const solarPower = capValue(tibber, 'measure_current.L1');
 
   return (
-    <div className="relative h-full p-5">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <p className="panel-title flex items-center gap-1.5">
-            <MapPin size={11} className="text-nx-cyan" aria-hidden="true" /> {cur.address}
+    <div className="relative h-full p-3">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="min-w-0">
+          <p className="panel-title flex items-center gap-1">
+            <MapPin size={10} className="text-nx-cyan" aria-hidden="true" /> {cur.address}
           </p>
-          <h2 className="mt-1 text-lg font-semibold flex items-center gap-2">
+          <h2 className="mt-0.5 text-sm font-semibold flex items-center gap-1.5">
             {allSecure
-              ? <ShieldCheck size={18} className="text-nx-green" aria-hidden="true" />
-              : <ShieldAlert size={18} className="text-nx-amber" aria-hidden="true" />}
-            {allSecure ? 'Alt er sikret' : 'Sjekk sikkerhet'}
+              ? <ShieldCheck size={14} className="text-nx-green" aria-hidden="true" />
+              : <ShieldAlert size={14} className="text-nx-amber" aria-hidden="true" />}
+            {allSecure ? 'Sikret' : 'Sjekk'}
           </h2>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <Stat icon={<Thermometer size={14} className="text-nx-cyan" aria-hidden="true" />} label="Innetemp" value={`${avg}°C`} />
-          <Stat icon={<Droplets size={14} className="text-nx-cyan" aria-hidden="true" />} label="Fuktighet" value={humidity} />
+        <div className="flex items-center gap-2 flex-wrap text-[10px] font-mono">
+          <Mini icon={<Thermometer size={10} className="text-nx-cyan" aria-hidden="true" />} value={`${avg}°`} />
+          <Mini icon={<Droplets size={10} className="text-nx-cyan" aria-hidden="true" />} value={humidity} />
           {securityCounts.locks > 0 && (
-            <Stat icon={<Lock size={14} className="text-nx-green" aria-hidden="true" />} label="Låser" value={`${securityCounts.locked}/${securityCounts.locks}`} tone={securityCounts.locked === securityCounts.locks ? 'green' : 'amber'} />
+            <Mini icon={<Lock size={10} className={securityCounts.locked === securityCounts.locks ? 'text-nx-green' : 'text-nx-amber'} aria-hidden="true" />} value={`${securityCounts.locked}/${securityCounts.locks}`} />
           )}
           {securityCounts.open > 0 && (
-            <Stat icon={<DoorOpen size={14} className="text-nx-amber" aria-hidden="true" />} label="Åpne" value={String(securityCounts.open)} tone="amber" />
+            <Mini icon={<DoorOpen size={10} className="text-nx-amber" aria-hidden="true" />} value={String(securityCounts.open)} />
           )}
           {securityCounts.cameras > 0 && (
-            <Stat icon={<CameraIcon size={14} className="text-nx-cyan" aria-hidden="true" />} label="Kamera" value={String(securityCounts.cameras)} tone={securityCounts.motion ? 'amber' : undefined} />
+            <Mini icon={<CameraIcon size={10} className={securityCounts.motion ? 'text-nx-amber' : 'text-nx-cyan'} aria-hidden="true" />} value={String(securityCounts.cameras)} />
           )}
         </div>
       </div>
@@ -157,7 +162,7 @@ export function HouseView({ devices, zones, weather, forceLocation = null }) {
         </div>
       )}
 
-      <div className="relative mt-3 aspect-[16/9] w-full overflow-hidden rounded-xl border border-nx-line/60 bg-nx-bg">
+      <div className="relative mt-2 aspect-[16/9] w-full overflow-hidden rounded-xl border border-nx-line/60 bg-nx-bg">
         <img
           src={cur.image}
           alt={`${cur.address} sett fra droneperspektiv`}
@@ -382,19 +387,11 @@ function Brackets() {
   );
 }
 
-function Stat({ icon, label, value, tone }) {
+function Mini({ icon, value }) {
   return (
-    <div className="text-right">
-      <div className="text-[10px] uppercase tracking-[0.18em] text-nx-mute flex items-center gap-1.5 justify-end">
-        {icon}{label}
-      </div>
-      <div className={[
-        'font-mono text-base',
-        tone === 'green' ? 'text-nx-green' :
-        tone === 'amber' ? 'text-nx-amber' :
-        'text-nx-text'
-      ].join(' ')}>{value}</div>
-    </div>
+    <span className="inline-flex items-center gap-1 rounded border border-nx-line/60 bg-nx-panel/60 px-1.5 py-0.5">
+      {icon}<span className="text-nx-text">{value}</span>
+    </span>
   );
 }
 

@@ -345,89 +345,90 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
       const tesla = findFirst(data.devices, d => d.class === 'car' || /tesla/i.test(d.driverUri || ''));
       const roborock = findFirst(data.devices, d => d.class === 'vacuumcleaner');
       const tibber = findFirst(data.devices, d => /tibber/i.test(d.driverUri || ''));
-      return wrapper(<>
-        {/* Kompakt hilsen-bar tar full bredde, lavt vertikalt */}
-        <div className="col-span-12 panel px-5 py-3 flex flex-wrap items-center gap-3 justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-base font-semibold">
-              God kveld, <span className="neon-text">{system?.user || 'Ole'}</span>
-            </h1>
-            <span className="chip text-[11px]">
-              <span className="h-1.5 w-1.5 rounded-full bg-nx-green animate-pulseGlow" />
-              Hjemmemodus
-            </span>
-            <span className="chip text-[11px]">
-              <span className="h-1.5 w-1.5 rounded-full bg-nx-cyan" />
-              {system?.demo ? 'Demo' : 'Live'}
-            </span>
-            <span className="chip text-[11px]">
-              <span className="h-1.5 w-1.5 rounded-full bg-nx-purple" />
-              {counts.devices} enheter · {counts.zones} rom
-            </span>
+      return (
+        <motion.div
+          key={section}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="mt-4 grid grid-cols-12 gap-2.5"
+        >
+          {/* Kompakt hilsen-bar */}
+          <div className="col-span-12 panel px-4 py-2 flex flex-wrap items-center gap-2 justify-between">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-sm font-semibold">
+                God kveld, <span className="neon-text">{system?.user || 'Ole'}</span>
+              </h1>
+              <span className="chip text-[10px] px-2 py-0.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-nx-green animate-pulseGlow" />
+                Hjemmemodus
+              </span>
+              <span className="chip text-[10px] px-2 py-0.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-nx-cyan" />
+                {system?.demo ? 'Demo' : 'Live'}
+              </span>
+              <span className="chip text-[10px] px-2 py-0.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-nx-purple" />
+                {counts.devices} enh · {counts.zones} rom · {counts.flows} flows
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-[10px] text-nx-mute font-mono">
+              {data.weather?.now?.temp != null && (
+                <span>UTE <span className="text-nx-cyan">{Math.round(data.weather.now.temp)}°</span></span>
+              )}
+              {data.energy?.live?.watts != null && (
+                <span>NÅ <span className="text-nx-cyan">{Math.round(data.energy.live.watts).toLocaleString('no-NO')} W</span></span>
+              )}
+              {data.energy?.today?.kwh != null && (
+                <span>I DAG <span className="text-nx-cyan">{data.energy.today.kwh} kWh</span></span>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-3 text-[11px] text-nx-mute font-mono">
-            {data.weather?.now?.temp != null && (
-              <span>UTE: <span className="text-nx-cyan">{Math.round(data.weather.now.temp)}°C</span></span>
-            )}
-            {data.energy?.live?.watts != null && (
-              <span>NÅ: <span className="text-nx-cyan">{Math.round(data.energy.live.watts).toLocaleString('no-NO')} W</span></span>
-            )}
+
+          {/* Hus + hytte side-by-side */}
+          <div className="col-span-12 lg:col-span-6 panel overflow-hidden">
+            <HouseView devices={data.devices || {}} zones={data.zones || {}} weather={data.weather} forceLocation="home" />
           </div>
-        </div>
+          <div className="col-span-12 lg:col-span-6 panel overflow-hidden">
+            <HouseView devices={data.devices || {}} zones={data.zones || {}} weather={data.weather} forceLocation="cabin" />
+          </div>
 
-        {/* Begge hus side-by-side */}
-        <div className="col-span-12 lg:col-span-6 panel overflow-hidden">
-          <HouseView
-            devices={data.devices || {}}
-            zones={data.zones || {}}
-            weather={data.weather}
-            forceLocation="home"
-          />
-        </div>
-        <div className="col-span-12 lg:col-span-6 panel overflow-hidden">
-          <HouseView
-            devices={data.devices || {}}
-            zones={data.zones || {}}
-            weather={data.weather}
-            forceLocation="cabin"
-          />
-        </div>
+          {/* Rad 1: Sikkerhet + 3 spesial-widgets */}
+          <div className="col-span-6 lg:col-span-3 panel p-3">
+            <SecurityWidget security={data.security} />
+          </div>
+          {tibber && <div className="col-span-6 lg:col-span-3"><TibberCard device={tibber} /></div>}
+          {tesla && <div className="col-span-6 lg:col-span-3"><TeslaCard device={tesla} /></div>}
+          {roborock && <div className="col-span-6 lg:col-span-3"><RoborockCard device={roborock} onSet={setCapability} /></div>}
 
-        {/* Spesial-widgets — alltid synlige under */}
-        <div className="col-span-12 sm:col-span-6 lg:col-span-3 panel p-5">
-          <SecurityWidget security={data.security} />
-        </div>
-        {tibber && <div className="col-span-12 sm:col-span-6 lg:col-span-3"><TibberCard device={tibber} /></div>}
-        {tesla && <div className="col-span-12 sm:col-span-6 lg:col-span-3"><TeslaCard device={tesla} /></div>}
-        {roborock && <div className="col-span-12 sm:col-span-6 lg:col-span-3"><RoborockCard device={roborock} onSet={setCapability} /></div>}
+          {/* Rad 2: Hurtigkontroller + Energi-graf + Vær */}
+          <div className="col-span-12 sm:col-span-6 lg:col-span-3 panel p-3">
+            <QuickControls flows={data.flows || {}} onRun={runFlow} />
+          </div>
+          <div className="col-span-12 sm:col-span-12 lg:col-span-6 panel p-3">
+            <Suspense fallback={<LoadingPanel label="LASTER GRAF..." />}>
+              <EnergyWidget energy={data.energy} />
+            </Suspense>
+          </div>
+          <div className="col-span-12 sm:col-span-6 lg:col-span-3 panel p-3">
+            <WeatherWidget weather={data.weather} />
+          </div>
 
-        {/* Innhold-rad: hurtigkontroller + energi */}
-        <div className="col-span-12 lg:col-span-3 panel p-5">
-          <QuickControls flows={data.flows || {}} onRun={runFlow} />
-        </div>
-        <div className="col-span-12 lg:col-span-6 panel p-5">
-          <Suspense fallback={<LoadingPanel label="LASTER GRAF..." />}>
-            <EnergyWidget energy={data.energy} />
-          </Suspense>
-        </div>
-        <div className="col-span-12 lg:col-span-3 panel p-5">
-          <WeatherWidget weather={data.weather} />
-        </div>
-
-        {/* Bunn-rad: temp + lys + aktiviteter + favoritter */}
-        <div className="col-span-12 sm:col-span-6 lg:col-span-3 panel p-5">
-          <RoomTemps devices={data.devices || {}} zones={data.zones || {}} />
-        </div>
-        <div className="col-span-12 sm:col-span-6 lg:col-span-3 panel p-5">
-          <Lighting devices={data.devices || {}} onSet={setCapability} />
-        </div>
-        <div className="col-span-12 sm:col-span-6 lg:col-span-3 panel p-5">
-          <ActivityFeed activity={data.activity || []} />
-        </div>
-        <div className="col-span-12 sm:col-span-6 lg:col-span-3 panel p-5">
-          <FavoriteAutomations flows={data.flows || {}} onRun={runFlow} />
-        </div>
-      </>);
+          {/* Rad 3: 4 widgets på en rad */}
+          <div className="col-span-6 lg:col-span-3 panel p-3">
+            <RoomTemps devices={data.devices || {}} zones={data.zones || {}} />
+          </div>
+          <div className="col-span-6 lg:col-span-3 panel p-3">
+            <Lighting devices={data.devices || {}} onSet={setCapability} />
+          </div>
+          <div className="col-span-6 lg:col-span-3 panel p-3">
+            <ActivityFeed activity={data.activity || []} />
+          </div>
+          <div className="col-span-6 lg:col-span-3 panel p-3">
+            <FavoriteAutomations flows={data.flows || {}} onRun={runFlow} />
+          </div>
+        </motion.div>
+      );
     }
   }
 }
