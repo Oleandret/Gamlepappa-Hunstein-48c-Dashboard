@@ -56,13 +56,16 @@ export function FloorPlanPin({
         <meta.Icon size={11} className="text-nx-bg" aria-hidden="true" />
       </button>
 
-      {/* Liten label under pin-en (alltid synlig) */}
-      <div
-        className="pointer-events-none absolute left-1/2 -translate-x-1/2 mt-1 whitespace-nowrap rounded border border-nx-cyan/40 bg-nx-bg/85 backdrop-blur-sm px-1 py-0.5 text-[9px] font-mono text-nx-cyan"
-        style={{ top: '100%' }}
-      >
-        {labelText}
-      </div>
+      {/* Liten label under pin-en. I edit-modus skjules den fordi EditTools-
+          komponenten viser label-input på samme posisjon. */}
+      {!editing && (
+        <div
+          className="pointer-events-none absolute left-1/2 -translate-x-1/2 mt-1 whitespace-nowrap rounded border border-nx-cyan/40 bg-nx-bg/85 backdrop-blur-sm px-1 py-0.5 text-[9px] font-mono text-nx-cyan"
+          style={{ top: '100%' }}
+        >
+          {labelText}
+        </div>
+      )}
 
       {/* Popover med kontroller / info */}
       {open && !editing && (

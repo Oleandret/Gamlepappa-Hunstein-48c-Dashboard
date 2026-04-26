@@ -458,8 +458,9 @@ function FloorPlanCanvas({ plan, rooms, showAutoRooms = false, pins, devices, zo
       {/* Hjørne-brackets */}
       <Brackets />
 
-      {/* Room hot-spots (auto-genererte rektangler) — kun hvis togglet på */}
-      {showAutoRooms && rooms.filter(r => r.status.matchesView !== false).map(r => (
+      {/* Room hot-spots (auto-genererte rektangler) — kun hvis togglet på OG
+          ikke i edit-mode (de hadde overlappet med pin-edit-verktøyene). */}
+      {showAutoRooms && !editing && rooms.filter(r => r.status.matchesView !== false).map(r => (
         <RoomOverlay key={r.name} room={r} />
       ))}
 
@@ -558,7 +559,7 @@ function RoomOverlay({ room }) {
   return (
     <div
       className={[
-        'absolute rounded transition-all',
+        'absolute rounded transition-all pointer-events-none',
         hasData ? 'border-2' : 'border border-dashed',
         alarm ? 'border-nx-red/70 bg-nx-red/10 animate-pulseGlow'
               : hasData ? 'border-nx-cyan/55 bg-nx-cyan/10'
