@@ -9,6 +9,7 @@ import { useFrontImageConfig } from './lib/useFrontImageConfig.js';
 import { useFrontSensors } from './lib/useFrontSensors.js';
 import { useFlowFavorites } from './lib/useFlowFavorites.js';
 import { useLinks } from './lib/useLinks.js';
+import { useFloorPlanPins } from './lib/useFloorPlanPins.js';
 import { pushEvent, diffDevicesAndLog } from './lib/activityLog.js';
 import { ActivityLogPanel } from './components/ActivityLogPanel.jsx';
 import { Sidebar } from './components/Sidebar.jsx';
@@ -69,6 +70,7 @@ export default function App() {
   const frontSensors = useFrontSensors();
   const flowFavorites = useFlowFavorites();
   const links = useLinks();
+  const floorPlanPins = useFloorPlanPins();
   const prevDevicesRef = useRef(null);
 
   useEffect(() => {
@@ -219,6 +221,7 @@ export default function App() {
               frontSensors={frontSensors}
               flowFavorites={flowFavorites}
               links={links}
+              floorPlanPins={floorPlanPins}
             />
           )}
 
@@ -263,7 +266,7 @@ export default function App() {
   );
 }
 
-function SectionView({ section, system, data, counts, setCapability, runFlow, favorites, pinConfig, imageConfig, frontSensors, flowFavorites, links }) {
+function SectionView({ section, system, data, counts, setCapability, runFlow, favorites, pinConfig, imageConfig, frontSensors, flowFavorites, links, floorPlanPins }) {
   const userName = system?.user || 'Ole';
   const greetingPanel = (
     <div className="col-span-12 lg:col-span-3 panel p-5">
@@ -342,6 +345,8 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
           devices={data.devices || {}}
           zones={data.zones || {}}
           location="home"
+          floorPlanPins={floorPlanPins}
+          onSetCapability={setCapability}
         />,
         false
       );
@@ -352,6 +357,8 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
           devices={data.devices || {}}
           zones={data.zones || {}}
           location="cabin"
+          floorPlanPins={floorPlanPins}
+          onSetCapability={setCapability}
         />,
         false
       );

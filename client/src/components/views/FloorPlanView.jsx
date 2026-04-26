@@ -1,6 +1,7 @@
-import { useMemo, useState, useEffect } from 'react';
-import { Home as HomeIcon, Anchor, Building2, Upload, Lock, Unlock, Camera as CameraIcon, DoorOpen, FileSpreadsheet, ZoomIn, ZoomOut, Thermometer, ShieldAlert, Lightbulb, Layers } from 'lucide-react';
-import { capValue, hasCap } from '../../lib/deviceUtils.js';
+import { useMemo, useState, useEffect, useRef } from 'react';
+import { Home as HomeIcon, Anchor, Building2, Upload, Lock, Unlock, Camera as CameraIcon, DoorOpen, FileSpreadsheet, ZoomIn, ZoomOut, Thermometer, ShieldAlert, Lightbulb, Layers, Edit2, Plus } from 'lucide-react';
+import { capValue, hasCap, classLabel } from '../../lib/deviceUtils.js';
+import { FloorPlanPin } from '../FloorPlanPin.jsx';
 
 /**
  * Floor plan visualisation. Reads plantegninger from /public/* and lets the
@@ -106,7 +107,7 @@ const VIEW_MODES = [
   { id: 'light',    label: 'Lys',          Icon: Lightbulb }
 ];
 
-export function FloorPlanView({ devices, zones, location = 'home' }) {
+export function FloorPlanView({ devices, zones, location = 'home', floorPlanPins, onSetCapability }) {
   // Velg første tilgjengelige plan for denne lokasjonen som default
   const plansForLocation = useMemo(
     () => Object.values(PLANS).filter(p => p.location === location),
@@ -114,6 +115,7 @@ export function FloorPlanView({ devices, zones, location = 'home' }) {
   );
   const [planId, setPlanId] = useState(plansForLocation[0]?.id || 'cabinMain');
   const [viewMode, setViewMode] = useState('all');
+  const [editing, setEditing] = useState(false);
 
   // Sync default når location bytter (bruker navigerer mellom hus/hytte i sidebar)
   useEffect(() => {
@@ -170,9 +172,9 @@ export function FloorPlanView({ devices, zones, location = 'home' }) {
         </div>
       </header>
 
-      {/* View-mode filter — gjelder ikke for romskjerma-referanse */}
+      {/* View-mode filter + edit-toggle — gjelder ikke for romskjerma-referanse */}
       {plan.kind !== 'reference' && (
-        <div className="flex flex-wrap gap-1.5 mb-3">
+        <div className="flex flex-wrap items-center gap-1.5 mb-3">
           {VIEW_MODES.map(m => {
             const active = viewMode === m.id;
             const Icon = m.Icon;
@@ -191,6 +193,21 @@ export function FloorPlanView({ devices, zones, location = 'home' }) {
               </button>
             );
           })}
+          {floorPlanPins && (
+            <button
+              onClick={() => setEditing(e => !e)}
+              aria-pressed={editing}
+              className={[
+                'ml-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono uppercase tracking-[0.18em] transition-colors border',
+                editing
+                  ? 'bg-nx-cyan/15 text-nx-cyan border-nx-cyan/55 shadow-glow-soft'
+                  : 'border-nx-line/60 text-nx-mute hover:text-nx-text hover:border-nx-cyan/40'
+              ].join(' ')}
+            >
+              <Edit2 size={11} aria-hidden="true" />
+              {editing ? 'Ferdig' : 'Rediger pins'}
+            </button>
+          )}
         </div>
       )}
 
@@ -198,8 +215,33 @@ export function FloorPlanView({ devices, zones, location = 'home' }) {
         ? <PlanPlaceholder plan={plan} />
         : plan.kind === 'reference'
           ? <ReferenceImage plan={plan} />
-          : <FloorPlanCanvas plan={plan} rooms={roomData} />
+          : <FloorPlanCanvas
+              plan={plan}
+              rooms={roomData}
+              pins={floorPlanPins?.getPins(plan.id) || []}
+              devices={devices}
+              zones={zones}
+              editing={editing}
+              floorPlanPins={floorPlanPins}
+              onSetCapability={onSetCapability}
+            />
       }
+
+      {/* Add-pin verktøylinje når man er i edit-modus */}
+      {editing && plan.kind !== 'reference' && floorPlanPins && (
+        <AddPinPanel
+          planId={plan.id}
+          devices={devices}
+          zones={zones}
+          existingPins={floorPlanPins.getPins(plan.id)}
+          onAdd={(pin) => floorPlanPins.addPin(plan.id, pin)}
+          onResetPlan={() => {
+            if (confirm('Fjerne ALLE pins fra denne plantegninga?')) {
+              floorPlanPins.resetPlan(plan.id);
+            }
+          }}
+        />
+      )}
 
       {plan.image && plan.kind !== 'reference' && (
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
@@ -258,9 +300,45 @@ function ReferenceImage({ plan }) {
   );
 }
 
-function FloorPlanCanvas({ plan, rooms }) {
+function FloorPlanCanvas({ plan, rooms, pins, devices, zones, editing, floorPlanPins, onSetCapability }) {
+  const containerRef = useRef(null);
+  const [draggingId, setDraggingId] = useState(null);
+
+  // Drag-håndtering for pins når man er i edit-modus (pointer events for touch+mus)
+  useEffect(() => {
+    if (!draggingId) return;
+    const move = (e) => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const cx = e.clientX ?? e.touches?.[0]?.clientX;
+      const cy = e.clientY ?? e.touches?.[0]?.clientY;
+      if (cx == null || cy == null) return;
+      const x = Math.max(0, Math.min(100, ((cx - rect.left) / rect.width)  * 100));
+      const y = Math.max(0, Math.min(100, ((cy - rect.top)  / rect.height) * 100));
+      floorPlanPins?.updatePin(plan.id, draggingId, { x, y });
+    };
+    const up = () => setDraggingId(null);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+    };
+  }, [draggingId, plan.id, floorPlanPins]);
+
   return (
-    <div className="relative w-full aspect-[7/8] overflow-hidden rounded-xl border border-nx-line/60 bg-nx-bg">
+    <div
+      ref={containerRef}
+      className="relative w-full overflow-hidden rounded-xl border border-nx-line/60 bg-nx-bg"
+      style={{
+        height: 'calc(100vh - 320px)',
+        minHeight: '480px',
+        maxHeight: '880px',
+        touchAction: editing ? 'none' : undefined
+      }}
+    >
       <img
         src={plan.image}
         alt={plan.label}
@@ -289,10 +367,102 @@ function FloorPlanCanvas({ plan, rooms }) {
       {/* Hjørne-brackets */}
       <Brackets />
 
-      {/* Room hot-spots */}
+      {/* Room hot-spots (auto-genererte) */}
       {rooms.filter(r => r.status.matchesView !== false).map(r => (
         <RoomOverlay key={r.name} room={r} />
       ))}
+
+      {/* Brukerens egne device-pins */}
+      {pins.map(pin => (
+        <FloorPlanPin
+          key={pin.id}
+          pin={pin}
+          device={devices?.[pin.deviceId]}
+          editing={editing}
+          isDragging={draggingId === pin.id}
+          onMoveStart={(id) => setDraggingId(id)}
+          onUpdate={(patch) => floorPlanPins?.updatePin(plan.id, pin.id, patch)}
+          onRemove={() => floorPlanPins?.removePin(plan.id, pin.id)}
+          onSet={onSetCapability}
+        />
+      ))}
+    </div>
+  );
+}
+
+function AddPinPanel({ planId, devices, zones, existingPins, onAdd, onResetPlan }) {
+  const [deviceId, setDeviceId] = useState('');
+  const [label, setLabel] = useState('');
+
+  const groups = useMemo(() => {
+    const byZone = {};
+    Object.values(devices || {}).forEach(d => {
+      const zoneName = zones?.[d.zone]?.name || 'Uten sone';
+      if (!byZone[zoneName]) byZone[zoneName] = [];
+      byZone[zoneName].push(d);
+    });
+    Object.values(byZone).forEach(arr => arr.sort((a, b) => (a.name || '').localeCompare(b.name || '')));
+    return Object.entries(byZone).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [devices, zones]);
+
+  const handleAdd = () => {
+    if (!deviceId) return;
+    onAdd({ deviceId, label: label.trim() });
+    setDeviceId(''); setLabel('');
+  };
+
+  return (
+    <div className="mt-3 panel p-3 border border-nx-cyan/30">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <p className="panel-title">Legg til enhet på plantegning ({existingPins.length} plassert)</p>
+        <button
+          type="button"
+          onClick={onResetPlan}
+          className="text-[10px] uppercase tracking-[0.18em] font-mono text-nx-mute hover:text-nx-red"
+          title="Fjern alle pins fra denne plantegninga"
+        >
+          Tøm alt
+        </button>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={deviceId}
+          onChange={(e) => setDeviceId(e.target.value)}
+          className="flex-1 min-w-[220px] bg-nx-panel/60 border border-nx-line/60 rounded px-2 py-1 text-xs text-nx-text font-mono"
+        >
+          <option value="">— velg enhet —</option>
+          {groups.map(([zoneName, devs]) => (
+            <optgroup key={zoneName} label={zoneName}>
+              {devs.map(d => (
+                <option key={d.id} value={d.id}>
+                  {d.name || '(uten navn)'} · {classLabel(d.class)}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        <input
+          type="text"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          placeholder="kort label (valgfri)"
+          className="w-40 bg-nx-panel/60 border border-nx-line/60 rounded px-2 py-1 text-xs text-nx-text font-mono"
+        />
+        <button
+          type="button"
+          onClick={handleAdd}
+          disabled={!deviceId}
+          className={[
+            'inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-mono uppercase tracking-[0.16em] transition-colors',
+            deviceId ? 'bg-nx-cyan/15 text-nx-cyan hover:bg-nx-cyan/25' : 'text-nx-mute opacity-50 cursor-not-allowed'
+          ].join(' ')}
+        >
+          <Plus size={12} /> Legg til
+        </button>
+      </div>
+      <p className="mt-2 text-[10px] text-nx-mute">
+        Pin-en plasseres på midten av plantegninga — dra den til riktig posisjon. Lagres umiddelbart.
+      </p>
     </div>
   );
 }
