@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Home as HomeIcon, Anchor, Building2, Upload, Lock, Unlock, Camera as CameraIcon, DoorOpen, FileSpreadsheet, ZoomIn, ZoomOut } from 'lucide-react';
+import { useMemo, useState, useEffect } from 'react';
+import { Home as HomeIcon, Anchor, Building2, Upload, Lock, Unlock, Camera as CameraIcon, DoorOpen, FileSpreadsheet, ZoomIn, ZoomOut, Thermometer, ShieldAlert, Lightbulb, Layers } from 'lucide-react';
 import { capValue, hasCap } from '../../lib/deviceUtils.js';
 
 /**
@@ -99,26 +99,49 @@ const PLANS = {
   }
 };
 
-export function FloorPlanView({ devices, zones }) {
-  const [planId, setPlanId] = useState('cabinMain');
-  const plan = PLANS[planId];
+const VIEW_MODES = [
+  { id: 'all',      label: 'Alle',         Icon: Layers },
+  { id: 'temp',     label: 'Temperatur',   Icon: Thermometer },
+  { id: 'security', label: 'Sikkerhet',    Icon: ShieldAlert },
+  { id: 'light',    label: 'Lys',          Icon: Lightbulb }
+];
 
-  const tabs = Object.values(PLANS);
+export function FloorPlanView({ devices, zones, location = 'home' }) {
+  // Velg første tilgjengelige plan for denne lokasjonen som default
+  const plansForLocation = useMemo(
+    () => Object.values(PLANS).filter(p => p.location === location),
+    [location]
+  );
+  const [planId, setPlanId] = useState(plansForLocation[0]?.id || 'cabinMain');
+  const [viewMode, setViewMode] = useState('all');
+
+  // Sync default når location bytter (bruker navigerer mellom hus/hytte i sidebar)
+  useEffect(() => {
+    if (!plansForLocation.find(p => p.id === planId)) {
+      setPlanId(plansForLocation[0]?.id || 'cabinMain');
+    }
+  }, [plansForLocation, planId]);
+
+  const plan = PLANS[planId] || plansForLocation[0];
+  if (!plan) return null;
 
   const roomData = useMemo(
-    () => plan.rooms.map(r => ({ ...r, status: getRoomStatus(r, devices, zones) })),
-    [plan, devices, zones]
+    () => plan.rooms.map(r => ({ ...r, status: getRoomStatus(r, devices, zones, viewMode) })),
+    [plan, devices, zones, viewMode]
   );
+
+  const locationLabel = location === 'cabin' ? 'Hytte · Halsaneset' : 'Hus · Hunstein 48c';
 
   return (
     <div>
       <header className="flex items-center justify-between flex-wrap gap-3 mb-3">
         <div>
           <h2 className="panel-title">Plantegning</h2>
-          <p className="mt-1 text-xl font-semibold">{plan.label}</p>
+          <p className="mt-1 text-xl font-semibold">{locationLabel}</p>
+          <p className="mt-0.5 text-xs text-nx-mute font-mono">{plan.label}</p>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {tabs.map(t => {
+          {plansForLocation.map(t => {
             const active = planId === t.id;
             const Icon = t.kind === 'reference' ? FileSpreadsheet
                        : t.location === 'cabin' ? Anchor
@@ -147,6 +170,30 @@ export function FloorPlanView({ devices, zones }) {
         </div>
       </header>
 
+      {/* View-mode filter — gjelder ikke for romskjerma-referanse */}
+      {plan.kind !== 'reference' && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {VIEW_MODES.map(m => {
+            const active = viewMode === m.id;
+            const Icon = m.Icon;
+            return (
+              <button
+                key={m.id}
+                onClick={() => setViewMode(m.id)}
+                aria-pressed={active}
+                className={[
+                  'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono uppercase tracking-[0.18em] transition-colors',
+                  active ? 'bg-nx-cyan/15 text-nx-cyan shadow-glow-soft' : 'text-nx-mute hover:text-nx-text hover:bg-nx-panel/60'
+                ].join(' ')}
+              >
+                <Icon size={11} aria-hidden="true" />
+                {m.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {!plan.image
         ? <PlanPlaceholder plan={plan} />
         : plan.kind === 'reference'
@@ -156,8 +203,8 @@ export function FloorPlanView({ devices, zones }) {
 
       {plan.image && plan.kind !== 'reference' && (
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-          {roomData.filter(r => r.status.hasData).map(r => (
-            <RoomStatusCard key={r.name} room={r} />
+          {roomData.filter(r => r.status.hasData && r.status.matchesView !== false).map(r => (
+            <RoomStatusCard key={r.name} room={r} viewMode={viewMode} />
           ))}
         </div>
       )}
@@ -189,13 +236,17 @@ function ReferenceImage({ plan }) {
           Smarthus-romskjerma · 3 etasjer · alle Google/Siri-kommandoer + teknisk utstyr per rom
         </p>
       </div>
-      <div className="rounded-xl border border-nx-line/60 bg-white overflow-auto max-h-[80vh]">
+      <div className="rounded-xl border border-nx-line/60 bg-nx-bg overflow-auto max-h-[80vh]">
         <img
           src={plan.image}
           alt={plan.label}
           loading="lazy"
           decoding="async"
-          style={{ width: `${zoom * 100}%`, maxWidth: 'none' }}
+          style={{
+            width: `${zoom * 100}%`,
+            maxWidth: 'none',
+            filter: 'invert(1) hue-rotate(180deg) brightness(0.95) contrast(1.1) saturate(1.15)'
+          }}
           className="block"
           draggable={false}
         />
@@ -209,25 +260,51 @@ function ReferenceImage({ plan }) {
 
 function FloorPlanCanvas({ plan, rooms }) {
   return (
-    <div className="relative w-full aspect-[7/8] overflow-hidden rounded-xl border border-nx-line/60 bg-white">
+    <div className="relative w-full aspect-[7/8] overflow-hidden rounded-xl border border-nx-line/60 bg-nx-bg">
       <img
         src={plan.image}
         alt={plan.label}
         loading="lazy"
         decoding="async"
         className="absolute inset-0 h-full w-full object-contain"
+        style={{
+          filter: 'invert(1) hue-rotate(180deg) brightness(0.95) contrast(1.1) saturate(1.15)'
+        }}
         draggable={false}
       />
 
-      {/* Cyan tint overlay for sci-fi feel */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 mix-blend-multiply" style={{
-        background: 'radial-gradient(circle at 50% 40%, rgba(34,230,255,0.05), transparent 70%)'
+      {/* Sci-fi grid overlay */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-grid bg-[size:32px_32px] opacity-[0.12] mix-blend-screen" />
+
+      {/* Cyan radial tint */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{
+        background: 'radial-gradient(circle at 50% 40%, rgba(34,230,255,0.10), transparent 70%)'
       }} />
 
+      {/* Sweep-linje for sci-fi-stemning */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -inset-x-10 h-32 bg-gradient-to-b from-transparent via-nx-cyan/8 to-transparent animate-scan" />
+      </div>
+
+      {/* Hjørne-brackets */}
+      <Brackets />
+
       {/* Room hot-spots */}
-      {rooms.map(r => (
+      {rooms.filter(r => r.status.matchesView !== false).map(r => (
         <RoomOverlay key={r.name} room={r} />
       ))}
+    </div>
+  );
+}
+
+function Brackets() {
+  const cls = 'absolute h-5 w-5 border-nx-cyan/70';
+  return (
+    <div aria-hidden="true">
+      <div className={`${cls} top-2 left-2 border-t-2 border-l-2`} />
+      <div className={`${cls} top-2 right-2 border-t-2 border-r-2`} />
+      <div className={`${cls} bottom-2 left-2 border-b-2 border-l-2`} />
+      <div className={`${cls} bottom-2 right-2 border-b-2 border-r-2`} />
     </div>
   );
 }
@@ -242,7 +319,7 @@ function RoomOverlay({ room }) {
         'absolute rounded transition-all',
         hasData ? 'border-2' : 'border border-dashed',
         alarm ? 'border-nx-red/70 bg-nx-red/10 animate-pulseGlow'
-              : hasData ? 'border-nx-cyan/55 bg-nx-cyan/8'
+              : hasData ? 'border-nx-cyan/55 bg-nx-cyan/10'
                         : 'border-nx-mute/30 bg-transparent'
       ].join(' ')}
       style={{
@@ -255,11 +332,23 @@ function RoomOverlay({ room }) {
       {hasData && (
         <div className="absolute inset-x-0 top-0 -translate-y-full mb-1 flex justify-center">
           <div className={[
-            'rounded border bg-nx-bg/90 backdrop-blur-sm px-1.5 py-0.5 shadow-glow-soft text-[9px] font-mono leading-tight whitespace-nowrap',
+            'rounded border bg-nx-bg/90 backdrop-blur-sm px-1.5 py-0.5 shadow-glow-soft text-[9px] font-mono leading-tight whitespace-nowrap flex items-center gap-1',
             alarm ? 'border-nx-red/55' : 'border-nx-cyan/45'
           ].join(' ')}>
             <span className="text-nx-mute tracking-[0.18em] uppercase">{room.name}</span>
-            {status.temp != null && <span className="ml-1.5 text-nx-cyan">{status.temp.toFixed(1)}°</span>}
+            {status.temp != null && <span className="text-nx-cyan">{status.temp.toFixed(1)}°</span>}
+            {status.locks > 0 && (
+              status.locked === status.locks
+                ? <Lock size={9} className="text-nx-green" />
+                : <Unlock size={9} className="text-nx-amber" />
+            )}
+            {status.openContact > 0 && <DoorOpen size={9} className="text-nx-amber" />}
+            {status.motion > 0 && <span className="text-nx-red">●</span>}
+            {status.lights > 0 && (
+              <span className={status.lightsOn ? 'text-nx-amber' : 'text-nx-mute'}>
+                <Lightbulb size={9} className="inline" /> {status.lightsOn}/{status.lights}
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -267,33 +356,46 @@ function RoomOverlay({ room }) {
   );
 }
 
-function RoomStatusCard({ room }) {
+function RoomStatusCard({ room, viewMode = 'all' }) {
   const s = room.status;
+  // Hva som vises i kortet styres av viewMode
+  const showTemp     = viewMode === 'all' || viewMode === 'temp';
+  const showSecurity = viewMode === 'all' || viewMode === 'security';
+  const showLight    = viewMode === 'all' || viewMode === 'light';
+
   return (
     <div className={[
       'panel p-2 text-xs',
-      (s.motion || s.openContact) ? 'border-nx-red/40' : ''
+      (showSecurity && (s.motion || s.openContact)) ? 'border-nx-red/40' : ''
     ].join(' ')}>
       <div className="flex items-center justify-between">
         <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-nx-mute truncate">{room.name}</span>
-        {s.temp != null && <span className="font-mono text-nx-cyan">{s.temp.toFixed(1)}°</span>}
+        {showTemp && s.temp != null && <span className="font-mono text-nx-cyan">{s.temp.toFixed(1)}°</span>}
       </div>
       <div className="mt-1 flex flex-wrap gap-1.5 text-[10px]">
-        {s.locks > 0 && (
+        {showSecurity && s.locks > 0 && (
           <span className={s.locked === s.locks ? 'text-nx-green' : 'text-nx-amber'}>
             {s.locked === s.locks ? <Lock size={10} className="inline" /> : <Unlock size={10} className="inline" />}
             {' '}{s.locked}/{s.locks}
           </span>
         )}
-        {s.cameras > 0 && (
+        {showSecurity && s.cameras > 0 && (
           <span className={s.motion ? 'text-nx-red' : 'text-nx-mute'}>
             <CameraIcon size={10} className="inline" /> {s.cameras}
           </span>
         )}
-        {s.openContact > 0 && (
+        {showSecurity && s.openContact > 0 && (
           <span className="text-nx-amber"><DoorOpen size={10} className="inline" /> {s.openContact}</span>
         )}
-        {s.deviceCount > 0 && !s.temp && !s.locks && !s.cameras && (
+        {showSecurity && s.motion > 0 && (
+          <span className="text-nx-red">● bevegelse</span>
+        )}
+        {showLight && s.lights > 0 && (
+          <span className={s.lightsOn ? 'text-nx-amber' : 'text-nx-mute'}>
+            <Lightbulb size={10} className="inline" /> {s.lightsOn}/{s.lights}
+          </span>
+        )}
+        {viewMode === 'all' && s.deviceCount > 0 && !s.temp && !s.locks && !s.cameras && !s.lights && (
           <span className="text-nx-mute">{s.deviceCount} enh</span>
         )}
       </div>
@@ -315,8 +417,10 @@ function PlanPlaceholder({ plan }) {
 
 /**
  * Aggregate sensor status for one room rectangle by matching against zone-name regex.
+ * `viewMode` påvirker `matchesView` — om dette rommet skal vises i gjeldende
+ * filter (Temperatur / Sikkerhet / Lys / Alle).
  */
-function getRoomStatus(room, devices, zones) {
+function getRoomStatus(room, devices, zones, viewMode = 'all') {
   const all = Object.values(devices || {});
   const matchingZones = Object.values(zones || {}).filter(z => room.match.test(z.name || ''));
   const zoneIds = new Set(matchingZones.map(z => z.id));
@@ -325,16 +429,34 @@ function getRoomStatus(room, devices, zones) {
   const temps = list.map(d => capValue(d, 'measure_temperature')).filter(t => Number.isFinite(t));
   const locks = list.filter(d => d.class === 'lock');
   const cams  = list.filter(d => d.class === 'camera');
+  const lights = list.filter(d => d.class === 'light' || hasCap(d, 'dim'));
+  const lightsOn = lights.filter(d => capValue(d, 'onoff') === true).length;
+  const motionCount = list.filter(d => capValue(d, 'alarm_motion') === true).length;
+  const openContactCount = list.filter(d => hasCap(d, 'alarm_contact') && capValue(d, 'alarm_contact') === true).length;
+  const contactDevices = list.filter(d => hasCap(d, 'alarm_contact')).length;
+  const motionDevices = list.filter(d => hasCap(d, 'alarm_motion')).length;
+
+  // matchesView avgjør om rommet vises i gjeldende view-mode
+  const hasTemp     = temps.length > 0;
+  const hasSecurity = locks.length > 0 || cams.length > 0 || motionDevices > 0 || contactDevices > 0;
+  const hasLight    = lights.length > 0;
+  const matchesView = viewMode === 'all'
+    || (viewMode === 'temp'     && hasTemp)
+    || (viewMode === 'security' && hasSecurity)
+    || (viewMode === 'light'    && hasLight);
 
   return {
     deviceCount: list.length,
     hasData: list.length > 0,
+    matchesView,
     temp: temps.length ? temps.reduce((a, b) => a + b, 0) / temps.length : null,
     locks: locks.length,
     locked: locks.filter(d => capValue(d, 'locked') === true).length,
     cameras: cams.length,
-    motion: list.filter(d => capValue(d, 'alarm_motion') === true).length,
-    openContact: list.filter(d => hasCap(d, 'alarm_contact') && capValue(d, 'alarm_contact') === true).length,
+    motion: motionCount,
+    openContact: openContactCount,
+    lights: lights.length,
+    lightsOn,
     summary: list.length ? `${list.length} enheter` : 'Ingen enheter koblet'
   };
 }

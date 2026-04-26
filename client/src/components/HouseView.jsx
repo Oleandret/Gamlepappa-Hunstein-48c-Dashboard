@@ -217,11 +217,11 @@ export function HouseView({ devices, zones, weather, forceLocation = null, custo
         {pins.map((p, i) => {
           if (p.kind === 'zone') {
             const z = zoneStatus.find(s => s.name === p.zoneName);
-            return <ZonePin key={i} zone={z || { name: p.zoneName, summary: '—' }} pos={p} />;
+            return <ZonePin key={i} zone={z || { name: p.zoneName, summary: '—' }} pos={p} customLabel={p.label} />;
           }
           if (p.kind === 'cabinZone') {
             const z = zoneStatus.find(s => s.name === p.zoneName);
-            return <ZonePin key={i} zone={z || { name: p.zoneName, summary: '—' }} pos={p} />;
+            return <ZonePin key={i} zone={z || { name: p.zoneName, summary: '—' }} pos={p} customLabel={p.label} />;
           }
           if (p.kind === 'cabinDevice') {
             const dev = locationDevices.find(d => new RegExp(p.deviceMatch, 'i').test(d.name || ''));
@@ -232,14 +232,14 @@ export function HouseView({ devices, zones, weather, forceLocation = null, custo
             return <DevicePin key={i} device={dev} fallbackLabel={p.label} pos={p} />;
           }
           if (p.kind === 'tesla') return tesla
-            ? <TeslaPin key={i} tesla={tesla} pos={p} />
+            ? <TeslaPin key={i} tesla={tesla} pos={p} customLabel={p.label} />
             : null;
           if (p.kind === 'solar') return tibber
-            ? <SolarPin key={i} solarAmps={solarPower} pos={p} />
+            ? <SolarPin key={i} solarAmps={solarPower} pos={p} customLabel={p.label} />
             : null;
-          if (p.kind === 'sauna')     return <LabelPin key={i} label="SAUNA" sub="Halsaneset" pos={p} Icon={Flame} />;
-          if (p.kind === 'pier')      return <LabelPin key={i} label="BRYGGE" sub="Sjøside" pos={p} Icon={Anchor} />;
-          if (p.kind === 'boathouse') return <LabelPin key={i} label="BÅTHUS" sub="Verkstedslys" pos={p} Icon={Anchor} />;
+          if (p.kind === 'sauna')     return <LabelPin key={i} label={p.label || 'SAUNA'}  sub="Halsaneset"   pos={p} Icon={Flame} />;
+          if (p.kind === 'pier')      return <LabelPin key={i} label={p.label || 'BRYGGE'} sub="Sjøside"      pos={p} Icon={Anchor} />;
+          if (p.kind === 'boathouse') return <LabelPin key={i} label={p.label || 'BÅTHUS'} sub="Verkstedslys" pos={p} Icon={Anchor} />;
           return null;
         })}
       </div>
@@ -247,13 +247,14 @@ export function HouseView({ devices, zones, weather, forceLocation = null, custo
   );
 }
 
-const ZonePin = memo(function ZonePin({ zone, pos }) {
+const ZonePin = memo(function ZonePin({ zone, pos, customLabel }) {
   const hasAlarm = zone.motion || zone.openContact;
   const allLocked = zone.locks > 0 && zone.locked === zone.locks;
+  const displayName = customLabel || zone.name;
   return (
-    <PinShell pos={pos} hasAlarm={hasAlarm} ariaLabel={`${zone.name}: ${zone.summary || '—'}`}>
+    <PinShell pos={pos} hasAlarm={hasAlarm} ariaLabel={`${displayName}: ${zone.summary || '—'}`}>
       <div className="text-[8px] tracking-[0.18em] text-nx-mute font-mono leading-none">
-        {zone.name?.toUpperCase()}
+        {displayName?.toUpperCase()}
       </div>
       {zone.temp != null && (
         <div className="text-[12px] font-mono text-nx-cyan leading-tight">
@@ -390,13 +391,14 @@ function DevicePin({ device, fallbackLabel, pos }) {
   );
 }
 
-function TeslaPin({ tesla, pos }) {
+function TeslaPin({ tesla, pos, customLabel }) {
   const battery = capValue(tesla, 'measure_battery');
   const charging = String(capValue(tesla, 'ev_charging_state') || '').toLowerCase().includes('charging');
+  const displayName = customLabel || tesla.name;
   return (
-    <PinShell pos={pos} ariaLabel={`Tesla ${tesla.name}: batteri ${battery}%`}>
+    <PinShell pos={pos} ariaLabel={`Tesla ${displayName}: batteri ${battery}%`}>
       <div className="text-[8px] tracking-[0.18em] text-nx-mute font-mono leading-none flex items-center gap-1">
-        <Car size={9} aria-hidden="true" /> {tesla.name?.toUpperCase()}
+        <Car size={9} aria-hidden="true" /> {displayName?.toUpperCase()}
       </div>
       {battery != null && (
         <div className="text-[12px] font-mono text-nx-cyan leading-tight">
@@ -408,12 +410,12 @@ function TeslaPin({ tesla, pos }) {
   );
 }
 
-function SolarPin({ solarAmps, pos }) {
+function SolarPin({ solarAmps, pos, customLabel }) {
   const producing = solarAmps != null && solarAmps < 0;
   return (
     <PinShell pos={pos} ariaLabel="Solcelleanlegg" accent={producing ? 'green' : 'cyan'}>
       <div className="text-[8px] tracking-[0.18em] text-nx-mute font-mono leading-none flex items-center gap-1">
-        <Sun size={9} aria-hidden="true" /> SOL
+        <Sun size={9} aria-hidden="true" /> {(customLabel || 'SOL').toString().toUpperCase()}
       </div>
       <div className={['text-[12px] font-mono leading-tight', producing ? 'text-nx-green' : 'text-nx-mute'].join(' ')}>
         {producing ? `+${Math.abs(solarAmps).toFixed(1)} A` : 'idle'}

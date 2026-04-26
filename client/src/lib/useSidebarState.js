@@ -33,3 +33,16 @@ export function useLogPinned() {
   const toggle = useCallback(() => setPinned(p => !p), []);
   return { pinned, toggle };
 }
+
+const FLOWS_KEY = 'nexora.flowsSidebar.pinned';
+
+export function useFlowsSidebarPinned() {
+  const [pinned, setPinned] = useState(() => {
+    try { return localStorage.getItem(FLOWS_KEY) === '1'; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(FLOWS_KEY, pinned ? '1' : '0'); } catch {}
+  }, [pinned]);
+  const toggle = useCallback(() => setPinned(p => !p), []);
+  return { pinned, toggle };
+}

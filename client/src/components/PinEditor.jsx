@@ -255,10 +255,12 @@ function PreviewWithPins({ location, pins, onMove, devices }) {
 function EditorPin({ pin, devices, dragging, onPointerDown }) {
   const meta = KIND_LABELS[pin.kind] || { label: pin.kind, Icon: MapPin };
   const Icon = meta.Icon;
+  // Custom label vinner alltid hvis brukeren har satt en — det er hele poenget
+  // med å kunne overstyre.
   const labelText =
+    pin.label ||
     (pin.kind === 'device' && devices?.[pin.deviceId]?.name) ||
     pin.zoneName ||
-    pin.label ||
     pin.deviceMatch ||
     meta.label;
 
@@ -336,30 +338,48 @@ function PinList({ pins, zones, devices, onCyclePlacement, onUpdate, onRemove })
 function PinIdentField({ pin, zones, devices, onUpdate }) {
   const allZones = useMemo(() => Object.values(zones || {}), [zones]);
 
+  // Felles label-input som alle pin-typer får tilgang til. Tom = bruk default-navn.
+  const labelInput = (
+    <input
+      type="text"
+      value={pin.label || ''}
+      onChange={(e) => onUpdate({ label: e.target.value })}
+      placeholder="vist navn"
+      className="w-28 shrink-0 bg-nx-panel/60 border border-nx-line/60 rounded px-1.5 py-0.5 text-xs text-nx-text font-mono"
+      title="Kort navn som vises på framsiden (la stå tomt for default)"
+    />
+  );
+
   if (pin.kind === 'device') {
     return (
-      <DevicePicker
-        value={pin.deviceId}
-        onChange={(id) => onUpdate({ deviceId: id })}
-        devices={devices}
-        zones={zones}
-        className="flex-1 min-w-0"
-      />
+      <div className="flex-1 min-w-0 flex gap-1">
+        <DevicePicker
+          value={pin.deviceId}
+          onChange={(id) => onUpdate({ deviceId: id })}
+          devices={devices}
+          zones={zones}
+          className="flex-1 min-w-0"
+        />
+        {labelInput}
+      </div>
     );
   }
 
   if (pin.kind === 'zone' || pin.kind === 'cabinZone') {
     return (
-      <select
-        value={pin.zoneName || ''}
-        onChange={(e) => onUpdate({ zoneName: e.target.value })}
-        className="flex-1 min-w-0 bg-nx-panel/60 border border-nx-line/60 rounded px-1.5 py-0.5 text-xs text-nx-text font-mono"
-      >
-        <option value="">— velg sone —</option>
-        {allZones.map(z => (
-          <option key={z.id} value={z.name}>{z.name}</option>
-        ))}
-      </select>
+      <div className="flex-1 min-w-0 flex gap-1">
+        <select
+          value={pin.zoneName || ''}
+          onChange={(e) => onUpdate({ zoneName: e.target.value })}
+          className="flex-1 min-w-0 bg-nx-panel/60 border border-nx-line/60 rounded px-1.5 py-0.5 text-xs text-nx-text font-mono"
+        >
+          <option value="">— velg sone —</option>
+          {allZones.map(z => (
+            <option key={z.id} value={z.name}>{z.name}</option>
+          ))}
+        </select>
+        {labelInput}
+      </div>
     );
   }
 
@@ -373,18 +393,18 @@ function PinIdentField({ pin, zones, devices, onUpdate }) {
           placeholder="enhetsnavn (regex)"
           className="flex-1 min-w-0 bg-nx-panel/60 border border-nx-line/60 rounded px-1.5 py-0.5 text-xs text-nx-text font-mono"
         />
-        <input
-          type="text"
-          value={pin.label || ''}
-          onChange={(e) => onUpdate({ label: e.target.value })}
-          placeholder="LABEL"
-          className="w-20 bg-nx-panel/60 border border-nx-line/60 rounded px-1.5 py-0.5 text-xs text-nx-text font-mono uppercase"
-        />
+        {labelInput}
       </div>
     );
   }
 
-  return <span className="flex-1 min-w-0 text-xs text-nx-mute italic truncate">— auto —</span>;
+  // Spesial-pins (tesla, solar, sauna, pier, boathouse) — bare label
+  return (
+    <div className="flex-1 min-w-0 flex gap-1 items-center">
+      <span className="text-xs text-nx-mute italic">auto-data</span>
+      {labelInput}
+    </div>
+  );
 }
 
 function DevicePicker({ value, onChange, devices, zones, className = '' }) {

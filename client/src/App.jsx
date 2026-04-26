@@ -3,16 +3,25 @@ import { motion } from 'framer-motion';
 import { api } from './lib/api.js';
 import { usePageVisibility } from './lib/usePageVisibility.js';
 import { useFavorites } from './lib/useFavorites.js';
-import { useSidebarPinned, useLogPinned } from './lib/useSidebarState.js';
+import { useSidebarPinned, useLogPinned, useFlowsSidebarPinned } from './lib/useSidebarState.js';
 import { usePinConfig } from './lib/usePinConfig.js';
 import { useFrontImageConfig } from './lib/useFrontImageConfig.js';
+import { useFrontSensors } from './lib/useFrontSensors.js';
+import { useFlowFavorites } from './lib/useFlowFavorites.js';
+import { useLinks } from './lib/useLinks.js';
 import { pushEvent, diffDevicesAndLog } from './lib/activityLog.js';
 import { ActivityLogPanel } from './components/ActivityLogPanel.jsx';
 import { Sidebar } from './components/Sidebar.jsx';
+import { FlowsSidebar } from './components/FlowsSidebar.jsx';
 import { TopBar } from './components/TopBar.jsx';
 import { HouseView } from './components/HouseView.jsx';
 import { PinEditor } from './components/PinEditor.jsx';
 import { FrontImageConfig } from './components/FrontImageConfig.jsx';
+import { FrontSensors } from './components/FrontSensors.jsx';
+import { FrontSensorEditor } from './components/FrontSensorEditor.jsx';
+import { FlowFavoritesView } from './components/views/FlowFavoritesView.jsx';
+import { MaintenanceView } from './components/views/MaintenanceView.jsx';
+import { LinksView } from './components/views/LinksView.jsx';
 import { QuickControls } from './components/QuickControls.jsx';
 import { WeatherWidget } from './components/WeatherWidget.jsx';
 import { SecurityWidget } from './components/SecurityWidget.jsx';
@@ -53,8 +62,12 @@ export default function App() {
   const favorites = useFavorites();
   const sidebar = useSidebarPinned();
   const logPin = useLogPinned();
+  const flowsSidebar = useFlowsSidebarPinned();
   const pinConfig = usePinConfig();
   const imageConfig = useFrontImageConfig();
+  const frontSensors = useFrontSensors();
+  const flowFavorites = useFlowFavorites();
+  const links = useLinks();
   const prevDevicesRef = useRef(null);
 
   useEffect(() => {
@@ -202,6 +215,9 @@ export default function App() {
               favorites={favorites}
               pinConfig={pinConfig}
               imageConfig={imageConfig}
+              frontSensors={frontSensors}
+              flowFavorites={flowFavorites}
+              links={links}
             />
           )}
 
@@ -210,6 +226,12 @@ export default function App() {
             <span>v{system?.version || '1.0'} · {counts.devices} enh · {counts.zones} rom · {system?.demo ? 'demo' : 'live'}</span>
           </footer>
         </main>
+        <FlowsSidebar
+          flows={data.flows || {}}
+          onRun={runFlow}
+          pinned={flowsSidebar.pinned}
+          onTogglePin={flowsSidebar.toggle}
+        />
       </div>
 
       {/* ElevenLabs ConvAI — to ulike agenter avhengig av side.
@@ -240,7 +262,7 @@ export default function App() {
   );
 }
 
-function SectionView({ section, system, data, counts, setCapability, runFlow, favorites, pinConfig, imageConfig }) {
+function SectionView({ section, system, data, counts, setCapability, runFlow, favorites, pinConfig, imageConfig, frontSensors, flowFavorites, links }) {
   const userName = system?.user || 'Ole';
   const greetingPanel = (
     <div className="col-span-12 lg:col-span-3 panel p-5">
@@ -313,9 +335,45 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
         false
       );
 
-    case 'plantegning':
+    case 'plantegning-hus':
       return wrapper(
         <FloorPlanView
+          devices={data.devices || {}}
+          zones={data.zones || {}}
+          location="home"
+        />,
+        false
+      );
+
+    case 'plantegning-hytte':
+      return wrapper(
+        <FloorPlanView
+          devices={data.devices || {}}
+          zones={data.zones || {}}
+          location="cabin"
+        />,
+        false
+      );
+
+    case 'flow-favoritter':
+      return wrapper(
+        <FlowFavoritesView
+          flows={data.flows || {}}
+          onRun={runFlow}
+          flowFavorites={flowFavorites}
+        />,
+        false
+      );
+
+    case 'lenker':
+      return wrapper(
+        <LinksView links={links} />,
+        false
+      );
+
+    case 'vedlikehold':
+      return wrapper(
+        <MaintenanceView
           devices={data.devices || {}}
           zones={data.zones || {}}
         />,
@@ -380,6 +438,13 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
         </div>
         <div className="col-span-12 lg:col-span-8 panel p-5">
           <DiscoveryPanel />
+        </div>
+        <div className="col-span-12 panel p-5">
+          <FrontSensorEditor
+            sensors={frontSensors}
+            devices={data.devices || {}}
+            zones={data.zones || {}}
+          />
         </div>
         <div className="col-span-12 lg:col-span-5 panel p-5">
           <FrontImageConfig imageConfig={imageConfig} />
@@ -451,6 +516,9 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
               )}
             </div>
           </div>
+
+          {/* Brukervalgte sensor-chips (vises bare hvis listen ikke er tom) */}
+          <FrontSensors sensors={frontSensors.list} devices={data.devices || {}} />
 
           {/* Hus + hytte side-by-side */}
           <div className="col-span-12 lg:col-span-6 panel overflow-hidden">
