@@ -24,19 +24,40 @@ function defaults() {
   };
 }
 
+/**
+ * Sanitiser én enkelt pin. Returnerer null hvis kind mangler (det er det
+ * eneste vi virkelig trenger — alt annet kan vi gi sane defaults for).
+ * Tidligere kastet vi hele arrayen hvis bare én pin var rar; nå filtrerer
+ * vi den enkelte pin-en bort i stedet, så resten av brukerens config
+ * overlever.
+ */
+function sanitizePin(p) {
+  if (!p || typeof p !== 'object') return null;
+  if (typeof p.kind !== 'string' || !p.kind) return null;
+  const known = ['top', 'bottom', 'left', 'right'];
+  const out = {
+    ...p,
+    kind: p.kind,
+    x: Number.isFinite(p.x) ? Math.max(0, Math.min(100, p.x)) : 50,
+    y: Number.isFinite(p.y) ? Math.max(0, Math.min(100, p.y)) : 50,
+    placement: known.includes(p.placement) ? p.placement : 'top'
+  };
+  if (typeof p.id === 'string') out.id = p.id;
+  return out;
+}
+
 function read() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaults();
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return defaults();
-    // Validere strukturen — alle pins må ha minimum kind+x+y
-    const valid = (arr) => Array.isArray(arr) && arr.every(p =>
-      p && typeof p.kind === 'string' && Number.isFinite(p.x) && Number.isFinite(p.y)
-    );
+    const sanitize = (arr) => Array.isArray(arr) ? arr.map(sanitizePin).filter(Boolean) : null;
+    const homePins  = sanitize(parsed.home);
+    const cabinPins = sanitize(parsed.cabin);
     return {
-      home:  valid(parsed.home)  ? withIds(parsed.home)  : defaults().home,
-      cabin: valid(parsed.cabin) ? withIds(parsed.cabin) : defaults().cabin
+      home:  homePins  != null ? withIds(homePins)  : defaults().home,
+      cabin: cabinPins != null ? withIds(cabinPins) : defaults().cabin
     };
   } catch {
     return defaults();

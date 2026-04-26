@@ -318,12 +318,15 @@ function CabinDevicePin({ device, label, pos }) {
  */
 function DevicePin({ device, fallbackLabel, pos }) {
   if (!device) {
+    // Enheten finnes ikke i Homey-data. Gjør pin-en TYDELIG synlig (rød), så
+    // brukeren skjønner at den er der men ikke koblet riktig — ikke at
+    // den "forsvant".
     return (
-      <PinShell pos={pos} ariaLabel={fallbackLabel || 'Enhet ikke funnet'}>
-        <div className="text-[8px] tracking-[0.18em] text-nx-mute font-mono leading-none">
+      <PinShell pos={pos} ariaLabel={fallbackLabel || 'Enhet ikke funnet'} hasAlarm>
+        <div className="text-[8px] tracking-[0.18em] text-nx-red font-mono leading-none">
           {(fallbackLabel || 'ENHET').toString().toUpperCase()}
         </div>
-        <div className="text-[10px] font-mono text-nx-mute leading-tight">— mangler —</div>
+        <div className="text-[10px] font-mono text-nx-red leading-tight">finner ikke</div>
       </PinShell>
     );
   }
