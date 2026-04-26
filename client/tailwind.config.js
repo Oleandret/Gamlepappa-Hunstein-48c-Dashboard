@@ -47,12 +47,22 @@ export default {
         float: {
           '0%,100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-4px)' }
+        },
+        equalizer: {
+          '0%,100%': { transform: 'scaleY(0.25)' },
+          '50%': { transform: 'scaleY(1)' }
+        },
+        sweep: {
+          '0%': { transform: 'rotate(0deg)' },
+          '100%': { transform: 'rotate(360deg)' }
         }
       },
       animation: {
         pulseGlow: 'pulseGlow 2.4s ease-out infinite',
         scan: 'scan 6s linear infinite',
-        float: 'float 4s ease-in-out infinite'
+        float: 'float 4s ease-in-out infinite',
+        equalizer: 'equalizer 0.9s ease-in-out infinite',
+        sweep: 'sweep 3s linear infinite'
       }
     }
   },

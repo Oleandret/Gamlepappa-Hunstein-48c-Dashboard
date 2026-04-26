@@ -5,12 +5,14 @@ import { usePageVisibility } from './lib/usePageVisibility.js';
 import { useFavorites } from './lib/useFavorites.js';
 import { useSidebarPinned, useLogPinned } from './lib/useSidebarState.js';
 import { usePinConfig } from './lib/usePinConfig.js';
+import { useFrontImageConfig } from './lib/useFrontImageConfig.js';
 import { pushEvent, diffDevicesAndLog } from './lib/activityLog.js';
 import { ActivityLogPanel } from './components/ActivityLogPanel.jsx';
 import { Sidebar } from './components/Sidebar.jsx';
 import { TopBar } from './components/TopBar.jsx';
 import { HouseView } from './components/HouseView.jsx';
 import { PinEditor } from './components/PinEditor.jsx';
+import { FrontImageConfig } from './components/FrontImageConfig.jsx';
 import { QuickControls } from './components/QuickControls.jsx';
 import { WeatherWidget } from './components/WeatherWidget.jsx';
 import { SecurityWidget } from './components/SecurityWidget.jsx';
@@ -52,6 +54,7 @@ export default function App() {
   const sidebar = useSidebarPinned();
   const logPin = useLogPinned();
   const pinConfig = usePinConfig();
+  const imageConfig = useFrontImageConfig();
   const prevDevicesRef = useRef(null);
 
   useEffect(() => {
@@ -198,6 +201,7 @@ export default function App() {
               runFlow={runFlow}
               favorites={favorites}
               pinConfig={pinConfig}
+              imageConfig={imageConfig}
             />
           )}
 
@@ -236,7 +240,7 @@ export default function App() {
   );
 }
 
-function SectionView({ section, system, data, counts, setCapability, runFlow, favorites, pinConfig }) {
+function SectionView({ section, system, data, counts, setCapability, runFlow, favorites, pinConfig, imageConfig }) {
   const userName = system?.user || 'Ole';
   const greetingPanel = (
     <div className="col-span-12 lg:col-span-3 panel p-5">
@@ -362,7 +366,7 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
           <SecurityWidget security={data.security} />
         </div>
         <div className="col-span-12 lg:col-span-4 panel overflow-hidden">
-          <HouseView devices={data.devices || {}} zones={data.zones || {}} weather={data.weather} customPins={pinConfig?.config} />
+          <HouseView devices={data.devices || {}} zones={data.zones || {}} weather={data.weather} customPins={pinConfig?.config} imageConfig={imageConfig?.config} />
         </div>
         <div className="col-span-12 panel p-5">
           <ActivityFeed activity={data.activity || []} />
@@ -377,7 +381,10 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
         <div className="col-span-12 lg:col-span-8 panel p-5">
           <DiscoveryPanel />
         </div>
-        <div className="col-span-12 panel p-5">
+        <div className="col-span-12 lg:col-span-5 panel p-5">
+          <FrontImageConfig imageConfig={imageConfig} />
+        </div>
+        <div className="col-span-12 lg:col-span-7 panel p-5">
           <PinEditor pinConfig={pinConfig} devices={data.devices || {}} zones={data.zones || {}} />
         </div>
       </>);
@@ -447,10 +454,10 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
 
           {/* Hus + hytte side-by-side */}
           <div className="col-span-12 lg:col-span-6 panel overflow-hidden">
-            <HouseView devices={data.devices || {}} zones={data.zones || {}} weather={data.weather} forceLocation="home" customPins={pinConfig?.config} />
+            <HouseView devices={data.devices || {}} zones={data.zones || {}} weather={data.weather} forceLocation="home" customPins={pinConfig?.config} imageConfig={imageConfig?.config} />
           </div>
           <div className="col-span-12 lg:col-span-6 panel overflow-hidden">
-            <HouseView devices={data.devices || {}} zones={data.zones || {}} weather={data.weather} forceLocation="cabin" customPins={pinConfig?.config} />
+            <HouseView devices={data.devices || {}} zones={data.zones || {}} weather={data.weather} forceLocation="cabin" customPins={pinConfig?.config} imageConfig={imageConfig?.config} />
           </div>
 
           {/* Rad 1: Sikkerhet + 3 spesial-widgets */}

@@ -1,6 +1,7 @@
 import { Bell, Search, Wifi } from 'lucide-react';
 import { useNow, formatTime, formatDateLong } from '../lib/useNow.js';
 import { SECTIONS } from '../lib/sections.js';
+import { AIConnection } from './AIConnection.jsx';
 
 export function TopBar({ section, onSection, system }) {
   const now = useNow(1000);
@@ -49,8 +50,11 @@ export function TopBar({ section, onSection, system }) {
           <Wifi size={14} className={isLive ? 'text-nx-green' : 'text-nx-amber'} aria-hidden="true" />
           <span className="capitalize">{formatDateLong(now)}</span>
         </div>
-        <div className="font-mono text-xl tracking-wider text-nx-text" aria-label="Klokke">
-          {formatTime(now)}
+        <div className="flex flex-col items-end gap-1">
+          <div className="font-mono text-xl tracking-wider text-nx-text leading-none" aria-label="Klokke">
+            {formatTime(now)}
+          </div>
+          <AIConnection />
         </div>
       </div>
     </div>

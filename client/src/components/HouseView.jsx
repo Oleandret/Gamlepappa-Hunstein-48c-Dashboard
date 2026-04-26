@@ -64,13 +64,16 @@ export const VIEWS = {
   }
 };
 
-export function HouseView({ devices, zones, weather, forceLocation = null, customPins = null }) {
+export function HouseView({ devices, zones, weather, forceLocation = null, customPins = null, imageConfig = null }) {
   const [internalView, setInternalView] = useState('home');
   const view = forceLocation || internalView;
   const cur = VIEWS[view];
   const showToggle = !forceLocation;
   // Hvis brukeren har overstyrt pin-config i innstillinger, bruk den; ellers default.
   const pins = (customPins && Array.isArray(customPins[view])) ? customPins[view] : cur.pins;
+  // Brukerstyrt bildestørrelse (aspect ratio + max-h). Fallback til 16/9 + 260px.
+  const aspectRatio = imageConfig?.aspectRatio || '16/9';
+  const maxHeightPx = imageConfig?.maxHeight ?? 260;
 
   const outdoorTemp = Number.isFinite(weather?.now?.temp) ? `${Math.round(weather.now.temp)}°C` : '--';
   const humidity = Number.isFinite(weather?.now?.humidity) ? `${Math.round(weather.now.humidity)}%` : '--';
@@ -175,7 +178,10 @@ export function HouseView({ devices, zones, weather, forceLocation = null, custo
         </div>
       )}
 
-      <div className="relative mt-2 aspect-[16/9] w-full max-h-[260px] overflow-hidden rounded-xl border border-nx-line/60 bg-nx-bg">
+      <div
+        className="relative mt-2 w-full overflow-hidden rounded-xl border border-nx-line/60 bg-nx-bg"
+        style={{ aspectRatio: aspectRatio.replace('/', ' / '), maxHeight: `${maxHeightPx}px` }}
+      >
         <img
           src={cur.image}
           alt={`${cur.address} sett fra droneperspektiv`}
@@ -220,6 +226,10 @@ export function HouseView({ devices, zones, weather, forceLocation = null, custo
           if (p.kind === 'cabinDevice') {
             const dev = locationDevices.find(d => new RegExp(p.deviceMatch, 'i').test(d.name || ''));
             return <CabinDevicePin key={i} device={dev} label={p.label} pos={p} />;
+          }
+          if (p.kind === 'device') {
+            const dev = devices?.[p.deviceId];
+            return <DevicePin key={i} device={dev} fallbackLabel={p.label} pos={p} />;
           }
           if (p.kind === 'tesla') return tesla
             ? <TeslaPin key={i} tesla={tesla} pos={p} />
@@ -296,6 +306,85 @@ function CabinDevicePin({ device, label, pos }) {
         <div className={['text-[10px] font-mono leading-tight', onoff ? 'text-nx-green' : 'text-nx-mute'].join(' ')}>
           {onoff ? 'PÅ' : 'AV'}
         </div>
+      )}
+    </PinShell>
+  );
+}
+
+/**
+ * Generisk pin for en spesifikk Homey-enhet valgt i innstillinger.
+ * Velger den mest relevante capability-en å vise basert på hva enheten har.
+ */
+function DevicePin({ device, fallbackLabel, pos }) {
+  if (!device) {
+    return (
+      <PinShell pos={pos} ariaLabel={fallbackLabel || 'Enhet ikke funnet'}>
+        <div className="text-[8px] tracking-[0.18em] text-nx-mute font-mono leading-none">
+          {(fallbackLabel || 'ENHET').toString().toUpperCase()}
+        </div>
+        <div className="text-[10px] font-mono text-nx-mute leading-tight">— mangler —</div>
+      </PinShell>
+    );
+  }
+
+  const t        = capValue(device, 'measure_temperature');
+  const target   = capValue(device, 'target_temperature');
+  const battery  = capValue(device, 'measure_battery');
+  const onoff    = capValue(device, 'onoff');
+  const locked   = capValue(device, 'locked');
+  const motion   = capValue(device, 'alarm_motion');
+  const contact  = capValue(device, 'alarm_contact');
+  const playing  = capValue(device, 'speaker_playing');
+  const dim      = capValue(device, 'dim');
+  const power    = capValue(device, 'measure_power');
+
+  const name = (fallbackLabel || device.name || 'enhet').toString();
+
+  // Velg "primær" verdi som vises stort
+  let primary = null;
+  if (Number.isFinite(t)) {
+    primary = (
+      <span>
+        {Number(t).toFixed(1)}°C
+        {Number.isFinite(target) && <span className="text-nx-mute text-[9px] ml-1">→ {Number(target).toFixed(0)}°</span>}
+      </span>
+    );
+  } else if (device.class === 'lock' && typeof locked === 'boolean') {
+    primary = locked
+      ? <span className="text-nx-green inline-flex items-center gap-1"><Lock size={10} /> Låst</span>
+      : <span className="text-nx-amber inline-flex items-center gap-1"><Unlock size={10} /> Åpen</span>;
+  } else if (typeof motion === 'boolean' && motion) {
+    primary = <span className="text-nx-red">Bevegelse</span>;
+  } else if (typeof contact === 'boolean' && contact) {
+    primary = <span className="text-nx-amber">Åpen</span>;
+  } else if (typeof playing === 'boolean') {
+    primary = (
+      <span className={playing ? 'text-nx-cyan inline-flex items-center gap-1' : 'text-nx-mute inline-flex items-center gap-1'}>
+        <Music size={9} /> {playing ? 'spiller' : 'stille'}
+      </span>
+    );
+  } else if (typeof onoff === 'boolean') {
+    primary = onoff
+      ? <span className="text-nx-green">{Number.isFinite(dim) ? `${Math.round(dim * 100)}%` : 'PÅ'}</span>
+      : <span className="text-nx-mute">AV</span>;
+  } else if (Number.isFinite(power)) {
+    primary = <span>{Math.round(power)} W</span>;
+  } else if (Number.isFinite(battery)) {
+    primary = <span>{Math.round(battery)}%</span>;
+  } else {
+    primary = <span className="text-nx-mute">—</span>;
+  }
+
+  return (
+    <PinShell pos={pos} ariaLabel={`${name} status`}>
+      <div className="text-[8px] tracking-[0.18em] text-nx-mute font-mono leading-none truncate max-w-[120px]">
+        {name.toUpperCase()}
+      </div>
+      <div className="text-[12px] font-mono text-nx-cyan leading-tight">
+        {primary}
+      </div>
+      {Number.isFinite(battery) && Number.isFinite(t) && (
+        <div className="text-[9px] font-mono text-nx-mute leading-tight">bat {Math.round(battery)}%</div>
       )}
     </PinShell>
   );
