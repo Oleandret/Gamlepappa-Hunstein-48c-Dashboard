@@ -398,7 +398,11 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
 
     case 'oversikt':
     default: {
-      const tesla = findFirst(data.devices, d => d.class === 'car' || /tesla/i.test(d.driverUri || ''));
+      // Foretrekk Model X hvis flere Tesla-enheter er registrert.
+      const allTeslas = data.devices
+        ? Object.values(data.devices).filter(d => d.class === 'car' || /tesla/i.test(d.driverUri || ''))
+        : [];
+      const tesla = allTeslas.find(d => /model\s*x/i.test(d.name || '')) || allTeslas[0] || null;
       const roborock = findFirst(data.devices, d => d.class === 'vacuumcleaner');
       const tibber = findFirst(data.devices, d => /tibber/i.test(d.driverUri || ''));
       return (

@@ -112,10 +112,11 @@ export function HouseView({ devices, zones, weather, forceLocation = null, custo
                     && securityCounts.motion === 0;
 
   // Find Tesla + Tibber for the special pins (only relevant for "home")
-  const tesla = useMemo(() =>
-    allDevs.find(d => d.class === 'car' || /tesla/i.test(d.driverUri || '')),
-    [allDevs]
-  );
+  // Foretrekk Model X hvis flere Tesla-enheter er registrert.
+  const tesla = useMemo(() => {
+    const cars = allDevs.filter(d => d.class === 'car' || /tesla/i.test(d.driverUri || ''));
+    return cars.find(d => /model\s*x/i.test(d.name || '')) || cars[0] || null;
+  }, [allDevs]);
   const tibber = useMemo(() =>
     allDevs.find(d => /tibber/i.test(d.driverUri || '')),
     [allDevs]
