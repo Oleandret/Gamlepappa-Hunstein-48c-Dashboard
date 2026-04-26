@@ -1,7 +1,8 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { Home as HomeIcon, Anchor, Building2, Upload, Lock, Unlock, Camera as CameraIcon, DoorOpen, FileSpreadsheet, ZoomIn, ZoomOut, Thermometer, ShieldAlert, Lightbulb, Layers, Edit2, Plus } from 'lucide-react';
+import { Home as HomeIcon, Anchor, Building2, Upload, Lock, Unlock, Camera as CameraIcon, DoorOpen, FileSpreadsheet, ZoomIn, ZoomOut, Thermometer, ShieldAlert, Lightbulb, Layers, Edit2, Plus, Wifi, Cpu } from 'lucide-react';
 import { capValue, hasCap, classLabel } from '../../lib/deviceUtils.js';
 import { FloorPlanPin } from '../FloorPlanPin.jsx';
+import { RichDevicePicker } from '../RichDevicePicker.jsx';
 
 /**
  * Floor plan visualisation. Reads plantegninger from /public/* and lets the
@@ -104,8 +105,45 @@ const VIEW_MODES = [
   { id: 'all',      label: 'Alle',         Icon: Layers },
   { id: 'temp',     label: 'Temperatur',   Icon: Thermometer },
   { id: 'security', label: 'Sikkerhet',    Icon: ShieldAlert },
-  { id: 'light',    label: 'Lys',          Icon: Lightbulb }
+  { id: 'light',    label: 'Lys',          Icon: Lightbulb },
+  { id: 'wifi',     label: 'Wifi',         Icon: Wifi },
+  { id: 'tech',     label: 'Teknisk',      Icon: Cpu }
 ];
+
+/**
+ * "Teknisk" = enheter som ikke faller naturlig inn under lys, sikkerhet eller
+ * rene temperaturmålere. Speakere, TV, stikkontakter, vifter, varmere,
+ * støvsugere, gardiner, EV-ladere, termostater, røykvarslere som også gjør
+ * mer enn alarm, osv.
+ */
+function isTechnicalDevice(d) {
+  if (!d) return false;
+  const isLight = d.class === 'light' || hasCap(d, 'dim');
+  const isSecurity = d.class === 'lock' || d.class === 'camera'
+    || hasCap(d, 'alarm_motion') || hasCap(d, 'alarm_contact')
+    || hasCap(d, 'alarm_smoke')  || hasCap(d, 'alarm_water');
+  // Rent temperaturmåler-only-sensor — uten ekstra capabilities
+  const caps = (d.capabilities && Array.isArray(d.capabilities)) ? d.capabilities
+              : d.capabilities ? Object.keys(d.capabilities)
+              : d.capabilitiesObj ? Object.keys(d.capabilitiesObj) : [];
+  const isTempOnly = caps.length <= 2
+    && hasCap(d, 'measure_temperature')
+    && !hasCap(d, 'onoff') && !hasCap(d, 'target_temperature');
+  return !isLight && !isSecurity && !isTempOnly;
+}
+
+// Heuristikk for wifi-enheter: Homey-flags + kjente wifi/cloud-driver-mønstre.
+// Fanger Sonos, Hue, TP-Link, Shelly, Tuya, Meross, Sonoff, Tesla, Roborock,
+// Tibber, Nest, Ring, Arlo, Withings, Netatmo, Mill, Husqvarna automower osv.
+const WIFI_DRIVER_RE = /(wifi|sonos|hue|tplink|shelly|tuya|meross|sonoff|esphome|tesla|roborock|tibber|nest|ring|arlo|withings|netatmo|mill|automower|husqvarna|ecobee|netgear|broadlink|yeelight|plejd|airthings|bambu)/i;
+
+function isWifiDevice(d) {
+  if (!d) return false;
+  if (Array.isArray(d.flags) && d.flags.some(f => /wifi|cloud/i.test(f))) return true;
+  if (typeof d.driverUri === 'string' && WIFI_DRIVER_RE.test(d.driverUri)) return true;
+  if (typeof d.driverId === 'string' && WIFI_DRIVER_RE.test(d.driverId)) return true;
+  return false;
+}
 
 export function FloorPlanView({ devices, zones, location = 'home', floorPlanPins, onSetCapability }) {
   // Velg første tilgjengelige plan for denne lokasjonen som default
@@ -414,17 +452,6 @@ function AddPinPanel({ planId, devices, zones, existingPins, onAdd, onResetPlan 
   const [deviceId, setDeviceId] = useState('');
   const [label, setLabel] = useState('');
 
-  const groups = useMemo(() => {
-    const byZone = {};
-    Object.values(devices || {}).forEach(d => {
-      const zoneName = zones?.[d.zone]?.name || 'Uten sone';
-      if (!byZone[zoneName]) byZone[zoneName] = [];
-      byZone[zoneName].push(d);
-    });
-    Object.values(byZone).forEach(arr => arr.sort((a, b) => (a.name || '').localeCompare(b.name || '')));
-    return Object.entries(byZone).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [devices, zones]);
-
   const handleAdd = () => {
     if (!deviceId) return;
     onAdd({ deviceId, label: label.trim() });
@@ -445,22 +472,14 @@ function AddPinPanel({ planId, devices, zones, existingPins, onAdd, onResetPlan 
         </button>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <select
+        <RichDevicePicker
           value={deviceId}
-          onChange={(e) => setDeviceId(e.target.value)}
-          className="flex-1 min-w-[220px] bg-nx-panel/60 border border-nx-line/60 rounded px-2 py-1 text-xs text-nx-text font-mono"
-        >
-          <option value="">— velg enhet —</option>
-          {groups.map(([zoneName, devs]) => (
-            <optgroup key={zoneName} label={zoneName}>
-              {devs.map(d => (
-                <option key={d.id} value={d.id}>
-                  {d.name || '(uten navn)'} · {classLabel(d.class)}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+          onChange={setDeviceId}
+          devices={devices}
+          zones={zones}
+          placeholder="— velg enhet —"
+          className="flex-1 min-w-[260px]"
+        />
         <input
           type="text"
           value={label}
@@ -539,6 +558,16 @@ function RoomOverlay({ room }) {
                 <Lightbulb size={9} className="inline" /> {status.lightsOn}/{status.lights}
               </span>
             )}
+            {status.wifi > 0 && (
+              <span className={status.wifiOffline > 0 ? 'text-nx-red' : 'text-nx-cyan'}>
+                <Wifi size={9} className="inline" /> {status.wifiOffline > 0 ? `${status.wifiOffline}!` : status.wifi}
+              </span>
+            )}
+            {status.tech > 0 && (
+              <span className="text-nx-purple">
+                <Cpu size={9} className="inline" /> {status.tech}
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -552,6 +581,8 @@ function RoomStatusCard({ room, viewMode = 'all' }) {
   const showTemp     = viewMode === 'all' || viewMode === 'temp';
   const showSecurity = viewMode === 'all' || viewMode === 'security';
   const showLight    = viewMode === 'all' || viewMode === 'light';
+  const showWifi     = viewMode === 'all' || viewMode === 'wifi';
+  const showTech     = viewMode === 'all' || viewMode === 'tech';
 
   return (
     <div className={[
@@ -583,6 +614,16 @@ function RoomStatusCard({ room, viewMode = 'all' }) {
         {showLight && s.lights > 0 && (
           <span className={s.lightsOn ? 'text-nx-amber' : 'text-nx-mute'}>
             <Lightbulb size={10} className="inline" /> {s.lightsOn}/{s.lights}
+          </span>
+        )}
+        {showWifi && s.wifi > 0 && (
+          <span className={s.wifiOffline > 0 ? 'text-nx-red' : 'text-nx-cyan'} title={s.wifiOffline > 0 ? `${s.wifiOffline} offline` : `${s.wifi} wifi-enheter`}>
+            <Wifi size={10} className="inline" /> {s.wifi}{s.wifiOffline > 0 ? ` (${s.wifiOffline} offline)` : ''}
+          </span>
+        )}
+        {showTech && s.tech > 0 && (
+          <span className="text-nx-purple" title={`${s.tech} tekniske enheter`}>
+            <Cpu size={10} className="inline" /> {s.tech}
           </span>
         )}
         {viewMode === 'all' && s.deviceCount > 0 && !s.temp && !s.locks && !s.cameras && !s.lights && (
@@ -625,15 +666,22 @@ function getRoomStatus(room, devices, zones, viewMode = 'all') {
   const openContactCount = list.filter(d => hasCap(d, 'alarm_contact') && capValue(d, 'alarm_contact') === true).length;
   const contactDevices = list.filter(d => hasCap(d, 'alarm_contact')).length;
   const motionDevices = list.filter(d => hasCap(d, 'alarm_motion')).length;
+  const wifiDevices = list.filter(isWifiDevice);
+  const wifiOffline = wifiDevices.filter(d => d.available === false).length;
+  const techDevices = list.filter(isTechnicalDevice);
 
   // matchesView avgjør om rommet vises i gjeldende view-mode
   const hasTemp     = temps.length > 0;
   const hasSecurity = locks.length > 0 || cams.length > 0 || motionDevices > 0 || contactDevices > 0;
   const hasLight    = lights.length > 0;
+  const hasWifi     = wifiDevices.length > 0;
+  const hasTech     = techDevices.length > 0;
   const matchesView = viewMode === 'all'
     || (viewMode === 'temp'     && hasTemp)
     || (viewMode === 'security' && hasSecurity)
-    || (viewMode === 'light'    && hasLight);
+    || (viewMode === 'light'    && hasLight)
+    || (viewMode === 'wifi'     && hasWifi)
+    || (viewMode === 'tech'     && hasTech);
 
   return {
     deviceCount: list.length,
@@ -647,6 +695,9 @@ function getRoomStatus(room, devices, zones, viewMode = 'all') {
     openContact: openContactCount,
     lights: lights.length,
     lightsOn,
+    wifi: wifiDevices.length,
+    wifiOffline,
+    tech: techDevices.length,
     summary: list.length ? `${list.length} enheter` : 'Ingen enheter koblet'
   };
 }

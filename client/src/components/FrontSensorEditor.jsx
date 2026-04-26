@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { allCaps, classLabel } from '../lib/deviceUtils.js';
+import { RichDevicePicker } from './RichDevicePicker.jsx';
 
 const READABLE_CAPS = {
   measure_temperature: 'Temperatur',
@@ -135,20 +136,14 @@ export function FrontSensorEditor({ sensors, devices, zones }) {
       <div className="panel p-3 border border-nx-line/40">
         <p className="panel-title mb-2">Legg til sensor</p>
         <div className="flex flex-wrap items-center gap-2">
-          <select
+          <RichDevicePicker
             value={selectedDeviceId}
-            onChange={(e) => { setSelectedDeviceId(e.target.value); setSelectedCap(''); }}
-            className="flex-1 min-w-[200px] bg-nx-panel/60 border border-nx-line/60 rounded px-2 py-1 text-xs text-nx-text font-mono"
-          >
-            <option value="">— velg enhet —</option>
-            {groups.map(([zoneName, devs]) => (
-              <optgroup key={zoneName} label={zoneName}>
-                {devs.map(d => (
-                  <option key={d.id} value={d.id}>{d.name || '(uten navn)'} {d.class ? `· ${classLabel(d.class)}` : ''}</option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+            onChange={(id) => { setSelectedDeviceId(id); setSelectedCap(''); }}
+            devices={devices}
+            zones={zones}
+            placeholder="— velg enhet —"
+            className="flex-1 min-w-[260px]"
+          />
 
           <select
             value={selectedCap}

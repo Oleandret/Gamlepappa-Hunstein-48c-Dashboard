@@ -5,6 +5,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { VIEWS } from './HouseView.jsx';
+import { RichDevicePicker } from './RichDevicePicker.jsx';
 
 /**
  * Editor for pin-konfig på framsidens hovedbilder.
@@ -353,11 +354,12 @@ function PinIdentField({ pin, zones, devices, onUpdate }) {
   if (pin.kind === 'device') {
     return (
       <div className="flex-1 min-w-0 flex gap-1">
-        <DevicePicker
+        <RichDevicePicker
           value={pin.deviceId}
           onChange={(id) => onUpdate({ deviceId: id })}
           devices={devices}
           zones={zones}
+          placeholder="— velg enhet —"
           className="flex-1 min-w-0"
         />
         {labelInput}
@@ -504,12 +506,13 @@ function AddPinForm({ zones, devices, onAdd }) {
 
         {needsDevice && (
           <>
-            <DevicePicker
+            <RichDevicePicker
               value={deviceId}
               onChange={setDeviceId}
               devices={devices}
               zones={zones}
-              className="flex-1 min-w-[200px]"
+              placeholder="— velg enhet —"
+              className="flex-1 min-w-[260px]"
             />
             <input
               type="text"

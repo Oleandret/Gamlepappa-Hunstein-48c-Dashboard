@@ -15,20 +15,10 @@ export function ActivityLogPanel({ pinned, onTogglePin }) {
   const [open, setOpen] = useState(pinned);
   const hoverRef = useRef(false);
   const timerRef = useRef(null);
-  const lastSeenIdRef = useRef(0);
-
-  // Open on new events, then auto-hide after delay
-  useEffect(() => {
-    if (entries.length === 0) return;
-    const newest = entries[0];
-    if (newest.id > lastSeenIdRef.current) {
-      lastSeenIdRef.current = newest.id;
-      if (!pinned) {
-        setOpen(true);
-        scheduleHide();
-      }
-    }
-  }, [entries, pinned]);
+  // Vi sporer fortsatt nyeste id slik at ulest-telleren på den lille
+  // sidefanen kan vises, men panelet skal IKKE poppe ut automatisk lenger
+  // — det forstyrrer når man klikker pins på plantegningene.
+  // Brukeren åpner det manuelt via fanen til venstre, eller låser det åpent.
 
   useEffect(() => {
     if (pinned) {
