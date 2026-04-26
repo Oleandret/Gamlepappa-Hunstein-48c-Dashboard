@@ -9,7 +9,7 @@ import { FloorPlanPin } from '../FloorPlanPin.jsx';
  *
  * Pin coordinates are tuned to match the actual room rectangles in each plan.
  */
-const PLAN_VERSION = '2';
+const PLAN_VERSION = '3';
 
 const PLANS = {
   cabinMain: {
@@ -116,6 +116,10 @@ export function FloorPlanView({ devices, zones, location = 'home', floorPlanPins
   const [planId, setPlanId] = useState(plansForLocation[0]?.id || 'cabinMain');
   const [viewMode, setViewMode] = useState('all');
   const [editing, setEditing] = useState(false);
+  // Auto-genererte rom-overlays (de hardkodede rektangelene fra PLANS[].rooms)
+  // er som standard SKRUDD AV nå som plantegningene er croppet — koordinatene
+  // er ikke lenger riktige. Brukeren kan slå dem på igjen via toggle om ønsket.
+  const [showAutoRooms, setShowAutoRooms] = useState(false);
 
   // Sync default når location bytter (bruker navigerer mellom hus/hytte i sidebar)
   useEffect(() => {
@@ -193,21 +197,36 @@ export function FloorPlanView({ devices, zones, location = 'home', floorPlanPins
               </button>
             );
           })}
-          {floorPlanPins && (
+          <div className="ml-auto flex items-center gap-1.5">
             <button
-              onClick={() => setEditing(e => !e)}
-              aria-pressed={editing}
+              onClick={() => setShowAutoRooms(s => !s)}
+              aria-pressed={showAutoRooms}
+              title="Vis/skjul auto-genererte rom-rektangler (kan være feilplassert)"
               className={[
-                'ml-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono uppercase tracking-[0.18em] transition-colors border',
-                editing
-                  ? 'bg-nx-cyan/15 text-nx-cyan border-nx-cyan/55 shadow-glow-soft'
+                'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono uppercase tracking-[0.18em] transition-colors border',
+                showAutoRooms
+                  ? 'bg-nx-cyan/15 text-nx-cyan border-nx-cyan/55'
                   : 'border-nx-line/60 text-nx-mute hover:text-nx-text hover:border-nx-cyan/40'
               ].join(' ')}
             >
-              <Edit2 size={11} aria-hidden="true" />
-              {editing ? 'Ferdig' : 'Rediger pins'}
+              {showAutoRooms ? 'Skjul auto-rom' : 'Vis auto-rom'}
             </button>
-          )}
+            {floorPlanPins && (
+              <button
+                onClick={() => setEditing(e => !e)}
+                aria-pressed={editing}
+                className={[
+                  'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono uppercase tracking-[0.18em] transition-colors border',
+                  editing
+                    ? 'bg-nx-cyan/15 text-nx-cyan border-nx-cyan/55 shadow-glow-soft'
+                    : 'border-nx-line/60 text-nx-mute hover:text-nx-text hover:border-nx-cyan/40'
+                ].join(' ')}
+              >
+                <Edit2 size={11} aria-hidden="true" />
+                {editing ? 'Ferdig' : 'Rediger pins'}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -218,6 +237,7 @@ export function FloorPlanView({ devices, zones, location = 'home', floorPlanPins
           : <FloorPlanCanvas
               plan={plan}
               rooms={roomData}
+              showAutoRooms={showAutoRooms}
               pins={floorPlanPins?.getPins(plan.id) || []}
               devices={devices}
               zones={zones}
@@ -300,7 +320,7 @@ function ReferenceImage({ plan }) {
   );
 }
 
-function FloorPlanCanvas({ plan, rooms, pins, devices, zones, editing, floorPlanPins, onSetCapability }) {
+function FloorPlanCanvas({ plan, rooms, showAutoRooms = false, pins, devices, zones, editing, floorPlanPins, onSetCapability }) {
   const containerRef = useRef(null);
   const [draggingId, setDraggingId] = useState(null);
 
@@ -367,8 +387,8 @@ function FloorPlanCanvas({ plan, rooms, pins, devices, zones, editing, floorPlan
       {/* Hjørne-brackets */}
       <Brackets />
 
-      {/* Room hot-spots (auto-genererte) */}
-      {rooms.filter(r => r.status.matchesView !== false).map(r => (
+      {/* Room hot-spots (auto-genererte rektangler) — kun hvis togglet på */}
+      {showAutoRooms && rooms.filter(r => r.status.matchesView !== false).map(r => (
         <RoomOverlay key={r.name} room={r} />
       ))}
 
