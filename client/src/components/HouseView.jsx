@@ -118,16 +118,16 @@ export function HouseView({ devices, zones, weather, forceLocation = null }) {
   const solarPower = capValue(tibber, 'measure_current.L1');
 
   return (
-    <div className="relative h-full p-3">
+    <div className="relative h-full p-2">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="min-w-0">
           <p className="panel-title flex items-center gap-1">
             <MapPin size={10} className="text-nx-cyan" aria-hidden="true" /> {cur.address}
           </p>
-          <h2 className="mt-0.5 text-sm font-semibold flex items-center gap-1.5">
+          <h2 className="mt-0.5 text-xs font-semibold flex items-center gap-1.5">
             {allSecure
-              ? <ShieldCheck size={14} className="text-nx-green" aria-hidden="true" />
-              : <ShieldAlert size={14} className="text-nx-amber" aria-hidden="true" />}
+              ? <ShieldCheck size={12} className="text-nx-green" aria-hidden="true" />
+              : <ShieldAlert size={12} className="text-nx-amber" aria-hidden="true" />}
             {allSecure ? 'Sikret' : 'Sjekk'}
           </h2>
         </div>
@@ -169,7 +169,7 @@ export function HouseView({ devices, zones, weather, forceLocation = null }) {
         </div>
       )}
 
-      <div className="relative mt-2 aspect-[16/9] w-full overflow-hidden rounded-xl border border-nx-line/60 bg-nx-bg">
+      <div className="relative mt-2 aspect-[21/9] w-full overflow-hidden rounded-xl border border-nx-line/60 bg-nx-bg">
         <img
           src={cur.image}
           alt={`${cur.address} sett fra droneperspektiv`}

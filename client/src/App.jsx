@@ -203,6 +203,15 @@ export default function App() {
           </footer>
         </main>
       </div>
+
+      {/* ElevenLabs ConvAI — to ulike agenter avhengig av side.
+          `key` tvinger remount når man bytter mellom oversikt og andre seksjoner,
+          slik at widgeten plukker opp den nye agent-id-en. */}
+      {section === 'oversikt' ? (
+        <elevenlabs-convai key="agent-oversikt" agent-id="SCOI5nAeUm2P90tPlhxJ"></elevenlabs-convai>
+      ) : (
+        <elevenlabs-convai key="agent-andre" agent-id="agent_4501kc02r47xec2s0r87f0awxdj6"></elevenlabs-convai>
+      )}
     </div>
   );
 }
@@ -361,12 +370,12 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35 }}
-          className="mt-4 grid grid-cols-12 gap-2.5"
+          className="mt-3 grid grid-cols-12 gap-2"
         >
           {/* Kompakt hilsen-bar */}
-          <div className="col-span-12 panel px-4 py-2 flex flex-wrap items-center gap-2 justify-between">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-sm font-semibold">
+          <div className="col-span-12 panel px-3 py-1.5 flex flex-wrap items-center gap-1.5 justify-between">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h1 className="text-xs font-semibold">
                 God kveld, <span className="neon-text">{system?.user || 'Ole'}</span>
               </h1>
               <span className="chip text-[10px] px-2 py-0.5">
@@ -404,7 +413,7 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
           </div>
 
           {/* Rad 1: Sikkerhet + 3 spesial-widgets */}
-          <div className="col-span-6 lg:col-span-3 panel p-3">
+          <div className="col-span-6 lg:col-span-3 panel p-2">
             <SecurityWidget security={data.security} />
           </div>
           {tibber && <div className="col-span-6 lg:col-span-3"><TibberCard device={tibber} /></div>}
@@ -412,29 +421,29 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
           {roborock && <div className="col-span-6 lg:col-span-3"><RoborockCard device={roborock} onSet={setCapability} /></div>}
 
           {/* Rad 2: Hurtigkontroller + Energi-graf + Vær */}
-          <div className="col-span-12 sm:col-span-6 lg:col-span-3 panel p-3">
+          <div className="col-span-12 sm:col-span-6 lg:col-span-3 panel p-2">
             <QuickControls flows={data.flows || {}} onRun={runFlow} />
           </div>
-          <div className="col-span-12 sm:col-span-12 lg:col-span-6 panel p-3">
+          <div className="col-span-12 sm:col-span-12 lg:col-span-6 panel p-2">
             <Suspense fallback={<LoadingPanel label="LASTER GRAF..." />}>
               <EnergyWidget energy={data.energy} />
             </Suspense>
           </div>
-          <div className="col-span-12 sm:col-span-6 lg:col-span-3 panel p-3">
+          <div className="col-span-12 sm:col-span-6 lg:col-span-3 panel p-2">
             <WeatherWidget weather={data.weather} />
           </div>
 
           {/* Rad 3: 4 widgets på en rad */}
-          <div className="col-span-6 lg:col-span-3 panel p-3">
+          <div className="col-span-6 lg:col-span-3 panel p-2">
             <RoomTemps devices={data.devices || {}} zones={data.zones || {}} />
           </div>
-          <div className="col-span-6 lg:col-span-3 panel p-3">
+          <div className="col-span-6 lg:col-span-3 panel p-2">
             <Lighting devices={data.devices || {}} onSet={setCapability} />
           </div>
-          <div className="col-span-6 lg:col-span-3 panel p-3">
+          <div className="col-span-6 lg:col-span-3 panel p-2">
             <ActivityFeed activity={data.activity || []} />
           </div>
-          <div className="col-span-6 lg:col-span-3 panel p-3">
+          <div className="col-span-6 lg:col-span-3 panel p-2">
             <FavoriteAutomations flows={data.flows || {}} onRun={runFlow} />
           </div>
         </motion.div>
