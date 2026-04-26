@@ -165,6 +165,25 @@ nexora-hunstein-dashboard/
 - **Lokasjon for vær**: oppdater `HOME_LAT` / `HOME_LON` / `HOME_PLACE` i `.env`
 - **Posisjon på rom-pinner**: rediger `ROOM_PINS`-array i `client/src/components/HouseView.jsx`
 - **Farger / aksenter**: endre `nx`-paletten i `client/tailwind.config.js`
+- **Favoritt-enheter**: pin direkte fra Enheter/Rom-fanene (lagres i nettleseren)
+
+## Discovery — full kartlegging av din Homey
+
+For å la dashbordet (og Claude) vite nøyaktig hvilke enheter, klasser og capabilities du har:
+
+```bash
+HOMEY_PAT=<din_token> npm run discover --prefix server
+```
+
+Dette skriver `homey-inventory.json` til prosjektroten med:
+- Alle enheter, rom og flows (rå-data)
+- Klasse-fordeling og capability-statistikk
+- Feature-flagg (hasEnergy, hasSecurity, hasClimate, hasLights osv.)
+- Spesielle enheter (uvanlige klasser som kan trenge egne widgets)
+
+Du kan også kalle `GET /api/homey/inventory` mot live-serveren for samme data.
+
+Del `homey-inventory.json` med Claude i chatten for å få et dashbord skreddersydd til ditt eksakte oppsett (egne widgets for Tesla-lader, robotgressklipper, sauna, osv.).
 
 ## Lisens
 

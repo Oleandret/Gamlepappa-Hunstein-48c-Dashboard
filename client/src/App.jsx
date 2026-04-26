@@ -1,7 +1,8 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { api } from './lib/api.js';
 import { usePageVisibility } from './lib/usePageVisibility.js';
+import { useFavorites } from './lib/useFavorites.js';
 import { Sidebar } from './components/Sidebar.jsx';
 import { TopBar } from './components/TopBar.jsx';
 import { HouseView } from './components/HouseView.jsx';
@@ -13,10 +14,16 @@ import { RoomTemps } from './components/RoomTemps.jsx';
 import { Lighting } from './components/Lighting.jsx';
 import { FavoriteAutomations } from './components/FavoriteAutomations.jsx';
 import { Particles } from './components/Particles.jsx';
+import { ZonesView } from './components/views/ZonesView.jsx';
+import { DevicesView } from './components/views/DevicesView.jsx';
+import { FavoritesView } from './components/views/FavoritesView.jsx';
 
-// Charting is heavy (~150 KB) — lazy-load so it stays out of the initial bundle.
+// Lazy-loaded heavy widgets
 const EnergyWidget = lazy(() =>
   import('./components/EnergyWidget.jsx').then(m => ({ default: m.EnergyWidget }))
+);
+const EnergyView = lazy(() =>
+  import('./components/views/EnergyView.jsx').then(m => ({ default: m.EnergyView }))
 );
 
 const POLL_MS = 12000;
@@ -30,8 +37,8 @@ export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [section, setSection] = useState('oversikt');
   const visible = usePageVisibility();
+  const favorites = useFavorites();
 
-  // Poll loop with AbortController + page-visibility pause
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
@@ -78,7 +85,6 @@ export default function App() {
     };
   }, [visible]);
 
-  // Optimistic capability writes
   const setCapability = useCallback(async (deviceId, capability, value) => {
     setData(d => {
       if (!d.devices?.[deviceId]) return d;
@@ -105,8 +111,10 @@ export default function App() {
 
   const counts = useMemo(() => ({
     devices: data.devices ? Object.keys(data.devices).length : 0,
-    flows: data.flows ? Object.values(data.flows).filter(f => f.enabled).length : 0
-  }), [data.devices, data.flows]);
+    flows: data.flows ? Object.values(data.flows).filter(f => f.enabled).length : 0,
+    zones: data.zones ? Object.keys(data.zones).length : 0,
+    favorites: favorites.ids.length
+  }), [data.devices, data.flows, data.zones, favorites.ids]);
 
   return (
     <div className="relative min-h-screen bg-nx-bg bg-scanlines overflow-hidden">
@@ -141,12 +149,13 @@ export default function App() {
               counts={counts}
               setCapability={setCapability}
               runFlow={runFlow}
+              favorites={favorites}
             />
           )}
 
           <footer className="mt-10 mb-4 flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-nx-mute font-mono">
             <span>NEXORA · {system?.house || 'Hunstein 48c'}</span>
-            <span>v{system?.version || '1.0'} · {system?.demo ? 'demo' : 'live'}</span>
+            <span>v{system?.version || '1.0'} · {counts.devices} enh · {counts.zones} rom · {system?.demo ? 'demo' : 'live'}</span>
           </footer>
         </main>
       </div>
@@ -154,11 +163,7 @@ export default function App() {
   );
 }
 
-/**
- * Each top-level section gets a tailored layout. They reuse the same widgets
- * but lay them out for the focus of that section.
- */
-function SectionView({ section, system, data, counts, setCapability, runFlow }) {
+function SectionView({ section, system, data, counts, setCapability, runFlow, favorites }) {
   const userName = system?.user || 'Ole';
   const greetingPanel = (
     <div className="col-span-12 lg:col-span-3 panel p-5">
@@ -178,17 +183,21 @@ function SectionView({ section, system, data, counts, setCapability, runFlow }) 
           <span className="h-1.5 w-1.5 rounded-full bg-nx-cyan" />
           {system?.demo ? 'Demo' : 'Live'}
         </span>
+        <span className="chip">
+          <span className="h-1.5 w-1.5 rounded-full bg-nx-purple" />
+          {counts.devices} enheter
+        </span>
       </div>
     </div>
   );
 
-  const wrapper = (children) => (
+  const wrapper = (children, gridGap = true) => (
     <motion.div
       key={section}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
-      className="mt-6 grid grid-cols-12 gap-4 lg:gap-5"
+      className={gridGap ? 'mt-6 grid grid-cols-12 gap-4 lg:gap-5' : 'mt-6'}
     >
       {children}
     </motion.div>
@@ -196,18 +205,49 @@ function SectionView({ section, system, data, counts, setCapability, runFlow }) 
 
   switch (section) {
     case 'rom':
-      return wrapper(<>
-        {greetingPanel}
-        <div className="col-span-12 lg:col-span-9 panel overflow-hidden">
-          <HouseView devices={data.devices || {}} zones={data.zones || {}} weather={data.weather} />
-        </div>
-        <div className="col-span-12 lg:col-span-6 panel p-5">
-          <RoomTemps devices={data.devices || {}} zones={data.zones || {}} />
-        </div>
-        <div className="col-span-12 lg:col-span-6 panel p-5">
-          <Lighting devices={data.devices || {}} onSet={setCapability} />
-        </div>
-      </>);
+      return wrapper(
+        <ZonesView
+          devices={data.devices || {}}
+          zones={data.zones || {}}
+          onSet={setCapability}
+          favorites={favorites}
+        />,
+        false
+      );
+
+    case 'enheter':
+      return wrapper(
+        <DevicesView
+          devices={data.devices || {}}
+          zones={data.zones || {}}
+          onSet={setCapability}
+          favorites={favorites}
+        />,
+        false
+      );
+
+    case 'energi':
+      return wrapper(
+        <Suspense fallback={<LoadingPanel label="LASTER ENERGI..." />}>
+          <EnergyView
+            devices={data.devices || {}}
+            zones={data.zones || {}}
+            energy={data.energy}
+          />
+        </Suspense>,
+        false
+      );
+
+    case 'favoritter':
+      return wrapper(
+        <FavoritesView
+          devices={data.devices || {}}
+          zones={data.zones || {}}
+          onSet={setCapability}
+          favorites={favorites}
+        />,
+        false
+      );
 
     case 'automasjon':
       return wrapper(<>
@@ -219,22 +259,6 @@ function SectionView({ section, system, data, counts, setCapability, runFlow }) 
           <FavoriteAutomations flows={data.flows || {}} onRun={runFlow} />
         </div>
         <div className="col-span-12 lg:col-span-6 panel p-5">
-          <ActivityFeed activity={data.activity || []} />
-        </div>
-      </>);
-
-    case 'energi':
-      return wrapper(<>
-        {greetingPanel}
-        <div className="col-span-12 lg:col-span-9 panel p-5">
-          <Suspense fallback={<ChartSkeleton />}>
-            <EnergyWidget energy={data.energy} />
-          </Suspense>
-        </div>
-        <div className="col-span-12 lg:col-span-4 panel p-5">
-          <WeatherWidget weather={data.weather} />
-        </div>
-        <div className="col-span-12 lg:col-span-8 panel p-5">
           <ActivityFeed activity={data.activity || []} />
         </div>
       </>);
@@ -275,7 +299,7 @@ function SectionView({ section, system, data, counts, setCapability, runFlow }) 
           <QuickControls flows={data.flows || {}} onRun={runFlow} />
         </div>
         <div className="col-span-12 lg:col-span-6 panel p-5">
-          <Suspense fallback={<ChartSkeleton />}>
+          <Suspense fallback={<LoadingPanel label="LASTER GRAF..." />}>
             <EnergyWidget energy={data.energy} />
           </Suspense>
         </div>
@@ -298,10 +322,10 @@ function SectionView({ section, system, data, counts, setCapability, runFlow }) 
   }
 }
 
-function ChartSkeleton() {
+function LoadingPanel({ label }) {
   return (
     <div className="h-40 grid place-items-center text-nx-mute" role="status">
-      <span className="font-mono text-xs">LASTER GRAF...</span>
+      <span className="font-mono text-xs">{label}</span>
     </div>
   );
 }
@@ -314,7 +338,9 @@ function SettingsPanel({ system, counts }) {
     ['Homey-konfigurert', system?.homeyConfigured ? 'Ja' : 'Nei'],
     ['Versjon', system?.version || '—'],
     ['Antall enheter', counts.devices || 0],
-    ['Aktive flows', counts.flows || 0]
+    ['Antall rom', counts.zones || 0],
+    ['Aktive flows', counts.flows || 0],
+    ['Favoritt-enheter', counts.favorites || 0]
   ];
   return (
     <div>
@@ -328,7 +354,7 @@ function SettingsPanel({ system, counts }) {
         ))}
       </ul>
       <p className="mt-4 text-xs text-nx-mute leading-relaxed">
-        For å bytte fra Demo til Live: legg inn <code className="font-mono text-nx-cyan">HOMEY_PAT</code> i Railway → Variables, eller hardkod i <code className="font-mono text-nx-cyan">server/config.js</code>. Du finner Personal Access Token på <a className="text-nx-cyan underline" href="https://my.homey.app/me" target="_blank" rel="noopener noreferrer">my.homey.app/me</a>.
+        For å kjøre full discovery av Homey-en din: kjør <code className="font-mono text-nx-cyan">npm run discover --prefix server</code> lokalt. Den dumper hele inventaret til <code className="font-mono text-nx-cyan">homey-inventory.json</code> som du kan dele med Claude for skreddersydd dashboard.
       </p>
     </div>
   );

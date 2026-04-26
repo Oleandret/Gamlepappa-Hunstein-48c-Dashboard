@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { homeyClient } from '../lib/homeyClient.js';
 import { isDemoMode } from '../config.js';
+import { buildInventory } from '../lib/inventory.js';
 import {
   MOCK_DEVICES,
   MOCK_ZONES,
@@ -58,6 +59,19 @@ homeyRoutes.get('/energy', safe(
 homeyRoutes.get('/activity', safe(
   async () => ({ activity: [] }),
   async () => ({ activity: MOCK_ACTIVITY })
+));
+
+/** Inventory: total opptelling av alle devices/zones/flows + capability-statistikk */
+homeyRoutes.get('/inventory', safe(
+  async () => {
+    const [devices, zones, flows] = await Promise.all([
+      homeyClient.listDevices(),
+      homeyClient.listZones(),
+      homeyClient.listFlows()
+    ]);
+    return buildInventory({ devices, zones, flows });
+  },
+  async () => buildInventory({ devices: MOCK_DEVICES, zones: MOCK_ZONES, flows: MOCK_FLOWS })
 ));
 
 homeyRoutes.get('/security', safe(
