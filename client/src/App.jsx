@@ -21,6 +21,7 @@ import { ZonesView } from './components/views/ZonesView.jsx';
 import { DevicesView } from './components/views/DevicesView.jsx';
 import { FavoritesView } from './components/views/FavoritesView.jsx';
 import { AudioView } from './components/views/AudioView.jsx';
+import { FloorPlanView } from './components/views/FloorPlanView.jsx';
 import { DiscoveryPanel } from './components/DiscoveryPanel.jsx';
 import { TeslaCard } from './components/special/TeslaCard.jsx';
 import { RoborockCard } from './components/special/RoborockCard.jsx';
@@ -275,6 +276,15 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
           devices={data.devices || {}}
           zones={data.zones || {}}
           onSet={setCapability}
+        />,
+        false
+      );
+
+    case 'plantegning':
+      return wrapper(
+        <FloorPlanView
+          devices={data.devices || {}}
+          zones={data.zones || {}}
         />,
         false
       );

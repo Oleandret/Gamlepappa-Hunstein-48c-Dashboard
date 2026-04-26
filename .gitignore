@@ -38,3 +38,6 @@ yarn-error.log*
 !client/public/**/*
 # Local discovery output
 homey-inventory*.json
+# Lokale PDF-tmp og PDF-kilder
+tmp-pdf-*.jpg
+*.pdf
