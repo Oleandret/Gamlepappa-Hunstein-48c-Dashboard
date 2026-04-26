@@ -10,6 +10,19 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: false
+    sourcemap: false,
+    chunkSizeWarningLimit: 800,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Split heavy vendors so the initial bundle stays small.
+          // Recharts is loaded only when the energy chart actually mounts.
+          'recharts':       ['recharts'],
+          'framer-motion':  ['framer-motion'],
+          'react-vendor':   ['react', 'react-dom'],
+          'icons':          ['lucide-react']
+        }
+      }
+    }
   }
 });

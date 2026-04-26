@@ -1,15 +1,6 @@
-import { Home, LayoutGrid, Zap, ShieldCheck, Workflow, Settings } from 'lucide-react';
+import { SECTIONS } from '../lib/sections.js';
 
-const items = [
-  { id: 'oversikt',   label: 'Oversikt',    Icon: Home },
-  { id: 'rom',        label: 'Rom',         Icon: LayoutGrid },
-  { id: 'automasjon', label: 'Automasjon',  Icon: Workflow },
-  { id: 'energi',     label: 'Energi',      Icon: Zap },
-  { id: 'sikkerhet',  label: 'Sikkerhet',   Icon: ShieldCheck },
-  { id: 'innstillinger', label: 'Innstillinger', Icon: Settings }
-];
-
-export function Sidebar({ section, onSection }) {
+export function Sidebar({ section, onSection, deviceCount = 0, flowCount = 0 }) {
   return (
     <aside className="w-20 lg:w-56 shrink-0 border-r border-nx-line/60 bg-nx-bg/70 backdrop-blur-md py-6">
       <div className="px-4 lg:px-5 flex items-center gap-2.5">
@@ -22,13 +13,15 @@ export function Sidebar({ section, onSection }) {
         </div>
       </div>
 
-      <div className="mt-8 px-2 lg:px-3 space-y-1">
-        {items.map(({ id, label, Icon }) => {
+      <nav className="mt-8 px-2 lg:px-3 space-y-1" aria-label="Hoved-navigasjon">
+        {SECTIONS.map(({ id, label, Icon }) => {
           const active = section === id;
           return (
             <button
               key={id}
               onClick={() => onSection(id)}
+              aria-current={active ? 'page' : undefined}
+              aria-label={label}
               className={[
                 'group relative w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors',
                 active
@@ -37,21 +30,21 @@ export function Sidebar({ section, onSection }) {
               ].join(' ')}
             >
               {active && (
-                <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full bg-nx-cyan shadow-glow-cyan" />
+                <span aria-hidden="true" className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full bg-nx-cyan shadow-glow-cyan" />
               )}
-              <Icon size={18} />
+              <Icon size={18} aria-hidden="true" />
               <span className="hidden lg:inline">{label}</span>
             </button>
           );
         })}
-      </div>
+      </nav>
 
-      <div className="mt-10 mx-3 hidden lg:block panel p-3">
+      <div className="mt-10 mx-3 hidden lg:block panel p-3" aria-label="System-status">
         <p className="panel-title">Status</p>
         <div className="mt-2 space-y-2 text-xs">
-          <Stat label="Enheter" value="42" />
-          <Stat label="Online" value="40" tone="green" />
-          <Stat label="Flows aktive" value="23" />
+          <Stat label="Enheter" value={deviceCount || '—'} />
+          <Stat label="Flows" value={flowCount || '—'} />
+          <Stat label="Online" value={deviceCount ? 'OK' : '—'} tone="green" />
         </div>
       </div>
     </aside>

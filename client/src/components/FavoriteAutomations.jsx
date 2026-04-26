@@ -18,7 +18,7 @@ export function FavoriteAutomations({ flows, onRun }) {
             key={f.id}
             className="group flex items-center gap-3 rounded-xl border border-nx-line/50 bg-nx-panel/40 px-2.5 py-2 hover:border-nx-cyan/50"
           >
-            <div className="grid h-8 w-8 place-items-center rounded-md bg-nx-cyan/10 text-nx-cyan">
+            <div className="grid h-8 w-8 place-items-center rounded-md bg-nx-cyan/10 text-nx-cyan" aria-hidden="true">
               <Workflow size={14}/>
             </div>
             <div className="min-w-0 flex-1">
@@ -27,10 +27,10 @@ export function FavoriteAutomations({ flows, onRun }) {
             </div>
             <button
               onClick={() => onRun(f.id)}
+              aria-label={`Kjør ${f.name}`}
               className="grid h-7 w-7 place-items-center rounded-full bg-nx-cyan/10 text-nx-cyan opacity-70 group-hover:opacity-100 hover:bg-nx-cyan/20"
-              aria-label="Kjør"
             >
-              <Play size={12}/>
+              <Play size={12} aria-hidden="true"/>
             </button>
           </li>
         ))}
