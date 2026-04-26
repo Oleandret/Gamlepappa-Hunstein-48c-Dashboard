@@ -1,9 +1,15 @@
 # Railway/Nixpacks configuration
+# IMPORTANT: --include=dev forces Vite + build tools to install even when
+# Railway sets NODE_ENV=production (otherwise devDependencies get skipped).
 [phases.setup]
 nixPkgs = ["nodejs_20", "npm-9_x"]
 
 [phases.install]
-cmds = ["npm ci || npm install", "npm install --prefix server", "npm install --prefix client"]
+cmds = [
+  "npm ci --include=dev || npm install --include=dev",
+  "npm install --include=dev --prefix server",
+  "npm install --include=dev --prefix client"
+]
 
 [phases.build]
 cmds = ["npm run build --prefix client"]
