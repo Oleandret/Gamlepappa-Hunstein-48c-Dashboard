@@ -3,17 +3,21 @@ import { motion } from 'framer-motion';
 import {
   Thermometer, Droplets, Lock, Unlock, Camera as CameraIcon,
   DoorOpen, ShieldAlert, ShieldCheck, Home as HomeIcon, Anchor,
-  Car, Sun, Flame, Music
+  Car, Sun, Flame, Music, MapPin
 } from 'lucide-react';
 import { capValue, hasCap } from '../lib/deviceUtils.js';
 
 /**
- * Two background images (huset + hytta) with their own pin layouts.
- * Position values are % of width / height tuned to the actual photos.
+ * Two locations: huset (Hunstein 48c) og hytta (Halsaneset 32).
+ * Each renders a background photo with sci-fi pin overlays.
+ *
+ * Use without `forceLocation` for a togglable single-panel view, or pass
+ * `forceLocation="home"` / `"cabin"` to lock to one location (no toggle).
  */
 const VIEWS = {
   home: {
     label: 'Hjem',
+    address: 'Hunstein 48c',
     Icon: HomeIcon,
     image: '/house.jpg',
     pins: [
@@ -31,29 +35,47 @@ const VIEWS = {
   },
   cabin: {
     label: 'Hytte',
+    address: 'Halsaneset 32',
     Icon: Anchor,
     image: '/cabin.jpg',
     pins: [
-      { kind: 'zone', zoneName: 'Halsaneset',         x: 62, y: 22, dx: -22, dy: -16 },
-      { kind: 'label', label: 'TERRASSE',  x: 38, y: 42, dx: -22, dy: -16, sub: 'Halsaneset Terasse' },
-      { kind: 'label', label: 'KJELLER',   x: 38, y: 55, dx: 6,   dy: 8,   sub: 'Halsaneset Kjeller' },
-      { kind: 'sauna', x: 24, y: 18, dx: -22, dy: -16 },
-      { kind: 'pier',  x: 47, y: 80, dx: -22, dy: -16 },
-      { kind: 'boathouse', x: 80, y: 76, dx: 6, dy: -16 }
+      { kind: 'cabinZone', zoneName: 'Halsaneset',          x: 62, y: 25, dx: -22, dy: -16 },
+      { kind: 'cabinDevice', deviceMatch: 'Terasse',        x: 38, y: 42, dx: -22, dy: -16, label: 'TERRASSE' },
+      { kind: 'cabinDevice', deviceMatch: 'Kjeller',        x: 38, y: 56, dx: 6,   dy: 8,   label: 'KJELLER' },
+      { kind: 'sauna',     x: 24, y: 18, dx: -22, dy: -16 },
+      { kind: 'pier',      x: 47, y: 80, dx: -22, dy: -16 },
+      { kind: 'boathouse', x: 80, y: 76, dx: 6,   dy: -16 }
     ]
   }
 };
 
-export function HouseView({ devices, zones, weather }) {
-  const [view, setView] = useState('home');
+export function HouseView({ devices, zones, weather, forceLocation = null }) {
+  const [internalView, setInternalView] = useState('home');
+  const view = forceLocation || internalView;
   const cur = VIEWS[view];
+  const showToggle = !forceLocation;
 
   const outdoorTemp = Number.isFinite(weather?.now?.temp) ? `${Math.round(weather.now.temp)}°C` : '--';
   const humidity = Number.isFinite(weather?.now?.humidity) ? `${Math.round(weather.now.humidity)}%` : '--';
 
   const zoneStatus = useMemo(() => buildZoneStatus(devices, zones), [devices, zones]);
   const allDevs = Object.values(devices || {});
-  const indoorTemps = allDevs
+
+  // Filter devices that belong to this location for the header stats
+  const locationDevices = useMemo(() => {
+    if (view === 'cabin') {
+      const cabinZone = Object.values(zones || {}).find(z => /halsaneset/i.test(z.name || ''));
+      if (!cabinZone) return [];
+      const cabinIds = collectZoneIds(zones, cabinZone.id);
+      return allDevs.filter(d => cabinIds.includes(d.zone));
+    }
+    // For huset: alle som IKKE er i Halsaneset
+    const cabinZone = Object.values(zones || {}).find(z => /halsaneset/i.test(z.name || ''));
+    const cabinIds = cabinZone ? collectZoneIds(zones, cabinZone.id) : [];
+    return allDevs.filter(d => !cabinIds.includes(d.zone));
+  }, [allDevs, zones, view]);
+
+  const indoorTemps = locationDevices
     .map(d => capValue(d, 'measure_temperature'))
     .filter(t => Number.isFinite(t));
   const avg = indoorTemps.length
@@ -61,18 +83,18 @@ export function HouseView({ devices, zones, weather }) {
     : '--';
 
   const securityCounts = useMemo(() => ({
-    locks:    allDevs.filter(d => d.class === 'lock').length,
-    locked:   allDevs.filter(d => d.class === 'lock' && capValue(d, 'locked')).length,
-    cameras:  allDevs.filter(d => d.class === 'camera').length,
-    motion:   allDevs.filter(d => capValue(d, 'alarm_motion') === true).length,
-    open:     allDevs.filter(d => capValue(d, 'alarm_contact') === true).length
-  }), [allDevs]);
+    locks:    locationDevices.filter(d => d.class === 'lock').length,
+    locked:   locationDevices.filter(d => d.class === 'lock' && capValue(d, 'locked')).length,
+    cameras:  locationDevices.filter(d => d.class === 'camera').length,
+    motion:   locationDevices.filter(d => capValue(d, 'alarm_motion') === true).length,
+    open:     locationDevices.filter(d => capValue(d, 'alarm_contact') === true).length
+  }), [locationDevices]);
 
-  const allSecure = securityCounts.locked === securityCounts.locks
+  const allSecure = (securityCounts.locks === 0 || securityCounts.locked === securityCounts.locks)
                     && securityCounts.open === 0
                     && securityCounts.motion === 0;
 
-  // Find Tesla + Tibber for the special pins
+  // Find Tesla + Tibber for the special pins (only relevant for "home")
   const tesla = useMemo(() =>
     allDevs.find(d => d.class === 'car' || /tesla/i.test(d.driverUri || '')),
     [allDevs]
@@ -81,69 +103,76 @@ export function HouseView({ devices, zones, weather }) {
     allDevs.find(d => /tibber/i.test(d.driverUri || '')),
     [allDevs]
   );
-  const solarPower = capValue(tibber, 'measure_current.L1');  // negative = production
+  const solarPower = capValue(tibber, 'measure_current.L1');
 
   return (
     <div className="relative h-full p-5">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <p className="panel-title">Hjemmet</p>
+          <p className="panel-title flex items-center gap-1.5">
+            <MapPin size={11} className="text-nx-cyan" aria-hidden="true" /> {cur.address}
+          </p>
           <h2 className="mt-1 text-lg font-semibold flex items-center gap-2">
             {allSecure
               ? <ShieldCheck size={18} className="text-nx-green" aria-hidden="true" />
-              : <ShieldAlert size={18} className="text-nx-amber" aria-hidden="true" />
-            }
+              : <ShieldAlert size={18} className="text-nx-amber" aria-hidden="true" />}
             {allSecure ? 'Alt er sikret' : 'Sjekk sikkerhet'}
           </h2>
         </div>
-        <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
           <Stat icon={<Thermometer size={14} className="text-nx-cyan" aria-hidden="true" />} label="Innetemp" value={`${avg}°C`} />
           <Stat icon={<Droplets size={14} className="text-nx-cyan" aria-hidden="true" />} label="Fuktighet" value={humidity} />
-          <Stat icon={<Lock size={14} className="text-nx-green" aria-hidden="true" />} label="Låser" value={`${securityCounts.locked}/${securityCounts.locks}`} tone={securityCounts.locked === securityCounts.locks ? 'green' : 'amber'} />
-          <Stat icon={<DoorOpen size={14} className="text-nx-cyan" aria-hidden="true" />} label="Åpne" value={String(securityCounts.open)} tone={securityCounts.open ? 'amber' : 'green'} />
-          <Stat icon={<CameraIcon size={14} className="text-nx-cyan" aria-hidden="true" />} label="Bevegelse" value={String(securityCounts.motion)} tone={securityCounts.motion ? 'amber' : undefined} />
+          {securityCounts.locks > 0 && (
+            <Stat icon={<Lock size={14} className="text-nx-green" aria-hidden="true" />} label="Låser" value={`${securityCounts.locked}/${securityCounts.locks}`} tone={securityCounts.locked === securityCounts.locks ? 'green' : 'amber'} />
+          )}
+          {securityCounts.open > 0 && (
+            <Stat icon={<DoorOpen size={14} className="text-nx-amber" aria-hidden="true" />} label="Åpne" value={String(securityCounts.open)} tone="amber" />
+          )}
+          {securityCounts.cameras > 0 && (
+            <Stat icon={<CameraIcon size={14} className="text-nx-cyan" aria-hidden="true" />} label="Kamera" value={String(securityCounts.cameras)} tone={securityCounts.motion ? 'amber' : undefined} />
+          )}
         </div>
       </div>
 
-      {/* Hjem / Hytte toggle */}
-      <div className="mt-3 flex gap-1 p-0.5 rounded-lg border border-nx-line/60 bg-nx-panel/40 w-fit">
-        {Object.entries(VIEWS).map(([key, v]) => {
-          const active = view === key;
-          const Icon = v.Icon;
-          return (
-            <button
-              key={key}
-              onClick={() => setView(key)}
-              aria-pressed={active}
-              className={[
-                'inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-mono uppercase tracking-[0.18em] transition-colors',
-                active ? 'bg-nx-cyan/15 text-nx-cyan shadow-glow-soft' : 'text-nx-mute hover:text-nx-text'
-              ].join(' ')}
-            >
-              <Icon size={12} aria-hidden="true" />
-              {v.label}
-            </button>
-          );
-        })}
-      </div>
+      {showToggle && (
+        <div className="mt-3 flex gap-1 p-0.5 rounded-lg border border-nx-line/60 bg-nx-panel/40 w-fit">
+          {Object.entries(VIEWS).map(([key, v]) => {
+            const active = view === key;
+            const Icon = v.Icon;
+            return (
+              <button
+                key={key}
+                onClick={() => setInternalView(key)}
+                aria-pressed={active}
+                className={[
+                  'inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-mono uppercase tracking-[0.18em] transition-colors',
+                  active ? 'bg-nx-cyan/15 text-nx-cyan shadow-glow-soft' : 'text-nx-mute hover:text-nx-text'
+                ].join(' ')}
+              >
+                <Icon size={12} aria-hidden="true" />
+                {v.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div className="relative mt-3 aspect-[3/2] w-full overflow-hidden rounded-xl border border-nx-line/60 bg-nx-bg">
         <img
           src={cur.image}
-          alt={view === 'home' ? 'Hunstein 48c sett fra droneperspektiv' : 'Halsaneset hytte sett fra droneperspektiv'}
+          alt={`${cur.address} sett fra droneperspektiv`}
           loading="lazy"
           decoding="async"
           className="absolute inset-0 h-full w-full object-cover"
           draggable={false}
         />
 
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-br from-nx-bg/55 via-nx-bg/15 to-nx-bg/65" />
         <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{
-          background: 'radial-gradient(circle at 50% 35%, rgba(34,230,255,0.10), transparent 65%)'
+          background: 'radial-gradient(circle at 50% 35%, rgba(34,230,255,0.08), transparent 70%)'
         }} />
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-grid bg-[size:32px_32px] opacity-20 mix-blend-screen" />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-grid bg-[size:32px_32px] opacity-12 mix-blend-screen" />
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -inset-x-10 h-32 bg-gradient-to-b from-transparent via-nx-cyan/10 to-transparent animate-scan" />
+          <div className="absolute -inset-x-10 h-32 bg-gradient-to-b from-transparent via-nx-cyan/8 to-transparent animate-scan" />
         </div>
         <Brackets />
 
@@ -158,14 +187,21 @@ export function HouseView({ devices, zones, weather }) {
         </motion.div>
 
         <div className="absolute bottom-3 left-3 font-mono text-[10px] uppercase tracking-[0.22em] text-nx-mute">
-          ◉ {view === 'home' ? 'HUNSTEIN 48c' : 'HALSANESET'} · LIVE
+          ◉ {cur.address.toUpperCase()} · LIVE
         </div>
 
-        {/* Render pins for current view */}
         {cur.pins.map((p, i) => {
           if (p.kind === 'zone') {
             const z = zoneStatus.find(s => s.name === p.zoneName);
             return <ZonePin key={i} zone={z || { name: p.zoneName, summary: '—' }} pos={p} />;
+          }
+          if (p.kind === 'cabinZone') {
+            const z = zoneStatus.find(s => s.name === p.zoneName);
+            return <ZonePin key={i} zone={z || { name: p.zoneName, summary: '—' }} pos={p} />;
+          }
+          if (p.kind === 'cabinDevice') {
+            const dev = locationDevices.find(d => new RegExp(p.deviceMatch, 'i').test(d.name || ''));
+            return <CabinDevicePin key={i} device={dev} label={p.label} pos={p} />;
           }
           if (p.kind === 'tesla') return tesla
             ? <TeslaPin key={i} tesla={tesla} pos={p} />
@@ -173,17 +209,12 @@ export function HouseView({ devices, zones, weather }) {
           if (p.kind === 'solar') return tibber
             ? <SolarPin key={i} solarAmps={solarPower} pos={p} />
             : null;
-          if (p.kind === 'sauna') return <LabelPin key={i} label="SAUNA" sub="Halsaneset" pos={p} Icon={Flame} />;
-          if (p.kind === 'pier')  return <LabelPin key={i} label="BRYGGE" sub="Sjøside" pos={p} Icon={Anchor} />;
+          if (p.kind === 'sauna')     return <LabelPin key={i} label="SAUNA" sub="Halsaneset" pos={p} Icon={Flame} />;
+          if (p.kind === 'pier')      return <LabelPin key={i} label="BRYGGE" sub="Sjøside" pos={p} Icon={Anchor} />;
           if (p.kind === 'boathouse') return <LabelPin key={i} label="BÅTHUS" sub="Verkstedslys" pos={p} Icon={Anchor} />;
-          if (p.kind === 'label')  return <LabelPin key={i} label={p.label} sub={p.sub} pos={p} Icon={Music} />;
           return null;
         })}
       </div>
-
-      <p className="mt-2 text-[10px] uppercase tracking-[0.22em] text-nx-mute font-mono">
-        {view === 'home' ? 'Hjem · Hunstein 48c' : 'Hytte · Halsaneset'} · pin-koordinater i HouseView.jsx
-      </p>
     </div>
   );
 }
@@ -216,11 +247,47 @@ const ZonePin = memo(function ZonePin({ zone, pos }) {
   );
 });
 
+function CabinDevicePin({ device, label, pos }) {
+  if (!device) {
+    return (
+      <PinShell pos={pos} ariaLabel={label}>
+        <div className="text-[8px] tracking-[0.18em] text-nx-mute font-mono leading-none">{label}</div>
+        <div className="text-[10px] font-mono text-nx-mute leading-tight">—</div>
+      </PinShell>
+    );
+  }
+  const t = capValue(device, 'measure_temperature');
+  const target = capValue(device, 'target_temperature');
+  const playing = capValue(device, 'speaker_playing');
+  const onoff = capValue(device, 'onoff');
+  return (
+    <PinShell pos={pos} ariaLabel={`${label} — ${device.name}`}>
+      <div className="text-[8px] tracking-[0.18em] text-nx-mute font-mono leading-none">{label}</div>
+      {t != null && (
+        <div className="text-[12px] font-mono text-nx-cyan leading-tight">
+          {Number(t).toFixed(1)}°C
+          {target != null && <span className="text-nx-mute text-[9px] ml-1">→ {Number(target).toFixed(0)}°</span>}
+        </div>
+      )}
+      {playing !== undefined && (
+        <div className={['text-[10px] font-mono leading-tight flex items-center gap-1', playing ? 'text-nx-cyan' : 'text-nx-mute'].join(' ')}>
+          <Music size={9} aria-hidden="true" /> {playing ? 'spiller' : 'stille'}
+        </div>
+      )}
+      {onoff !== undefined && playing === undefined && t == null && (
+        <div className={['text-[10px] font-mono leading-tight', onoff ? 'text-nx-green' : 'text-nx-mute'].join(' ')}>
+          {onoff ? 'PÅ' : 'AV'}
+        </div>
+      )}
+    </PinShell>
+  );
+}
+
 function TeslaPin({ tesla, pos }) {
   const battery = capValue(tesla, 'measure_battery');
   const charging = String(capValue(tesla, 'ev_charging_state') || '').toLowerCase().includes('charging');
   return (
-    <PinShell pos={pos} ariaLabel={`Tesla ${tesla.name}: batteri ${battery}%`} accent="cyan">
+    <PinShell pos={pos} ariaLabel={`Tesla ${tesla.name}: batteri ${battery}%`}>
       <div className="text-[8px] tracking-[0.18em] text-nx-mute font-mono leading-none flex items-center gap-1">
         <Car size={9} aria-hidden="true" /> {tesla.name?.toUpperCase()}
       </div>
@@ -260,7 +327,6 @@ function LabelPin({ label, sub, pos, Icon }) {
 }
 
 function PinShell({ pos, ariaLabel, hasAlarm = false, accent = 'cyan', children }) {
-  const isAlarm = hasAlarm;
   return (
     <div
       className="absolute"
@@ -270,15 +336,15 @@ function PinShell({ pos, ariaLabel, hasAlarm = false, accent = 'cyan', children 
     >
       <span aria-hidden="true" className={[
         'absolute inset-0 -m-1 rounded-full border animate-pulseGlow',
-        isAlarm ? 'border-nx-red/70'
-                : accent === 'green' ? 'border-nx-green/60'
-                : 'border-nx-cyan/60'
+        hasAlarm ? 'border-nx-red/70'
+                 : accent === 'green' ? 'border-nx-green/60'
+                 : 'border-nx-cyan/60'
       ].join(' ')} />
       <span aria-hidden="true" className={[
         'relative block h-2.5 w-2.5 rounded-full',
-        isAlarm ? 'bg-nx-red shadow-[0_0_12px_rgba(255,92,122,0.9)]'
-                : accent === 'green' ? 'bg-nx-green shadow-[0_0_12px_rgba(61,220,132,0.9)]'
-                : 'bg-nx-cyan shadow-[0_0_12px_rgba(34,230,255,0.9)]'
+        hasAlarm ? 'bg-nx-red shadow-[0_0_12px_rgba(255,92,122,0.9)]'
+                 : accent === 'green' ? 'bg-nx-green shadow-[0_0_12px_rgba(61,220,132,0.9)]'
+                 : 'bg-nx-cyan shadow-[0_0_12px_rgba(34,230,255,0.9)]'
       ].join(' ')} />
       <div
         className="absolute pointer-events-none"
@@ -287,17 +353,17 @@ function PinShell({ pos, ariaLabel, hasAlarm = false, accent = 'cyan', children 
       >
         <div className={[
           'rounded-md border bg-nx-bg/85 backdrop-blur-sm px-2 py-1 shadow-glow-soft min-w-[80px]',
-          isAlarm ? 'border-nx-red/55'
-                  : accent === 'green' ? 'border-nx-green/45'
-                  : 'border-nx-cyan/45'
+          hasAlarm ? 'border-nx-red/55'
+                   : accent === 'green' ? 'border-nx-green/45'
+                   : 'border-nx-cyan/45'
         ].join(' ')}>
           {children}
         </div>
         <div className={[
           'absolute left-1/2 top-full h-3 w-px',
-          isAlarm ? 'bg-nx-red/60'
-                  : accent === 'green' ? 'bg-nx-green/60'
-                  : 'bg-nx-cyan/50'
+          hasAlarm ? 'bg-nx-red/60'
+                   : accent === 'green' ? 'bg-nx-green/60'
+                   : 'bg-nx-cyan/50'
         ].join(' ')} />
       </div>
     </div>
@@ -362,4 +428,20 @@ function buildZoneStatus(devices, zones) {
       s.motion > 0 && `${s.motion} bevegelse`
     ].filter(Boolean).join(' · ') || 'OK'
   }));
+}
+
+function collectZoneIds(zones, rootId) {
+  const ids = [rootId];
+  const all = Object.values(zones || {});
+  const queue = [rootId];
+  while (queue.length) {
+    const current = queue.shift();
+    for (const z of all) {
+      if (z.parent === current) {
+        ids.push(z.id);
+        queue.push(z.id);
+      }
+    }
+  }
+  return ids;
 }

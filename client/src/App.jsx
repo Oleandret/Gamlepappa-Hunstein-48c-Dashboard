@@ -347,11 +347,24 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
       const tibber = findFirst(data.devices, d => /tibber/i.test(d.driverUri || ''));
       return wrapper(<>
         {greetingPanel}
-        <div className="col-span-12 lg:col-span-6 panel overflow-hidden">
-          <HouseView devices={data.devices || {}} zones={data.zones || {}} weather={data.weather} />
+        <div className="col-span-12 lg:col-span-9 panel overflow-hidden">
+          <HouseView
+            devices={data.devices || {}}
+            zones={data.zones || {}}
+            weather={data.weather}
+            forceLocation="home"
+          />
         </div>
         <div className="col-span-12 lg:col-span-3 panel p-5">
           <SecurityWidget security={data.security} />
+        </div>
+        <div className="col-span-12 lg:col-span-9 panel overflow-hidden">
+          <HouseView
+            devices={data.devices || {}}
+            zones={data.zones || {}}
+            weather={data.weather}
+            forceLocation="cabin"
+          />
         </div>
         <div className="col-span-12 lg:col-span-3 panel p-5">
           <QuickControls flows={data.flows || {}} onRun={runFlow} />
