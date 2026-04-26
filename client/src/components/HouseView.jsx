@@ -17,8 +17,14 @@ import { capValue, hasCap } from '../lib/deviceUtils.js';
  * Image URLs include a version query so browsers/CDN won't serve stale
  * copies after we update the JPGs.
  */
-const IMG_VERSION = '4';
+const IMG_VERSION = '5';
 
+/**
+ * Pin coordinates are % of the photo width / height.
+ * `placement` controls which side of the pin the badge floats on:
+ *   'top' (default), 'bottom', 'left', 'right'.
+ * Spread pins apart enough that the badges don't overlap visually.
+ */
 const VIEWS = {
   home: {
     label: 'Hjem',
@@ -26,16 +32,17 @@ const VIEWS = {
     Icon: HomeIcon,
     image: `/house.jpg?v=${IMG_VERSION}`,
     pins: [
-      { kind: 'zone', zoneName: 'Hovedsoverom', x: 58, y: 36, dx: 4,   dy: -16 },
-      { kind: 'zone', zoneName: 'Stue',         x: 50, y: 32, dx: -8,  dy: -16 },
-      { kind: 'zone', zoneName: 'Kjøkken',      x: 38, y: 36, dx: -22, dy: -16 },
-      { kind: 'zone', zoneName: 'Hovedetasjen', x: 53, y: 50, dx: -8,  dy: 8   },
-      { kind: 'zone', zoneName: 'Garasje',      x: 31, y: 53, dx: -22, dy: -16 },
-      { kind: 'zone', zoneName: 'Hage',         x: 24, y: 25, dx: -22, dy: -16 },
-      { kind: 'zone', zoneName: 'Kjeller',      x: 50, y: 70, dx: 4,   dy: 12  },
-      { kind: 'zone', zoneName: 'Kino',         x: 60, y: 72, dx: 4,   dy: 12  },
-      { kind: 'tesla', x: 78, y: 39, dx: -32, dy: -16 },
-      { kind: 'solar', x: 50, y: 14, dx: -22, dy: -16 }
+      // Top row (labels float above)
+      { kind: 'zone',  zoneName: 'Hage',         x: 18, y: 28, placement: 'top' },     // basketball court (venstre)
+      { kind: 'solar',                           x: 50, y: 18, placement: 'top' },     // solpaneler øverst
+      { kind: 'zone',  zoneName: 'Stue',         x: 60, y: 32, placement: 'top' },     // terrasse-stue
+      { kind: 'zone',  zoneName: 'Hovedsoverom', x: 78, y: 38, placement: 'top' },     // soverom oppe (høyre vinduer)
+      // Middle row (labels float to side)
+      { kind: 'zone',  zoneName: 'Garasje',      x: 30, y: 55, placement: 'left' },    // garasjeport (venstre)
+      { kind: 'tesla',                           x: 82, y: 55, placement: 'right' },   // gul Tesla (høyre)
+      // Lower row (labels float below — the sky is closed in by header)
+      { kind: 'zone',  zoneName: 'Hovedetasjen', x: 55, y: 65, placement: 'bottom' },  // hovedetasje vinduer
+      { kind: 'zone',  zoneName: 'Kjeller',      x: 50, y: 80, placement: 'bottom' }   // kjeller nederst
     ]
   },
   cabin: {
@@ -44,12 +51,12 @@ const VIEWS = {
     Icon: Anchor,
     image: `/cabin.jpg?v=${IMG_VERSION}`,
     pins: [
-      { kind: 'cabinZone', zoneName: 'Halsaneset',          x: 62, y: 25, dx: -22, dy: -16 },
-      { kind: 'cabinDevice', deviceMatch: 'Terasse',        x: 38, y: 42, dx: -22, dy: -16, label: 'TERRASSE' },
-      { kind: 'cabinDevice', deviceMatch: 'Kjeller',        x: 38, y: 56, dx: 6,   dy: 8,   label: 'KJELLER' },
-      { kind: 'sauna',     x: 24, y: 18, dx: -22, dy: -16 },
-      { kind: 'pier',      x: 47, y: 80, dx: -22, dy: -16 },
-      { kind: 'boathouse', x: 80, y: 76, dx: 6,   dy: -16 }
+      { kind: 'sauna',                                 x: 28, y: 14, placement: 'right' },  // lite sauna-bygg bak
+      { kind: 'cabinZone',   zoneName: 'Halsaneset',   x: 70, y: 22, placement: 'top' },   // hovedhytta
+      { kind: 'cabinDevice', deviceMatch: 'Terasse',   x: 50, y: 38, placement: 'left',   label: 'TERRASSE' }, // orangeri
+      { kind: 'cabinDevice', deviceMatch: 'Kjeller',   x: 47, y: 55, placement: 'left',   label: 'KJELLER' },  // glass-rom
+      { kind: 'pier',                                  x: 50, y: 82, placement: 'top' },   // brygge med båt
+      { kind: 'boathouse',                             x: 82, y: 78, placement: 'top' }    // båthus (høyre)
     ]
   }
 };
@@ -332,6 +339,9 @@ function LabelPin({ label, sub, pos, Icon }) {
 }
 
 function PinShell({ pos, ariaLabel, hasAlarm = false, accent = 'cyan', children }) {
+  const placement = pos.placement || 'top';
+  const placementStyle = getPlacementStyle(placement);
+
   return (
     <div
       className="absolute"
@@ -351,28 +361,53 @@ function PinShell({ pos, ariaLabel, hasAlarm = false, accent = 'cyan', children 
                  : accent === 'green' ? 'bg-nx-green shadow-[0_0_12px_rgba(61,220,132,0.9)]'
                  : 'bg-nx-cyan shadow-[0_0_12px_rgba(34,230,255,0.9)]'
       ].join(' ')} />
-      <div
-        className="absolute pointer-events-none"
-        style={{ left: `${pos.dx ?? 0}%`, top: `${pos.dy ?? -16}px`, transform: 'translateY(-100%)' }}
-        aria-hidden="true"
-      >
+      <div className="absolute pointer-events-none" style={placementStyle.label} aria-hidden="true">
         <div className={[
-          'rounded-md border bg-nx-bg/85 backdrop-blur-sm px-2 py-1 shadow-glow-soft min-w-[80px]',
+          'rounded-md border bg-nx-bg/85 backdrop-blur-sm px-2 py-1 shadow-glow-soft min-w-[72px] whitespace-nowrap',
           hasAlarm ? 'border-nx-red/55'
                    : accent === 'green' ? 'border-nx-green/45'
                    : 'border-nx-cyan/45'
         ].join(' ')}>
           {children}
         </div>
-        <div className={[
-          'absolute left-1/2 top-full h-3 w-px',
-          hasAlarm ? 'bg-nx-red/60'
-                   : accent === 'green' ? 'bg-nx-green/60'
-                   : 'bg-nx-cyan/50'
-        ].join(' ')} />
+        <div
+          className={[
+            'absolute',
+            hasAlarm ? 'bg-nx-red/60'
+                     : accent === 'green' ? 'bg-nx-green/60'
+                     : 'bg-nx-cyan/50'
+          ].join(' ')}
+          style={placementStyle.connector}
+        />
       </div>
     </div>
   );
+}
+
+function getPlacementStyle(placement) {
+  switch (placement) {
+    case 'bottom':
+      return {
+        label:     { top: '14px', left: '50%', transform: 'translateX(-50%)' },
+        connector: { left: '50%', top: '-8px', height: '8px', width: '1px' }
+      };
+    case 'left':
+      return {
+        label:     { right: '16px', top: '50%', transform: 'translateY(-50%)' },
+        connector: { right: '-8px', top: '50%', width: '8px', height: '1px' }
+      };
+    case 'right':
+      return {
+        label:     { left: '16px', top: '50%', transform: 'translateY(-50%)' },
+        connector: { left: '-8px', top: '50%', width: '8px', height: '1px' }
+      };
+    case 'top':
+    default:
+      return {
+        label:     { bottom: '14px', left: '50%', transform: 'translateX(-50%)' },
+        connector: { left: '50%', top: '100%', height: '8px', width: '1px' }
+      };
+  }
 }
 
 function Brackets() {

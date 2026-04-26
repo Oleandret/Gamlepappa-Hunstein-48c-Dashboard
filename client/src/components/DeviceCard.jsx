@@ -1,9 +1,11 @@
 import { memo } from 'react';
 import {
   Lightbulb, Power, Thermometer, Lock, Unlock, Camera, Wind,
-  Volume2, Zap, Droplet, Activity, BellRing, Star, StarOff,
+  Volume2, VolumeX, Zap, Droplet, Activity, BellRing, Star, StarOff,
   Battery, Sun, BatteryLow, AlertTriangle, Disc3, Car, Plug,
-  ChevronUp, ChevronDown, Bell, Tv, ShieldCheck, Blinds, Radio
+  ChevronUp, ChevronDown, Bell, Tv, ShieldCheck, Blinds, Radio,
+  Play, Pause, SkipForward, SkipBack, Plus, Minus, Palette,
+  ArrowUp, ArrowDown, Square, Home as HomeIcon
 } from 'lucide-react';
 import { capValue, hasCap, classLabel } from '../lib/deviceUtils.js';
 
@@ -118,6 +120,39 @@ export const DeviceCard = memo(function DeviceCard({ device, zoneName, onSet, is
         )}
       </div>
 
+      {/* Speaker transport controls */}
+      {(hasCap(device, 'speaker_playing') || hasCap(device, 'speaker_next') || hasCap(device, 'volume_mute')) && (
+        <SpeakerControls device={device} onSet={set} />
+      )}
+
+      {/* TV / media transport controls */}
+      {(hasCap(device, 'key_play') || hasCap(device, 'channel_up')) && (
+        <MediaControls device={device} onSet={set} />
+      )}
+
+      {/* Thermostat target temperature */}
+      {hasCap(device, 'target_temperature') && (
+        <TempStepper device={device} onSet={set} />
+      )}
+
+      {/* Curtain open/close shortcuts (bridge devices uten posisjon) */}
+      {(hasCap(device, 'open_close') || hasCap(device, 'windowcoverings_state')) && blindPos == null && (
+        <CurtainButtons device={device} onSet={set} />
+      )}
+
+      {/* Vacuum controls */}
+      {hasCap(device, 'is_cleaning') && (
+        <VacuumControls device={device} onSet={set} />
+      )}
+
+      {/* Light color temperature */}
+      {hasCap(device, 'light_temperature') && (
+        <Slider label="Farge" value={capValue(device, 'light_temperature') ?? 0.5}
+                onChange={(v) => set('light_temperature', v)}
+                ariaLabel={`${device.name} fargetemperatur`}
+                icons={[Sun, Sun]} />
+      )}
+
       {/* Dim / volume / blind sliders */}
       {(dim != null || volume != null || blindPos != null) && (
         <div className="space-y-1">
@@ -131,6 +166,13 @@ export const DeviceCard = memo(function DeviceCard({ device, zoneName, onSet, is
             <Slider label="Posisjon" value={blindPos} onChange={(v) => set('windowcoverings_set', v)}
                     ariaLabel={`${device.name} posisjon`} icons={[ChevronDown, ChevronUp]} />
           )}
+        </div>
+      )}
+
+      {/* Now-playing info */}
+      {(capValue(device, 'speaker_artist') || capValue(device, 'speaker_track')) && (
+        <div className="text-[10px] font-mono text-nx-mute leading-tight truncate">
+          {capValue(device, 'speaker_artist')}{capValue(device, 'speaker_artist') && capValue(device, 'speaker_track') ? ' — ' : ''}{capValue(device, 'speaker_track')}
         </div>
       )}
 
@@ -154,6 +196,129 @@ export const DeviceCard = memo(function DeviceCard({ device, zoneName, onSet, is
     </div>
   );
 });
+
+function SpeakerControls({ device, onSet }) {
+  const playing = capValue(device, 'speaker_playing');
+  const muted = capValue(device, 'volume_mute');
+  return (
+    <div className="flex items-center gap-1.5">
+      {hasCap(device, 'speaker_prev') && (
+        <CtlButton onClick={() => onSet('speaker_prev', true)} ariaLabel="Forrige spor"><SkipBack size={11} /></CtlButton>
+      )}
+      {hasCap(device, 'speaker_playing') && (
+        <CtlButton
+          onClick={() => onSet('speaker_playing', !playing)}
+          ariaLabel={playing ? 'Pause' : 'Spill av'}
+          pressed={!!playing}
+          primary={!!playing}
+        >
+          {playing ? <Pause size={11} /> : <Play size={11} />}
+        </CtlButton>
+      )}
+      {hasCap(device, 'speaker_next') && (
+        <CtlButton onClick={() => onSet('speaker_next', true)} ariaLabel="Neste spor"><SkipForward size={11} /></CtlButton>
+      )}
+      {hasCap(device, 'volume_mute') && (
+        <CtlButton
+          onClick={() => onSet('volume_mute', !muted)}
+          ariaLabel={muted ? 'Slå på lyd' : 'Demp'}
+          pressed={!!muted}
+          tone={muted ? 'amber' : undefined}
+          className="ml-auto"
+        >
+          {muted ? <VolumeX size={11} /> : <Volume2 size={11} />}
+        </CtlButton>
+      )}
+    </div>
+  );
+}
+
+function MediaControls({ device, onSet }) {
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      {hasCap(device, 'key_play') && (
+        <CtlButton onClick={() => onSet('key_play', true)} ariaLabel="Spill av"><Play size={11} /></CtlButton>
+      )}
+      {hasCap(device, 'key_pause') && (
+        <CtlButton onClick={() => onSet('key_pause', true)} ariaLabel="Pause"><Pause size={11} /></CtlButton>
+      )}
+      {hasCap(device, 'key_stop') && (
+        <CtlButton onClick={() => onSet('key_stop', true)} ariaLabel="Stopp"><Square size={11} /></CtlButton>
+      )}
+      {hasCap(device, 'channel_up') && (
+        <CtlButton onClick={() => onSet('channel_up', true)} ariaLabel="Kanal opp"><ArrowUp size={11} /></CtlButton>
+      )}
+      {hasCap(device, 'channel_down') && (
+        <CtlButton onClick={() => onSet('channel_down', true)} ariaLabel="Kanal ned"><ArrowDown size={11} /></CtlButton>
+      )}
+    </div>
+  );
+}
+
+function TempStepper({ device, onSet }) {
+  const target = capValue(device, 'target_temperature');
+  if (target == null) return null;
+  const current = Number(target);
+  const step = (delta) => onSet('target_temperature', Math.round((current + delta) * 2) / 2);
+  return (
+    <div className="flex items-center gap-1.5 text-[11px]">
+      <span className="text-nx-mute font-mono">MÅL</span>
+      <CtlButton onClick={() => step(-0.5)} ariaLabel="Senke målttemperatur"><Minus size={11} /></CtlButton>
+      <span className="font-mono text-nx-cyan w-10 text-center">{current.toFixed(1)}°</span>
+      <CtlButton onClick={() => step(0.5)} ariaLabel="Heve målttemperatur"><Plus size={11} /></CtlButton>
+    </div>
+  );
+}
+
+function CurtainButtons({ device, onSet }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <CtlButton onClick={() => onSet('open_close', true)} ariaLabel="Åpne"><ArrowUp size={11} /></CtlButton>
+      <CtlButton onClick={() => onSet('open_close', false)} ariaLabel="Lukke"><ArrowDown size={11} /></CtlButton>
+    </div>
+  );
+}
+
+function VacuumControls({ device, onSet }) {
+  const cleaning = capValue(device, 'is_cleaning');
+  return (
+    <div className="flex items-center gap-1.5">
+      <CtlButton
+        onClick={() => onSet('is_cleaning', !cleaning)}
+        ariaLabel={cleaning ? 'Pause' : 'Start rensing'}
+        pressed={!!cleaning}
+        primary={!cleaning}
+        tone={cleaning ? 'amber' : undefined}
+      >
+        {cleaning ? <Pause size={11} /> : <Play size={11} />}
+      </CtlButton>
+      {hasCap(device, 'dock') && (
+        <CtlButton onClick={() => onSet('dock', true)} ariaLabel="Send til dock"><HomeIcon size={11} /></CtlButton>
+      )}
+    </div>
+  );
+}
+
+function CtlButton({ onClick, ariaLabel, pressed, primary, tone, className = '', children }) {
+  const cls = [
+    'grid h-7 w-7 place-items-center rounded-md border transition-colors shrink-0',
+    primary ? 'bg-nx-cyan text-nx-bg border-nx-cyan'
+            : tone === 'amber' ? 'border-nx-amber/55 text-nx-amber bg-nx-amber/10'
+            : pressed ? 'border-nx-cyan/55 text-nx-cyan bg-nx-cyan/10'
+            : 'border-nx-line/60 text-nx-mute hover:border-nx-cyan/55 hover:text-nx-cyan',
+    className
+  ].join(' ');
+  return (
+    <button
+      onClick={onClick}
+      aria-label={ariaLabel}
+      aria-pressed={pressed}
+      className={cls}
+    >
+      {children}
+    </button>
+  );
+}
 
 function Slider({ label, value, onChange, ariaLabel, icons }) {
   const v = Math.max(0, Math.min(1, Number(value) || 0));
