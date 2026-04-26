@@ -8,7 +8,7 @@ import { capValue, hasCap } from '../../lib/deviceUtils.js';
  *
  * Pin coordinates are tuned to match the actual room rectangles in each plan.
  */
-const PLAN_VERSION = '1';
+const PLAN_VERSION = '2';
 
 const PLANS = {
   cabinMain: {
@@ -38,33 +38,63 @@ const PLANS = {
       { name: 'VASKEROM', match: /vask/i,               x: 38, y: 52, w: 24, h: 12 }
     ]
   },
-  homeRomskjerma: {
-    id: 'homeRomskjerma',
+  homeBasement: {
+    id: 'homeBasement',
     location: 'home',
-    label: 'Hus · Romskjerma',
-    image: `/home-romskjerma.jpg?v=${PLAN_VERSION}`,
-    kind: 'reference',  // referanse-bilde, ikke plantegning med rom-rektangler
-    rooms: []
+    label: 'Hus · Kjeller',
+    image: `/home-floor-basement.jpg?v=${PLAN_VERSION}`,
+    rooms: [
+      { name: 'KINO',          match: /kino/i,                 x: 17, y: 32, w: 12, h: 12 },
+      { name: 'SVØMMEBASSENG', match: /basseng$/i,             x: 22, y: 52, w: 22, h: 16 },
+      { name: 'BASSENGBAD',    match: /baderom|bassengbad/i,   x: 16, y: 72, w: 8,  h: 9  },
+      { name: 'SPORTSBOD',     match: /bod|sport/i,            x: 27, y: 70, w: 10, h: 8  },
+      { name: 'KONTOR',        match: /kontor|teknisk/i,       x: 35, y: 33, w: 7,  h: 6  },
+      { name: 'BAD',           match: /^bad$|baderom/i,        x: 39, y: 42, w: 5,  h: 5  },
+      { name: 'SOVEROM 1',     match: /soverom 1|hybel/i,      x: 36, y: 47, w: 11, h: 8  },
+      { name: 'SOVEROM 2',     match: /soverom 2/i,            x: 47, y: 38, w: 12, h: 9  },
+      { name: 'TRENINGSROM',   match: /trening/i,              x: 50, y: 50, w: 12, h: 10 },
+      { name: 'ENTRÉ',         match: /entr/i,                 x: 56, y: 70, w: 12, h: 8  }
+    ]
   },
   homeFloor1: {
     id: 'homeFloor1',
     location: 'home',
     label: 'Hus · 1. etasje',
-    image: null,
-    rooms: []
+    image: `/home-floor-1.jpg?v=${PLAN_VERSION}`,
+    rooms: [
+      { name: 'GARASJE',       match: /garasje/i,                       x: 22, y: 28, w: 22, h: 18 },
+      { name: 'BOD/SLUSE',     match: /^bod$|sluse/i,                   x: 41, y: 32, w: 8,  h: 7  },
+      { name: 'GANG',          match: /^gang$/i,                        x: 41, y: 22, w: 6,  h: 8  },
+      { name: 'WC',            match: /wc/i,                            x: 41, y: 16, w: 6,  h: 5  },
+      { name: 'BAD',           match: /^bad$|baderom/i,                 x: 47, y: 16, w: 8,  h: 8  },
+      { name: 'VASKEROM',      match: /vaskerom/i,                      x: 47, y: 24, w: 7,  h: 7  },
+      { name: 'WALK-IN/BOD',   match: /walk|walk-?in/i,                 x: 55, y: 22, w: 8,  h: 8  },
+      { name: 'SOVEROM 3',     match: /hovedsoverom|soverom 3/i,        x: 64, y: 18, w: 13, h: 11 },
+      { name: 'KJØKKEN/STUE',  match: /kj.kken|^stue$|hovedetasjen/i,   x: 50, y: 41, w: 26, h: 20 },
+      { name: 'TERRASSE',      match: /terasse|terrasse/i,              x: 78, y: 28, w: 10, h: 22 }
+    ]
   },
   homeFloor2: {
     id: 'homeFloor2',
     location: 'home',
     label: 'Hus · 2. etasje',
-    image: null,
-    rooms: []
+    image: `/home-floor-2.jpg?v=${PLAN_VERSION}`,
+    rooms: [
+      { name: 'VINTERHAGE',     match: /vinter|loft/i,             x: 17, y: 32, w: 22, h: 22 },
+      { name: 'SOVEROM 6 / VENDELA',  match: /vendela|soverom 6/i, x: 40, y: 28, w: 9,  h: 12 },
+      { name: 'SOVEROM 4 / ANDREA',   match: /andrea|soverom 4/i,  x: 49, y: 28, w: 9,  h: 12 },
+      { name: 'BAD',            match: /baderom|^bad$/i,           x: 38, y: 47, w: 8,  h: 7  },
+      { name: 'GANG/TRAPP',     match: /gang|entr|trapp/i,         x: 46, y: 47, w: 6,  h: 9  },
+      { name: 'SOVEROM 5 / YLVA / TV-STUE', match: /ylva|soverom 5|tv/i, x: 46, y: 56, w: 12, h: 10 },
+      { name: 'TERRASSE SJØSIDE', match: /terasse.*sj|sj.side/i,   x: 60, y: 32, w: 12, h: 22 }
+    ]
   },
-  homeBasement: {
-    id: 'homeBasement',
+  homeRomskjerma: {
+    id: 'homeRomskjerma',
     location: 'home',
-    label: 'Hus · Kjeller',
-    image: null,
+    label: 'Hus · Romskjerma',
+    image: `/home-romskjerma.jpg?v=${PLAN_VERSION}`,
+    kind: 'reference',
     rooms: []
   }
 };
