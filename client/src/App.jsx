@@ -17,6 +17,7 @@ import { Particles } from './components/Particles.jsx';
 import { ZonesView } from './components/views/ZonesView.jsx';
 import { DevicesView } from './components/views/DevicesView.jsx';
 import { FavoritesView } from './components/views/FavoritesView.jsx';
+import { DiscoveryPanel } from './components/DiscoveryPanel.jsx';
 
 // Lazy-loaded heavy widgets
 const EnergyWidget = lazy(() =>
@@ -154,7 +155,7 @@ export default function App() {
           )}
 
           <footer className="mt-10 mb-4 flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-nx-mute font-mono">
-            <span>NEXORA · {system?.house || 'Hunstein 48c'}</span>
+            <span>GAMLEPAPPA SMARTHUS · {system?.house || 'Hunstein 48c'}</span>
             <span>v{system?.version || '1.0'} · {counts.devices} enh · {counts.zones} rom · {system?.demo ? 'demo' : 'live'}</span>
           </footer>
         </main>
@@ -279,9 +280,11 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
 
     case 'innstillinger':
       return wrapper(<>
-        {greetingPanel}
-        <div className="col-span-12 lg:col-span-9 panel p-5">
+        <div className="col-span-12 lg:col-span-4 panel p-5">
           <SettingsPanel system={system} counts={counts} />
+        </div>
+        <div className="col-span-12 lg:col-span-8 panel p-5">
+          <DiscoveryPanel />
         </div>
       </>);
 
@@ -354,7 +357,7 @@ function SettingsPanel({ system, counts }) {
         ))}
       </ul>
       <p className="mt-4 text-xs text-nx-mute leading-relaxed">
-        For å kjøre full discovery av Homey-en din: kjør <code className="font-mono text-nx-cyan">npm run discover --prefix server</code> lokalt. Den dumper hele inventaret til <code className="font-mono text-nx-cyan">homey-inventory.json</code> som du kan dele med Claude for skreddersydd dashboard.
+        Bruk Discovery-panelet til høyre for å laste ned hele Homey-inventaret som JSON. Del fila med Claude for å bygge skreddersydde widgets for dine spesifikke enheter.
       </p>
     </div>
   );

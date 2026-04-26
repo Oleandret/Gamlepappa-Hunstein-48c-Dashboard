@@ -59,7 +59,7 @@ git add .
 git commit -q -m "feat: initial commit — Gamlepappa Hunstein 48c Dashboard
 
 - Express-backend med Homey Web API-integrasjon (PAT-basert)
-- React/Tailwind frontend i sci-fi NEXORA-stil
+- React/Tailwind frontend i sci-fi Gamlepappa Smarthus-stil
 - Droneskudd som husmodell med pulserende rom-pinner
 - Energi, sikkerhet, vær (met.no), romtemp, lys, automasjoner
 - Demo-modus med rik mock-data

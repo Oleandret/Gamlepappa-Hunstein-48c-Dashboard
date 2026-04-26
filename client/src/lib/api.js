@@ -28,6 +28,7 @@ export const api = {
   activity:   (signal) => jget('/homey/activity', signal),
   security:   (signal) => jget('/homey/security', signal),
   weather:    (signal) => jget('/weather', signal),
+  inventory:  (signal, full = false) => jget(`/homey/inventory${full ? '?full=true' : ''}`, signal),
   setCapability: (deviceId, capability, value) =>
     jpost(`/homey/devices/${encodeURIComponent(deviceId)}/capability/${encodeURIComponent(capability)}`, { value }),
   runFlow: (flowId) =>

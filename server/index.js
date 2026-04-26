@@ -97,7 +97,7 @@ const patSet = Boolean(cfg('HOMEY_PAT'));
 app.listen(PORT, () => {
   const banner = [
     '',
-    '  ⚡  NEXORA backend ready on port ' + PORT,
+    '  ⚡  Gamlepappa Smarthus backend ready on port ' + PORT,
     '     mode: ' + (isDemoMode() ? 'DEMO (mock data)' : 'LIVE (Homey)'),
     '     PAT:  ' + (patSet ? 'set ✓' : 'missing — fill in server/config.js or HOMEY_PAT env'),
     '     env:  ' + (isProd ? 'production' : 'development'),

@@ -19,7 +19,7 @@ weatherRoutes.get('/', async (_req, res) => {
     }
     const url = `${MET_API}?lat=${HOME_LAT}&lon=${HOME_LON}`;
     const r = await fetch(url, {
-      headers: { 'User-Agent': 'NEXORA-Hunstein-Dashboard/1.0 (oleandretorjussen@gmail.com)' }
+      headers: { 'User-Agent': 'Gamlepappa-Smarthus-Hunstein-Dashboard/1.0 (oleandretorjussen@gmail.com)' }
     });
     if (!r.ok) throw new Error(`met.no ${r.status}`);
     const json = await r.json();

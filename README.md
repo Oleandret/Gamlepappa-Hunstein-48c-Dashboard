@@ -1,8 +1,8 @@
 # Gamlepappa Hunstein 48c Dashboard
 
-Et sci-fi smart-home-dashboard kalt **NEXORA**, koblet til **Homey Pro** på Hunstein 48c og deployet via **Railway**.
+Et sci-fi smart-home-dashboard kalt **Gamlepappa Smarthus**, koblet til **Homey Pro** på Hunstein 48c og deployet via **Railway**.
 
-![NEXORA preview](https://img.shields.io/badge/UI-NEXORA-22e6ff?style=flat-square) ![Node](https://img.shields.io/badge/Node-20+-3ddc84?style=flat-square) ![Stack](https://img.shields.io/badge/stack-React%20%2B%20Express-7d5cff?style=flat-square)
+![Gamlepappa Smarthus preview](https://img.shields.io/badge/UI-Gamlepappa Smarthus-22e6ff?style=flat-square) ![Node](https://img.shields.io/badge/Node-20+-3ddc84?style=flat-square) ![Stack](https://img.shields.io/badge/stack-React%20%2B%20Express-7d5cff?style=flat-square)
 
 ## Funksjoner
 
@@ -52,7 +52,7 @@ npm run dev
 1. Gå til **[my.homey.app/me](https://my.homey.app/me)**
 2. Logg inn → klikk navnet ditt øverst → **Account**
 3. Velg **API Keys** → **Create new API key**
-4. Gi den et navn (f.eks. *NEXORA Dashboard*) og scope **Full Access**
+4. Gi den et navn (f.eks. *Gamlepappa Smarthus Dashboard*) og scope **Full Access**
 5. Kopier tokenet inn i `.env` som `HOMEY_PAT`
 
 Du trenger ikke `HOMEY_CLOUD_ID` — backenden slår den opp automatisk via PAT-en. Men hvis du vil låse den fast finner du Homey-ID-en på samme side.
@@ -66,7 +66,7 @@ Dashbordet har **ingen innlogging** — du åpner bare Railway-URL-en, og er ret
    ```bash
    git init
    git add .
-   git commit -m "feat: NEXORA dashboard"
+   git commit -m "feat: Gamlepappa Smarthus dashboard"
    git branch -M main
    git remote add origin https://github.com/<din-bruker>/nexora-hunstein-dashboard.git
    git push -u origin main

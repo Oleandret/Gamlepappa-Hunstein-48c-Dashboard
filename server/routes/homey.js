@@ -61,17 +61,26 @@ homeyRoutes.get('/activity', safe(
   async () => ({ activity: MOCK_ACTIVITY })
 ));
 
-/** Inventory: total opptelling av alle devices/zones/flows + capability-statistikk */
+/** Inventory: total opptelling av alle devices/zones/flows + capability-statistikk
+ *  Pass ?full=true for å inkludere raw devices/zones/flows (større respons). */
 homeyRoutes.get('/inventory', safe(
-  async () => {
+  async (req) => {
     const [devices, zones, flows] = await Promise.all([
       homeyClient.listDevices(),
       homeyClient.listZones(),
       homeyClient.listFlows()
     ]);
-    return buildInventory({ devices, zones, flows });
+    const inv = buildInventory({ devices, zones, flows });
+    if (req.query.full === 'true') inv.raw = { devices, zones, flows };
+    return inv;
   },
-  async () => buildInventory({ devices: MOCK_DEVICES, zones: MOCK_ZONES, flows: MOCK_FLOWS })
+  async (req) => {
+    const inv = buildInventory({ devices: MOCK_DEVICES, zones: MOCK_ZONES, flows: MOCK_FLOWS });
+    if (req.query.full === 'true') {
+      inv.raw = { devices: MOCK_DEVICES, zones: MOCK_ZONES, flows: MOCK_FLOWS };
+    }
+    return inv;
+  }
 ));
 
 homeyRoutes.get('/security', safe(

@@ -5,11 +5,11 @@ export function Sidebar({ section, onSection, deviceCount = 0, flowCount = 0 }) 
     <aside className="w-20 lg:w-56 shrink-0 border-r border-nx-line/60 bg-nx-bg/70 backdrop-blur-md py-6">
       <div className="px-4 lg:px-5 flex items-center gap-2.5">
         <div className="relative h-9 w-9 rounded-xl bg-gradient-to-br from-nx-cyan to-nx-purple grid place-items-center shadow-glow-cyan">
-          <span className="font-display text-nx-bg font-bold text-lg">N</span>
+          <span className="font-display text-nx-bg font-bold text-lg">G</span>
         </div>
         <div className="hidden lg:block leading-tight">
-          <div className="font-display font-semibold tracking-wide">NEXORA</div>
-          <div className="text-[10px] uppercase tracking-[0.22em] text-nx-mute">Smart Home</div>
+          <div className="font-display font-semibold tracking-wide">GAMLEPAPPA</div>
+          <div className="text-[10px] uppercase tracking-[0.22em] text-nx-mute">Smarthus</div>
         </div>
       </div>
 

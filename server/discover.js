@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * NEXORA Discovery — dump full Homey inventory to a local JSON file.
+ * Gamlepappa Smarthus Discovery — dump full Homey inventory to a local JSON file.
  *
  * Run from the project root:
  *
@@ -29,7 +29,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('\n  ⚡  NEXORA Discovery — leser Homey...\n');
+  console.log('\n  ⚡  Gamlepappa Smarthus Discovery — leser Homey...\n');
   const t0 = Date.now();
 
   const [devices, zones, flows] = await Promise.all([

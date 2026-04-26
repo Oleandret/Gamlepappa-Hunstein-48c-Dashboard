@@ -1,6 +1,6 @@
 /**
  * ────────────────────────────────────────────────────────────────────────────
- * NEXORA — hardkodet konfig (fallback)
+ * Gamlepappa Smarthus — hardkodet konfig (fallback)
  * ────────────────────────────────────────────────────────────────────────────
  *  Verdiene under brukes hvis env-variabler IKKE er satt på Railway.
  *  Anbefalt: la dette stå og sett HOMEY_PAT i Railway → Variables.
