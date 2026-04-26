@@ -17,7 +17,11 @@ import { Particles } from './components/Particles.jsx';
 import { ZonesView } from './components/views/ZonesView.jsx';
 import { DevicesView } from './components/views/DevicesView.jsx';
 import { FavoritesView } from './components/views/FavoritesView.jsx';
+import { AudioView } from './components/views/AudioView.jsx';
 import { DiscoveryPanel } from './components/DiscoveryPanel.jsx';
+import { TeslaCard } from './components/special/TeslaCard.jsx';
+import { RoborockCard } from './components/special/RoborockCard.jsx';
+import { TibberCard } from './components/special/TibberCard.jsx';
 
 // Lazy-loaded heavy widgets
 const EnergyWidget = lazy(() =>
@@ -227,6 +231,16 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
         false
       );
 
+    case 'lyd':
+      return wrapper(
+        <AudioView
+          devices={data.devices || {}}
+          zones={data.zones || {}}
+          onSet={setCapability}
+        />,
+        false
+      );
+
     case 'energi':
       return wrapper(
         <Suspense fallback={<LoadingPanel label="LASTER ENERGI..." />}>
@@ -289,7 +303,10 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
       </>);
 
     case 'oversikt':
-    default:
+    default: {
+      const tesla = findFirst(data.devices, d => d.class === 'car' || /tesla/i.test(d.driverUri || ''));
+      const roborock = findFirst(data.devices, d => d.class === 'vacuumcleaner');
+      const tibber = findFirst(data.devices, d => /tibber/i.test(d.driverUri || ''));
       return wrapper(<>
         {greetingPanel}
         <div className="col-span-12 lg:col-span-6 panel overflow-hidden">
@@ -301,6 +318,12 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
         <div className="col-span-12 lg:col-span-3 panel p-5">
           <QuickControls flows={data.flows || {}} onRun={runFlow} />
         </div>
+
+        {/* Special device cards — only render when device exists */}
+        {tibber && <div className="col-span-12 lg:col-span-4"><TibberCard device={tibber} /></div>}
+        {tesla && <div className="col-span-12 lg:col-span-4"><TeslaCard device={tesla} /></div>}
+        {roborock && <div className="col-span-12 lg:col-span-4"><RoborockCard device={roborock} onSet={setCapability} /></div>}
+
         <div className="col-span-12 lg:col-span-6 panel p-5">
           <Suspense fallback={<LoadingPanel label="LASTER GRAF..." />}>
             <EnergyWidget energy={data.energy} />
@@ -322,7 +345,13 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
           <FavoriteAutomations flows={data.flows || {}} onRun={runFlow} />
         </div>
       </>);
+    }
   }
+}
+
+function findFirst(devices, predicate) {
+  if (!devices) return null;
+  return Object.values(devices).find(predicate) || null;
 }
 
 function LoadingPanel({ label }) {

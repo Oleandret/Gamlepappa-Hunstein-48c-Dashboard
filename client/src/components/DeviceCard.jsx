@@ -3,7 +3,7 @@ import {
   Lightbulb, Power, Thermometer, Lock, Unlock, Camera, Wind,
   Volume2, Zap, Droplet, Activity, BellRing, Star, StarOff,
   Battery, Sun, BatteryLow, AlertTriangle, Disc3, Car, Plug,
-  ChevronUp, ChevronDown
+  ChevronUp, ChevronDown, Bell, Tv, ShieldCheck, Blinds, Radio
 } from 'lucide-react';
 import { capValue, hasCap, classLabel } from '../lib/deviceUtils.js';
 
@@ -201,12 +201,16 @@ function pickIcon(device) {
   if (cls === 'thermostat' || cls === 'heater') return Thermometer;
   if (cls === 'lock') return capValue(device, 'locked') ? Lock : Unlock;
   if (cls === 'camera') return Camera;
-  if (cls === 'speaker' || cls === 'tv') return Volume2;
-  if (cls === 'windowcoverings') return ChevronUp;
+  if (cls === 'doorbell') return Bell;
+  if (cls === 'speaker') return Volume2;
+  if (cls === 'tv') return Tv;
+  if (cls === 'windowcoverings' || cls === 'curtain') return Blinds;
   if (cls === 'fan') return Wind;
+  if (cls === 'homealarm') return ShieldCheck;
+  if (cls === 'remote') return Radio;
+  if (cls === 'car' || cls === 'electricvehicle' || cls === 'evcharger') return Car;
   if (cls === 'lawnmower') return Sun;
   if (cls === 'vacuumcleaner') return Disc3;
-  if (cls === 'electricvehicle' || cls === 'evcharger') return Car;
   if (cls === 'garagedoor') return Lock;
   if (hasCap(device, 'measure_power')) return Zap;
   if (hasCap(device, 'alarm_motion')) return Activity;
