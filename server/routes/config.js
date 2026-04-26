@@ -12,6 +12,7 @@ const ALLOWED_NS = new Set([
   'flowFavorites',      // stjernede flows
   'links',              // lenker-fanen
   'floorPlanPins',      // pins på plantegninger
+  'floorPlanFlows',     // favoritt-flows per plantegning
   'flowsSidebarFlows'   // brukervalgte flows i høyre-sidebar (kommer senere)
 ]);
 

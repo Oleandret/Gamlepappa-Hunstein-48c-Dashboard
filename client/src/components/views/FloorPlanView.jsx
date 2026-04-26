@@ -3,6 +3,7 @@ import { Home as HomeIcon, Anchor, Building2, Upload, FileSpreadsheet, ZoomIn, Z
 import { hasCap } from '../../lib/deviceUtils.js';
 import { FloorPlanPin } from '../FloorPlanPin.jsx';
 import { RichDevicePicker } from '../RichDevicePicker.jsx';
+import { FloorPlanFlowsPanel } from '../FloorPlanFlowsPanel.jsx';
 
 /**
  * Floor plan visualisation. Reads plantegninger from /public/* and lets the
@@ -180,7 +181,7 @@ function isWifiDevice(d) {
   return false;
 }
 
-export function FloorPlanView({ devices, zones, location = 'home', floorPlanPins, onSetCapability }) {
+export function FloorPlanView({ devices, zones, location = 'home', floorPlanPins, planFlows, flows, onRunFlow, onSetCapability }) {
   // Velg første tilgjengelige plan for denne lokasjonen som default
   const plansForLocation = useMemo(
     () => Object.values(PLANS).filter(p => p.location === location),
@@ -286,16 +287,32 @@ export function FloorPlanView({ devices, zones, location = 'home', floorPlanPins
         ? <PlanPlaceholder plan={plan} />
         : plan.kind === 'reference'
           ? <ReferenceImage plan={plan} />
-          : <FloorPlanCanvas
-              plan={plan}
-              pins={floorPlanPins?.getPins(plan.id) || []}
-              devices={devices}
-              zones={zones}
-              editing={editing}
-              viewMode={viewMode}
-              floorPlanPins={floorPlanPins}
-              onSetCapability={onSetCapability}
-            />
+          : (
+            <div className="flex flex-col xl:flex-row gap-3 items-stretch">
+              <div className="flex-1 min-w-0">
+                <FloorPlanCanvas
+                  plan={plan}
+                  pins={floorPlanPins?.getPins(plan.id) || []}
+                  devices={devices}
+                  zones={zones}
+                  editing={editing}
+                  viewMode={viewMode}
+                  floorPlanPins={floorPlanPins}
+                  onSetCapability={onSetCapability}
+                />
+              </div>
+              {planFlows && (
+                <FloorPlanFlowsPanel
+                  planId={plan.id}
+                  planLabel={plan.label}
+                  flows={flows}
+                  planFlows={planFlows}
+                  onRun={onRunFlow}
+                  editing={editing}
+                />
+              )}
+            </div>
+          )
       }
 
       {/* Add-pin verktøylinje når man er i edit-modus */}
