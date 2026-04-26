@@ -132,6 +132,32 @@ function isTechnicalDevice(d) {
   return !isLight && !isSecurity && !isTempOnly;
 }
 
+/**
+ * Avgjør om en pin (med referert enhet) tilhører gjeldende view-mode.
+ * Brukes til å filtrere brukerens egne pins slik at hver tegning kun
+ * viser pins som hører til kategorien.
+ */
+function pinMatchesViewMode(device, viewMode) {
+  if (viewMode === 'all') return true;
+  if (!device) return false; // ukjent enhet — vis bare i 'all'
+  switch (viewMode) {
+    case 'temp':
+      return hasCap(device, 'measure_temperature') || hasCap(device, 'target_temperature');
+    case 'security':
+      return device.class === 'lock' || device.class === 'camera'
+          || hasCap(device, 'alarm_motion') || hasCap(device, 'alarm_contact')
+          || hasCap(device, 'alarm_smoke')  || hasCap(device, 'alarm_water');
+    case 'light':
+      return device.class === 'light' || hasCap(device, 'dim');
+    case 'wifi':
+      return isWifiDevice(device);
+    case 'tech':
+      return isTechnicalDevice(device);
+    default:
+      return true;
+  }
+}
+
 // Heuristikk for wifi-enheter: Homey-flags + kjente wifi/cloud-driver-mønstre.
 // Fanger Sonos, Hue, TP-Link, Shelly, Tuya, Meross, Sonoff, Tesla, Roborock,
 // Tibber, Nest, Ring, Arlo, Withings, Netatmo, Mill, Husqvarna automower osv.
@@ -280,6 +306,7 @@ export function FloorPlanView({ devices, zones, location = 'home', floorPlanPins
               devices={devices}
               zones={zones}
               editing={editing}
+              viewMode={viewMode}
               floorPlanPins={floorPlanPins}
               onSetCapability={onSetCapability}
             />
@@ -358,7 +385,13 @@ function ReferenceImage({ plan }) {
   );
 }
 
-function FloorPlanCanvas({ plan, rooms, showAutoRooms = false, pins, devices, zones, editing, floorPlanPins, onSetCapability }) {
+function FloorPlanCanvas({ plan, rooms, showAutoRooms = false, pins, devices, zones, editing, viewMode = 'all', floorPlanPins, onSetCapability }) {
+  // I edit-modus viser vi alltid alle pins så brukeren kan flytte/endre dem.
+  // I visningsmodus filtrerer vi etter view-mode slik at f.eks. 'Wifi'-fanen
+  // bare viser wifi-pins, 'Lys' viser lys-pins, osv.
+  const visiblePins = editing
+    ? pins
+    : pins.filter(p => pinMatchesViewMode(devices?.[p.deviceId], viewMode));
   const containerRef = useRef(null);
   const [draggingId, setDraggingId] = useState(null);
 
@@ -430,8 +463,8 @@ function FloorPlanCanvas({ plan, rooms, showAutoRooms = false, pins, devices, zo
         <RoomOverlay key={r.name} room={r} />
       ))}
 
-      {/* Brukerens egne device-pins */}
-      {pins.map(pin => (
+      {/* Brukerens egne device-pins, filtrert etter view-mode */}
+      {visiblePins.map(pin => (
         <FloorPlanPin
           key={pin.id}
           pin={pin}
