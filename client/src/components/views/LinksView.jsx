@@ -87,9 +87,9 @@ export function LinksView({ links }) {
       </div>
 
       {groups.map(([category, items]) => (
-        <div key={category} className="col-span-12 panel p-4">
-          <p className="panel-title mb-3">{category} ({items.length})</p>
-          <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+        <div key={category} className="col-span-12 panel p-3">
+          <p className="panel-title mb-2 text-[10px]">{category} ({items.length})</p>
+          <ul className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 2xl:grid-cols-14 gap-1.5">
             {items.map(l => editing
               ? <EditableLinkCard key={l.id} link={l} onUpdate={(patch) => links.update(l.id, patch)} onRemove={() => links.remove(l.id)} />
               : <LinkCard key={l.id} link={l} />
@@ -133,15 +133,13 @@ function LinkCard({ link }) {
         href={link.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="group flex flex-col items-center gap-2 rounded-xl border border-nx-line/40 bg-nx-panel/40 p-3 hover:border-nx-cyan/50 hover:bg-nx-cyan/5 transition-colors text-center"
-        title={link.url}
+        className="group flex flex-col items-center gap-1 rounded-lg border border-nx-line/40 bg-nx-panel/40 p-1.5 hover:border-nx-cyan/50 hover:bg-nx-cyan/5 transition-colors text-center"
+        title={`${link.title} · ${link.url}`}
       >
-        <FaviconImage url={link.url} size={48} />
+        <FaviconImage url={link.url} size={28} />
         <div className="min-w-0 w-full">
-          <div className="text-sm leading-tight truncate">{link.title}</div>
-          <div className="text-[10px] text-nx-mute font-mono truncate">{domain}</div>
+          <div className="text-[11px] leading-tight truncate font-medium">{link.title}</div>
         </div>
-        <ExternalLink size={11} className="text-nx-mute opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true" />
       </a>
     </li>
   );

@@ -19,6 +19,7 @@ import { PinEditor } from './components/PinEditor.jsx';
 import { FrontImageConfig } from './components/FrontImageConfig.jsx';
 import { FrontSensors } from './components/FrontSensors.jsx';
 import { FrontSensorEditor } from './components/FrontSensorEditor.jsx';
+import { SecurityActivityLog } from './components/SecurityActivityLog.jsx';
 import { FlowFavoritesView } from './components/views/FlowFavoritesView.jsx';
 import { MaintenanceView } from './components/views/MaintenanceView.jsx';
 import { LinksView } from './components/views/LinksView.jsx';
@@ -427,6 +428,9 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
           <HouseView devices={data.devices || {}} zones={data.zones || {}} weather={data.weather} customPins={pinConfig?.config} imageConfig={imageConfig?.config} />
         </div>
         <div className="col-span-12 panel p-5">
+          <SecurityActivityLog />
+        </div>
+        <div className="col-span-12 panel p-5">
           <ActivityFeed activity={data.activity || []} />
         </div>
       </>);
@@ -554,7 +558,7 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
             <RoomTemps devices={data.devices || {}} zones={data.zones || {}} />
           </div>
           <div className="col-span-6 lg:col-span-3 panel p-2">
-            <Lighting devices={data.devices || {}} onSet={setCapability} />
+            <Lighting devices={data.devices || {}} zones={data.zones || {}} onSet={setCapability} />
           </div>
           <div className="col-span-6 lg:col-span-3 panel p-2">
             <ActivityFeed activity={data.activity || []} />

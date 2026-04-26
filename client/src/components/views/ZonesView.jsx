@@ -25,7 +25,7 @@ export function ZonesView({ devices, zones, onSet, favorites }) {
   return (
     <div>
       <h2 className="panel-title">Rom · {tree.totalZones} aktive · {tree.totalDevices} enheter</h2>
-      <div className="mt-4 space-y-6">
+      <div className="mt-3 space-y-4">
         {tree.floors.map(floor => (
           <FloorSection key={floor.id} floor={floor} onOpen={setOpenZoneId} />
         ))}
@@ -37,12 +37,12 @@ export function ZonesView({ devices, zones, onSet, favorites }) {
 function FloorSection({ floor, onOpen }) {
   return (
     <section>
-      <header className="flex items-center gap-2 mb-2">
-        <Building2 size={14} className="text-nx-cyan" aria-hidden="true" />
+      <header className="flex items-center gap-2 mb-1.5">
+        <Building2 size={12} className="text-nx-cyan" aria-hidden="true" />
         <h3 className="panel-title flex-1">{floor.name}</h3>
-        <span className="font-mono text-xs text-nx-mute">{floor.totalDevices} enheter</span>
+        <span className="font-mono text-[10px] text-nx-mute">{floor.totalDevices} enh</span>
       </header>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-1.5">
         {floor.rooms.map(r => (
           <RoomCard key={r.id} room={r} onClick={() => onOpen(r.id)} />
         ))}
@@ -52,26 +52,22 @@ function FloorSection({ floor, onOpen }) {
 }
 
 function RoomCard({ room, onClick }) {
-  const top = room.classCounts.slice(0, 2);
+  const top = room.classCounts.slice(0, 1);
   return (
     <button
       onClick={onClick}
-      className="panel p-3 text-left hover:border-nx-cyan/50 transition-colors group"
+      className="panel p-2 text-left hover:border-nx-cyan/50 transition-colors group"
       aria-label={`Åpne ${room.name} (${room.totalDevices} enheter)`}
     >
       <div className="flex items-center justify-between">
-        <HomeIcon size={14} className="text-nx-cyan group-hover:scale-110 transition-transform" aria-hidden="true" />
-        <span className="font-mono text-lg text-nx-text">{room.totalDevices}</span>
+        <HomeIcon size={11} className="text-nx-cyan group-hover:scale-110 transition-transform" aria-hidden="true" />
+        <span className="font-mono text-sm text-nx-text tabular-nums">{room.totalDevices}</span>
       </div>
-      <div className="mt-2 text-sm font-semibold leading-tight truncate" title={room.name}>{room.name}</div>
-      <div className="mt-0.5 text-[10px] text-nx-mute font-mono uppercase tracking-[0.14em] truncate">
+      <div className="mt-1 text-xs font-semibold leading-tight truncate" title={room.name}>{room.name}</div>
+      <div className="text-[9px] text-nx-mute font-mono uppercase tracking-[0.12em] truncate">
         {top.map(c => `${c.count} ${classLabel(c.cls).toLowerCase()}`).join(' · ') || '—'}
+        {room.onCount > 0 && <span className="text-nx-cyan ml-1">· {room.onCount} på</span>}
       </div>
-      {room.onCount > 0 && (
-        <div className="mt-1.5 text-[10px] text-nx-cyan font-mono">
-          {room.onCount} aktiv{room.onCount !== 1 ? 'e' : ''}
-        </div>
-      )}
     </button>
   );
 }

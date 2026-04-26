@@ -1,100 +1,166 @@
-import { Lightbulb, Power } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Lightbulb, ChevronDown, ChevronRight } from 'lucide-react';
 
-export function Lighting({ devices, onSet }) {
-  const lights = Object.values(devices).filter(d => d.class === 'light').slice(0, 4);
-  const onCount = lights.filter(l => l.capabilities?.onoff).length;
-  const anyOn = onCount > 0;
+/**
+ * Belysning gruppert per rom med toggle og dim-slider per lampe.
+ * Hver gruppe kan kollapses, og hele rommet kan slås av/på samlet.
+ */
+export function Lighting({ devices, zones, onSet }) {
+  const [collapsed, setCollapsed] = useState(new Set());
+
+  const groups = useMemo(() => {
+    const all = Object.values(devices || {});
+    const lights = all.filter(d => d.class === 'light' || d.capabilities?.dim != null);
+    const byZone = new Map();
+    for (const l of lights) {
+      const zone = zones?.[l.zone];
+      const key = zone?.id || '_none';
+      const name = zone?.name || 'Uten rom';
+      if (!byZone.has(key)) byZone.set(key, { id: key, name, lights: [] });
+      byZone.get(key).lights.push(l);
+    }
+    return [...byZone.values()]
+      .map(g => ({ ...g, lights: g.lights.sort((a, b) => (a.name || '').localeCompare(b.name || '')) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [devices, zones]);
+
+  const totalOn = groups.reduce((s, g) => s + g.lights.filter(l => l.capabilities?.onoff).length, 0);
+  const totalLights = groups.reduce((s, g) => s + g.lights.length, 0);
 
   function toggleAll(on) {
-    lights.forEach(l => onSet(l.id, 'onoff', on));
+    groups.forEach(g => g.lights.forEach(l => onSet(l.id, 'onoff', on)));
   }
-  function toggleOne(l) {
-    const next = !(l.capabilities?.onoff);
-    onSet(l.id, 'onoff', next);
+
+  function toggleZone(zoneId, on) {
+    const g = groups.find(g => g.id === zoneId);
+    if (!g) return;
+    g.lights.forEach(l => onSet(l.id, 'onoff', on));
+  }
+
+  function toggleCollapsed(id) {
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   }
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <p className="panel-title">Belysning</p>
-        <div role="group" aria-label="Skru alle lys av eller på" className="flex items-center gap-1 rounded-full border border-nx-line/60 p-0.5 text-[11px] font-mono">
-          <button
-            onClick={() => toggleAll(false)}
-            aria-pressed={!anyOn}
-            className={['px-2 py-0.5 rounded-full transition-colors', !anyOn ? 'bg-nx-cyan/15 text-nx-cyan' : 'text-nx-mute'].join(' ')}
-          >Av</button>
-          <button
-            onClick={() => toggleAll(true)}
-            aria-pressed={anyOn}
-            className={['px-2 py-0.5 rounded-full transition-colors', anyOn ? 'bg-nx-cyan/15 text-nx-cyan' : 'text-nx-mute'].join(' ')}
-          >På</button>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-mono text-nx-mute">{totalOn}/{totalLights}</span>
+          <div role="group" aria-label="Skru alle lys av eller på" className="flex items-center gap-1 rounded-full border border-nx-line/60 p-0.5 text-[10px] font-mono">
+            <button
+              onClick={() => toggleAll(false)}
+              aria-pressed={totalOn === 0}
+              className={['px-2 py-0.5 rounded-full transition-colors', totalOn === 0 ? 'bg-nx-cyan/15 text-nx-cyan' : 'text-nx-mute'].join(' ')}
+            >Alle av</button>
+            <button
+              onClick={() => toggleAll(true)}
+              aria-pressed={totalOn > 0}
+              className={['px-2 py-0.5 rounded-full transition-colors', totalOn > 0 ? 'bg-nx-cyan/15 text-nx-cyan' : 'text-nx-mute'].join(' ')}
+            >Alle på</button>
+          </div>
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <button
-          onClick={() => toggleAll(true)}
-          aria-label="Skru på alle lys"
-          className="rounded-xl border border-nx-line/60 bg-nx-panel/40 p-3 text-left"
-        >
-          <Power size={14} className="text-nx-cyan" aria-hidden="true" />
-          <div className="mt-1 text-sm">Alle lys</div>
-          <div className="text-[10px] text-nx-mute">{onCount}/{lights.length} på</div>
-        </button>
-        <button
-          aria-label="Aktiver scene Hyggelig"
-          className="rounded-xl border border-nx-cyan/40 bg-nx-cyan/10 p-3 text-left"
-        >
-          <div className="text-xs text-nx-cyan">Aktivitet</div>
-          <div className="mt-1 text-sm">Hyggelig</div>
-          <div className="text-[10px] text-nx-mute">forhåndsinnstilt scene</div>
-        </button>
-      </div>
-
-      <ul className="mt-3 space-y-2">
-        {lights.map(l => {
-          const on = !!l.capabilities?.onoff;
-          const dim = Math.round(((l.capabilities?.dim ?? 0) * 100));
+      <div className="mt-2 space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
+        {groups.map(g => {
+          const onCount = g.lights.filter(l => l.capabilities?.onoff).length;
+          const isCollapsed = collapsed.has(g.id);
+          const allOn = onCount === g.lights.length;
           return (
-            <li key={l.id} className="flex items-center gap-2">
-              <button
-                onClick={() => toggleOne(l)}
-                aria-label={`${l.name} — ${on ? 'skru av' : 'skru på'}`}
-                aria-pressed={on}
-                className={[
-                  'grid h-7 w-7 place-items-center rounded-md border transition-colors',
-                  on ? 'border-nx-cyan/60 text-nx-cyan bg-nx-cyan/10 shadow-glow-soft' : 'border-nx-line/60 text-nx-mute'
-                ].join(' ')}
-              >
-                <Lightbulb size={14} aria-hidden="true"/>
-              </button>
-              <span className="text-xs flex-1 truncate">{l.name}</span>
-              <div
-                className="w-24 h-1 rounded-full bg-nx-line/50 overflow-hidden"
-                role="progressbar"
-                aria-valuenow={on ? dim : 0}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-label={`${l.name} dim-nivå`}
-              >
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: on ? `${dim}%` : '0%',
-                    background: 'linear-gradient(90deg,#22e6ff,#7d5cff)'
-                  }}
-                />
+            <div key={g.id} className="border border-nx-line/40 rounded-lg overflow-hidden">
+              {/* Rom-header */}
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-nx-panel/40">
+                <button
+                  onClick={() => toggleCollapsed(g.id)}
+                  aria-label={isCollapsed ? `Vis lys i ${g.name}` : `Skjul lys i ${g.name}`}
+                  className="text-nx-mute hover:text-nx-cyan"
+                >
+                  {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                </button>
+                <span className="text-xs font-mono uppercase tracking-[0.16em] text-nx-mute flex-1 truncate">
+                  {g.name}
+                </span>
+                <span className="text-[10px] font-mono text-nx-cyan tabular-nums">
+                  {onCount}/{g.lights.length}
+                </span>
+                <button
+                  onClick={() => toggleZone(g.id, !allOn)}
+                  aria-label={allOn ? `Skru av alle lys i ${g.name}` : `Skru på alle lys i ${g.name}`}
+                  className={[
+                    'h-5 px-2 rounded-full text-[9px] font-mono uppercase border transition-colors',
+                    allOn
+                      ? 'border-nx-cyan/60 bg-nx-cyan/15 text-nx-cyan'
+                      : 'border-nx-line/60 text-nx-mute hover:border-nx-cyan/40 hover:text-nx-cyan'
+                  ].join(' ')}
+                >
+                  {allOn ? 'av' : 'på'}
+                </button>
               </div>
-              <span className="w-8 text-right text-[11px] font-mono text-nx-mute">
-                {on ? `${dim}` : '–'}
-              </span>
-            </li>
+
+              {/* Lampe-liste */}
+              {!isCollapsed && (
+                <ul className="divide-y divide-nx-line/30">
+                  {g.lights.map(l => <LightRow key={l.id} light={l} onSet={onSet} />)}
+                </ul>
+              )}
+            </div>
           );
         })}
-        {lights.length === 0 && (
-          <li className="text-sm text-nx-mute">Fant ingen lys i Homey.</li>
+        {groups.length === 0 && (
+          <p className="text-sm text-nx-mute">Fant ingen lys i Homey.</p>
         )}
-      </ul>
+      </div>
     </div>
+  );
+}
+
+function LightRow({ light, onSet }) {
+  const on = !!light.capabilities?.onoff;
+  const dim = light.capabilities?.dim ?? 0;
+  const supportsDim = light.capabilities?.dim != null || light.capabilitiesObj?.dim != null;
+
+  return (
+    <li className="flex items-center gap-2 px-2 py-1.5">
+      <button
+        onClick={() => onSet(light.id, 'onoff', !on)}
+        aria-label={`${light.name} — ${on ? 'skru av' : 'skru på'}`}
+        aria-pressed={on}
+        className={[
+          'grid h-6 w-6 place-items-center rounded-md border transition-colors shrink-0',
+          on ? 'border-nx-cyan/60 text-nx-cyan bg-nx-cyan/10 shadow-glow-soft' : 'border-nx-line/60 text-nx-mute'
+        ].join(' ')}
+      >
+        <Lightbulb size={11} aria-hidden="true" />
+      </button>
+      <span className="text-xs flex-1 truncate" title={light.name}>{light.name}</span>
+      {supportsDim ? (
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={Math.round(dim * 100)}
+          onChange={(e) => {
+            const v = Number(e.target.value) / 100;
+            // Slå på lyset automatisk hvis det er av og brukeren drar opp
+            if (!on && v > 0) onSet(light.id, 'onoff', true);
+            onSet(light.id, 'dim', v);
+          }}
+          aria-label={`${light.name} dim-nivå`}
+          className="w-20 accent-nx-cyan"
+          disabled={!on}
+        />
+      ) : (
+        <div className="w-20" />
+      )}
+      <span className="w-8 text-right text-[10px] font-mono text-nx-mute tabular-nums">
+        {supportsDim && on ? `${Math.round(dim * 100)}%` : on ? 'PÅ' : '–'}
+      </span>
+    </li>
   );
 }
