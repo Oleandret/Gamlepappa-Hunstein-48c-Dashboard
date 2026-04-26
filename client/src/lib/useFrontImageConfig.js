@@ -18,7 +18,7 @@ function sanitize(cfg) {
 }
 
 export function useFrontImageConfig() {
-  const [config, setConfig] = useServerSyncedState('frontImageConfig', DEFAULTS);
+  const [config, setConfig, sync] = useServerSyncedState('frontImageConfig', DEFAULTS);
   const clean = sanitize(config);
 
   const set = useCallback((patch) => {
@@ -27,5 +27,5 @@ export function useFrontImageConfig() {
 
   const reset = useCallback(() => setConfig(DEFAULTS), [setConfig]);
 
-  return { config: clean, set, reset, defaults: DEFAULTS };
+  return { config: clean, set, reset, defaults: DEFAULTS, sync };
 }

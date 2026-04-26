@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { allCaps, classLabel } from '../lib/deviceUtils.js';
 import { RichDevicePicker } from './RichDevicePicker.jsx';
+import { SaveButton } from './SaveButton.jsx';
 
 const READABLE_CAPS = {
   measure_temperature: 'Temperatur',
@@ -66,7 +67,10 @@ export function FrontSensorEditor({ sensors, devices, zones }) {
 
   return (
     <div>
-      <p className="panel-title mb-2">Sensor-widgets på framsiden</p>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <p className="panel-title">Sensor-widgets på framsiden</p>
+        <SaveButton sync={sensors.sync} />
+      </div>
       <p className="text-xs text-nx-mute mb-3">
         Små chips øverst på Oversikt som viser verdien til en valgt sensor — temp i hagen, batteri på røykvarsler, osv.
       </p>

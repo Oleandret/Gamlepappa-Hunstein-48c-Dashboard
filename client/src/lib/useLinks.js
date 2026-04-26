@@ -42,7 +42,7 @@ function sanitize(arr) {
 }
 
 export function useLinks() {
-  const [list, setList] = useServerSyncedState('links', () => withIds(DEFAULT_LINKS));
+  const [list, setList, sync] = useServerSyncedState('links', () => withIds(DEFAULT_LINKS));
   const cleanList = sanitize(list);
 
   const add = useCallback((link) => {
@@ -63,5 +63,5 @@ export function useLinks() {
 
   const resetToDefaults = useCallback(() => setList(withIds(DEFAULT_LINKS)), [setList]);
 
-  return { list: cleanList, add, update, remove, resetToDefaults };
+  return { list: cleanList, add, update, remove, resetToDefaults, sync };
 }

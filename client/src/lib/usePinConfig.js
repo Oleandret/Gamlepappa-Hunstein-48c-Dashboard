@@ -51,7 +51,7 @@ function newId(kind) {
 }
 
 export function usePinConfig() {
-  const [config, setConfig] = useServerSyncedState('pinConfig', defaults);
+  const [config, setConfig, sync] = useServerSyncedState('pinConfig', defaults);
   const clean = sanitize(config);
 
   const update = useCallback((next) => setConfig(sanitize(next)), [setConfig]);
@@ -91,5 +91,5 @@ export function usePinConfig() {
     setConfig(prev => ({ ...sanitize(prev), [location]: defaults()[location] }));
   }, [setConfig]);
 
-  return { config: clean, update, setLocation, updatePin, addPin, removePin, reset };
+  return { config: clean, update, setLocation, updatePin, addPin, removePin, reset, sync };
 }

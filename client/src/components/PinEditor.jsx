@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { VIEWS } from './HouseView.jsx';
 import { RichDevicePicker } from './RichDevicePicker.jsx';
+import { SaveButton } from './SaveButton.jsx';
 
 /**
  * Editor for pin-konfig på framsidens hovedbilder.
@@ -140,9 +141,11 @@ export function PinEditor({ pinConfig, devices = {}, zones = {} }) {
                 ? 'bg-nx-cyan/15 text-nx-cyan hover:bg-nx-cyan/25 shadow-glow-soft'
                 : 'text-nx-mute opacity-40 cursor-not-allowed'
             ].join(' ')}
+            title="Bekreft draft til pinConfig (kun lokalt — server-sync skjer auto)"
           >
-            <Save size={12} /> Lagre
+            <Save size={12} /> Bekreft
           </button>
+          <SaveButton sync={pinConfig.sync} label="Lagre til server" />
         </div>
       </div>
 

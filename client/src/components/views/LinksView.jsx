@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ExternalLink, Plus, Trash2, Edit2, Check, X, RotateCcw, Globe, Search } from 'lucide-react';
+import { SaveButton } from '../SaveButton.jsx';
 
 /**
  * Lenker-fane: brukerens favoritt-nettsider, gruppert per kategori.
@@ -73,6 +74,7 @@ export function LinksView({ links }) {
               <Edit2 size={12} />
               {editing ? 'Ferdig' : 'Rediger'}
             </button>
+            <SaveButton sync={links.sync} />
             {editing && (
               <button
                 type="button"

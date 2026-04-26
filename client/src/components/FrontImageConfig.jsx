@@ -1,4 +1,5 @@
 import { RotateCcw } from 'lucide-react';
+import { SaveButton } from './SaveButton.jsx';
 
 const RATIO_OPTIONS = [
   { value: '4/3',  label: '4 : 3   (høyt)' },
@@ -24,14 +25,17 @@ export function FrontImageConfig({ imageConfig }) {
     <div>
       <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
         <p className="panel-title">Hovedbildene på framsiden</p>
-        <button
-          type="button"
-          onClick={reset}
-          className="text-[10px] uppercase tracking-[0.18em] font-mono text-nx-mute hover:text-nx-cyan flex items-center gap-1"
-          title={`Tilbakestill til standard (${defaults.aspectRatio} · ${defaults.maxHeight}px)`}
-        >
-          <RotateCcw size={11} /> Standard
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={reset}
+            className="text-[10px] uppercase tracking-[0.18em] font-mono text-nx-mute hover:text-nx-cyan flex items-center gap-1"
+            title={`Tilbakestill til standard (${defaults.aspectRatio} · ${defaults.maxHeight}px)`}
+          >
+            <RotateCcw size={11} /> Standard
+          </button>
+          <SaveButton sync={imageConfig.sync} />
+        </div>
       </div>
 
       {/* Aspect ratio */}

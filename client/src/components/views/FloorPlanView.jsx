@@ -4,6 +4,7 @@ import { hasCap } from '../../lib/deviceUtils.js';
 import { FloorPlanPin } from '../FloorPlanPin.jsx';
 import { RichDevicePicker } from '../RichDevicePicker.jsx';
 import { FloorPlanFlowsPanel } from '../FloorPlanFlowsPanel.jsx';
+import { SaveButton } from '../SaveButton.jsx';
 
 /**
  * Floor plan visualisation. Reads plantegninger from /public/* and lets the
@@ -553,62 +554,6 @@ function Brackets() {
       <div className={`${cls} bottom-2 left-2 border-b-2 border-l-2`} />
       <div className={`${cls} bottom-2 right-2 border-b-2 border-r-2`} />
     </div>
-  );
-}
-
-/**
- * Eksplisitt 'Lagre til server'-knapp. Auto-save skjer 500ms etter siste
- * endring, men brukeren kan trykke denne for å tvinge fram et lagre nå og
- * få visuell bekreftelse på at det er gjort.
- *
- * Status-tilstander:
- *   normal    — "Lagre til server"
- *   saving    — "Lagrer..."  (med spinner)
- *   saved     — "Lagret ✓"   (i 2.5 sekunder etter vellykket save)
- *   error     — "Feil!"      (rød)
- */
-function SaveButton({ sync }) {
-  const { saving, lastSavedAt, error, flush } = sync || {};
-  const [showSavedFor, setShowSavedFor] = useState(null);
-
-  // Vis "Lagret ✓" kortvarig etter en save
-  useEffect(() => {
-    if (!lastSavedAt) return;
-    setShowSavedFor(lastSavedAt);
-    const t = setTimeout(() => setShowSavedFor(null), 2500);
-    return () => clearTimeout(t);
-  }, [lastSavedAt]);
-
-  const isJustSaved = showSavedFor === lastSavedAt && lastSavedAt;
-  const tone = error ? 'red' : isJustSaved ? 'green' : 'cyan';
-
-  let label = 'Lagre til server';
-  let Icon = Save;
-  if (saving) { label = 'Lagrer...'; Icon = Loader; }
-  else if (isJustSaved) { label = 'Lagret'; Icon = Check; }
-  else if (error) { label = 'Feil — prøv igjen'; Icon = AlertCircle; }
-
-  const colorClass = tone === 'red'
-    ? 'border-nx-red/55 text-nx-red bg-nx-red/10'
-    : tone === 'green'
-    ? 'border-nx-green/55 text-nx-green bg-nx-green/10'
-    : 'border-nx-line/60 text-nx-mute hover:text-nx-cyan hover:border-nx-cyan/40';
-
-  return (
-    <button
-      type="button"
-      onClick={() => flush?.().catch(() => {})}
-      disabled={saving}
-      className={[
-        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono uppercase tracking-[0.18em] transition-colors border',
-        colorClass,
-        saving ? 'opacity-70 cursor-wait' : ''
-      ].join(' ')}
-      title={error ? `Feil: ${error.message || 'ukjent'}` : 'Tving lagring til server nå'}
-    >
-      <Icon size={11} aria-hidden="true" className={saving ? 'animate-spin' : ''} />
-      {label}
-    </button>
   );
 }
 

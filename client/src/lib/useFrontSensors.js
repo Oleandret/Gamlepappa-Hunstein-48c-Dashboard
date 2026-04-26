@@ -18,7 +18,7 @@ function sanitize(arr) {
 }
 
 export function useFrontSensors() {
-  const [list, setList] = useServerSyncedState('frontSensors', []);
+  const [list, setList, sync] = useServerSyncedState('frontSensors', []);
   const cleanList = sanitize(list);
 
   const add = useCallback((sensor) => {
@@ -43,5 +43,5 @@ export function useFrontSensors() {
     });
   }, [setList]);
 
-  return { list: cleanList, add, update, remove, reorder };
+  return { list: cleanList, add, update, remove, reorder, sync };
 }
