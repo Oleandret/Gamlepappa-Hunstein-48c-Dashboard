@@ -1,8 +1,11 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { api } from './lib/api.js';
 import { usePageVisibility } from './lib/usePageVisibility.js';
 import { useFavorites } from './lib/useFavorites.js';
+import { useSidebarPinned, useLogPinned } from './lib/useSidebarState.js';
+import { pushEvent, diffDevicesAndLog } from './lib/activityLog.js';
+import { ActivityLogPanel } from './components/ActivityLogPanel.jsx';
 import { Sidebar } from './components/Sidebar.jsx';
 import { TopBar } from './components/TopBar.jsx';
 import { HouseView } from './components/HouseView.jsx';
@@ -43,6 +46,9 @@ export default function App() {
   const [section, setSection] = useState('oversikt');
   const visible = usePageVisibility();
   const favorites = useFavorites();
+  const sidebar = useSidebarPinned();
+  const logPin = useLogPinned();
+  const prevDevicesRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +69,12 @@ export default function App() {
         ]);
         if (cancelled) return;
         if (system) setSystem(system);
+        // Diff devices vs previous snapshot to push events to activity log.
+        // Skip the very first sync — we don't want to flood the log on load.
+        if (!initial && prevDevicesRef.current && devices?.devices) {
+          diffDevicesAndLog(prevDevicesRef.current, devices.devices, zones?.zones || {});
+        }
+        if (devices?.devices) prevDevicesRef.current = devices.devices;
         setData({
           zones: zones?.zones,
           devices: devices?.devices,
@@ -91,8 +103,10 @@ export default function App() {
   }, [visible]);
 
   const setCapability = useCallback(async (deviceId, capability, value) => {
+    let deviceName = deviceId;
     setData(d => {
       if (!d.devices?.[deviceId]) return d;
+      deviceName = d.devices[deviceId].name || deviceId;
       const next = { ...d, devices: { ...d.devices } };
       const dv = { ...d.devices[deviceId] };
       dv.capabilities = { ...dv.capabilities, [capability]: value };
@@ -105,14 +119,34 @@ export default function App() {
       next.devices[deviceId] = dv;
       return next;
     });
+    pushEvent({
+      type: capability === 'onoff' ? (value ? 'on' : 'off') : capability === 'locked' ? 'security' : 'info',
+      text: `${deviceName} → ${capability}=${formatValue(value)}`,
+      source: 'manuell'
+    });
     try { await api.setCapability(deviceId, capability, value); }
-    catch (e) { console.error('setCapability failed:', e.message); }
+    catch (e) {
+      console.error('setCapability failed:', e.message);
+      pushEvent({ type: 'alarm', text: `Klarte ikke styre ${deviceName}: ${e.message}`, source: 'feil' });
+    }
   }, []);
 
   const runFlow = useCallback(async (flowId) => {
+    let flowName = flowId;
+    setData(d => { flowName = d.flows?.[flowId]?.name || flowId; return d; });
+    pushEvent({ type: 'flow', text: `Kjørte flow: ${flowName}`, source: 'manuell' });
     try { await api.runFlow(flowId); }
-    catch (e) { console.error('runFlow failed:', e.message); }
+    catch (e) {
+      console.error('runFlow failed:', e.message);
+      pushEvent({ type: 'alarm', text: `Flow feilet: ${flowName} (${e.message})`, source: 'feil' });
+    }
   }, []);
+
+  function formatValue(v) {
+    if (typeof v === 'boolean') return v ? 'på' : 'av';
+    if (typeof v === 'number') return Number(v).toFixed(2).replace(/\.?0+$/, '');
+    return String(v);
+  }
 
   const counts = useMemo(() => ({
     devices: data.devices ? Object.keys(data.devices).length : 0,
@@ -129,14 +163,18 @@ export default function App() {
         <div className="absolute -bottom-40 right-1/4 h-96 w-96 rounded-full bg-nx-purple/15 blur-[120px]" />
       </div>
 
+      <ActivityLogPanel pinned={logPin.pinned} onTogglePin={logPin.toggle} />
+
       <div className="relative z-10 flex min-h-screen">
         <Sidebar
           section={section}
           onSection={setSection}
           deviceCount={counts.devices}
           flowCount={counts.flows}
+          pinned={sidebar.pinned}
+          onTogglePin={sidebar.toggle}
         />
-        <main className="flex-1 px-4 lg:px-8 py-6">
+        <main className="flex-1 px-4 lg:px-8 py-6 min-w-0">
           <TopBar system={system} section={section} onSection={setSection} />
 
           {!loaded && (

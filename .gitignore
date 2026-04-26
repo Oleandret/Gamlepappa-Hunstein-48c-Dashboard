@@ -36,3 +36,5 @@ yarn-error.log*
 /*.png
 # Keep public assets
 !client/public/**/*
+# Local discovery output
+homey-inventory*.json

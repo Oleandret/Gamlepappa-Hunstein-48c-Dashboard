@@ -1,83 +1,154 @@
-import { memo } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Thermometer, Droplets } from 'lucide-react';
+import {
+  Thermometer, Droplets, Lock, Unlock, Camera as CameraIcon,
+  DoorOpen, ShieldAlert, ShieldCheck, Home as HomeIcon, Anchor,
+  Car, Sun, Flame, Music
+} from 'lucide-react';
+import { capValue, hasCap } from '../lib/deviceUtils.js';
 
 /**
- * Room overlay positions (% of image width / height).
- * Tune these in one place to match the actual rooms in /house.jpg.
+ * Two background images (huset + hytta) with their own pin layouts.
+ * Position values are % of width / height tuned to the actual photos.
  */
-const ROOM_PINS = [
-  { zone: 'Stue',     label: 'STUE',     xPct: 50, yPct: 52, labelDX: -8,  labelDY: -16 },
-  { zone: 'Soverom',  label: 'SOVEROM',  xPct: 50, yPct: 28, labelDX: -22, labelDY: -16 },
-  { zone: 'Kjøkken',  label: 'KJØKKEN',  xPct: 35, yPct: 48, labelDX: -22, labelDY: -16 },
-  { zone: 'Bad',      label: 'BAD',      xPct: 42, yPct: 72, labelDX: 6,   labelDY: 12 },
-  { zone: 'Kontor',   label: 'KONTOR',   xPct: 60, yPct: 28, labelDX: 6,   labelDY: -16 },
-  { zone: 'Garasje',  label: 'GARASJE',  xPct: 72, yPct: 60, labelDX: 6,   labelDY: -16 }
-];
-
-function findTempForZone(zoneName, devices, zones) {
-  const zone = Object.values(zones).find(z => (z.name || '').toLowerCase() === zoneName.toLowerCase());
-  if (!zone) return null;
-  const dev = Object.values(devices).find(d =>
-    d.zone === zone.id && (
-      d.capabilities?.measure_temperature != null ||
-      d.capabilitiesObj?.measure_temperature?.value != null
-    )
-  );
-  if (!dev) return null;
-  const t = dev.capabilities?.measure_temperature ?? dev.capabilitiesObj?.measure_temperature?.value;
-  return Number.isFinite(t) ? t : null;
-}
+const VIEWS = {
+  home: {
+    label: 'Hjem',
+    Icon: HomeIcon,
+    image: '/house.jpg',
+    pins: [
+      { kind: 'zone', zoneName: 'Hovedsoverom', x: 58, y: 36, dx: 4,   dy: -16 },
+      { kind: 'zone', zoneName: 'Stue',         x: 50, y: 32, dx: -8,  dy: -16 },
+      { kind: 'zone', zoneName: 'Kjøkken',      x: 38, y: 36, dx: -22, dy: -16 },
+      { kind: 'zone', zoneName: 'Hovedetasjen', x: 53, y: 50, dx: -8,  dy: 8   },
+      { kind: 'zone', zoneName: 'Garasje',      x: 31, y: 53, dx: -22, dy: -16 },
+      { kind: 'zone', zoneName: 'Hage',         x: 24, y: 25, dx: -22, dy: -16 },
+      { kind: 'zone', zoneName: 'Kjeller',      x: 50, y: 70, dx: 4,   dy: 12  },
+      { kind: 'zone', zoneName: 'Kino',         x: 60, y: 72, dx: 4,   dy: 12  },
+      { kind: 'tesla', x: 78, y: 39, dx: -32, dy: -16 },
+      { kind: 'solar', x: 50, y: 14, dx: -22, dy: -16 }
+    ]
+  },
+  cabin: {
+    label: 'Hytte',
+    Icon: Anchor,
+    image: '/cabin.jpg',
+    pins: [
+      { kind: 'zone', zoneName: 'Halsaneset',         x: 62, y: 22, dx: -22, dy: -16 },
+      { kind: 'label', label: 'TERRASSE',  x: 38, y: 42, dx: -22, dy: -16, sub: 'Halsaneset Terasse' },
+      { kind: 'label', label: 'KJELLER',   x: 38, y: 55, dx: 6,   dy: 8,   sub: 'Halsaneset Kjeller' },
+      { kind: 'sauna', x: 24, y: 18, dx: -22, dy: -16 },
+      { kind: 'pier',  x: 47, y: 80, dx: -22, dy: -16 },
+      { kind: 'boathouse', x: 80, y: 76, dx: 6, dy: -16 }
+    ]
+  }
+};
 
 export function HouseView({ devices, zones, weather }) {
+  const [view, setView] = useState('home');
+  const cur = VIEWS[view];
+
   const outdoorTemp = Number.isFinite(weather?.now?.temp) ? `${Math.round(weather.now.temp)}°C` : '--';
   const humidity = Number.isFinite(weather?.now?.humidity) ? `${Math.round(weather.now.humidity)}%` : '--';
 
-  const indoorTemps = Object.values(devices)
-    .map(d => d.capabilities?.measure_temperature ?? d.capabilitiesObj?.measure_temperature?.value)
+  const zoneStatus = useMemo(() => buildZoneStatus(devices, zones), [devices, zones]);
+  const allDevs = Object.values(devices || {});
+  const indoorTemps = allDevs
+    .map(d => capValue(d, 'measure_temperature'))
     .filter(t => Number.isFinite(t));
   const avg = indoorTemps.length
     ? (indoorTemps.reduce((a, b) => a + b, 0) / indoorTemps.length).toFixed(1)
     : '--';
+
+  const securityCounts = useMemo(() => ({
+    locks:    allDevs.filter(d => d.class === 'lock').length,
+    locked:   allDevs.filter(d => d.class === 'lock' && capValue(d, 'locked')).length,
+    cameras:  allDevs.filter(d => d.class === 'camera').length,
+    motion:   allDevs.filter(d => capValue(d, 'alarm_motion') === true).length,
+    open:     allDevs.filter(d => capValue(d, 'alarm_contact') === true).length
+  }), [allDevs]);
+
+  const allSecure = securityCounts.locked === securityCounts.locks
+                    && securityCounts.open === 0
+                    && securityCounts.motion === 0;
+
+  // Find Tesla + Tibber for the special pins
+  const tesla = useMemo(() =>
+    allDevs.find(d => d.class === 'car' || /tesla/i.test(d.driverUri || '')),
+    [allDevs]
+  );
+  const tibber = useMemo(() =>
+    allDevs.find(d => /tibber/i.test(d.driverUri || '')),
+    [allDevs]
+  );
+  const solarPower = capValue(tibber, 'measure_current.L1');  // negative = production
 
   return (
     <div className="relative h-full p-5">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <p className="panel-title">Hjemmet</p>
-          <h2 className="mt-1 text-lg font-semibold">Alt er normalt</h2>
+          <h2 className="mt-1 text-lg font-semibold flex items-center gap-2">
+            {allSecure
+              ? <ShieldCheck size={18} className="text-nx-green" aria-hidden="true" />
+              : <ShieldAlert size={18} className="text-nx-amber" aria-hidden="true" />
+            }
+            {allSecure ? 'Alt er sikret' : 'Sjekk sikkerhet'}
+          </h2>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <Stat icon={<Thermometer size={14} className="text-nx-cyan" aria-hidden="true" />} label="Innetemp" value={`${avg}°C`} />
-          <Stat icon={<Droplets size={14} className="text-nx-cyan" aria-hidden="true" />} label="Luftfuktighet" value={humidity} />
-          <Stat label="Luftkvalitet" value="God" tone="green" />
+          <Stat icon={<Droplets size={14} className="text-nx-cyan" aria-hidden="true" />} label="Fuktighet" value={humidity} />
+          <Stat icon={<Lock size={14} className="text-nx-green" aria-hidden="true" />} label="Låser" value={`${securityCounts.locked}/${securityCounts.locks}`} tone={securityCounts.locked === securityCounts.locks ? 'green' : 'amber'} />
+          <Stat icon={<DoorOpen size={14} className="text-nx-cyan" aria-hidden="true" />} label="Åpne" value={String(securityCounts.open)} tone={securityCounts.open ? 'amber' : 'green'} />
+          <Stat icon={<CameraIcon size={14} className="text-nx-cyan" aria-hidden="true" />} label="Bevegelse" value={String(securityCounts.motion)} tone={securityCounts.motion ? 'amber' : undefined} />
         </div>
       </div>
 
-      <div className="relative mt-3 aspect-[16/9] w-full overflow-hidden rounded-xl border border-nx-line/60 bg-nx-bg">
+      {/* Hjem / Hytte toggle */}
+      <div className="mt-3 flex gap-1 p-0.5 rounded-lg border border-nx-line/60 bg-nx-panel/40 w-fit">
+        {Object.entries(VIEWS).map(([key, v]) => {
+          const active = view === key;
+          const Icon = v.Icon;
+          return (
+            <button
+              key={key}
+              onClick={() => setView(key)}
+              aria-pressed={active}
+              className={[
+                'inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-mono uppercase tracking-[0.18em] transition-colors',
+                active ? 'bg-nx-cyan/15 text-nx-cyan shadow-glow-soft' : 'text-nx-mute hover:text-nx-text'
+              ].join(' ')}
+            >
+              <Icon size={12} aria-hidden="true" />
+              {v.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="relative mt-3 aspect-[3/2] w-full overflow-hidden rounded-xl border border-nx-line/60 bg-nx-bg">
         <img
-          src="/house.jpg"
-          alt="Hunstein 48c sett fra droneperspektiv"
+          src={cur.image}
+          alt={view === 'home' ? 'Hunstein 48c sett fra droneperspektiv' : 'Halsaneset hytte sett fra droneperspektiv'}
           loading="lazy"
           decoding="async"
           className="absolute inset-0 h-full w-full object-cover"
           draggable={false}
         />
 
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-br from-nx-bg/65 via-nx-bg/20 to-nx-bg/75" />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-br from-nx-bg/55 via-nx-bg/15 to-nx-bg/65" />
         <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{
           background: 'radial-gradient(circle at 50% 35%, rgba(34,230,255,0.10), transparent 65%)'
         }} />
-
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-grid bg-[size:32px_32px] opacity-25 mix-blend-screen" />
-
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-grid bg-[size:32px_32px] opacity-20 mix-blend-screen" />
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -inset-x-10 h-32 bg-gradient-to-b from-transparent via-nx-cyan/12 to-transparent animate-scan" />
+          <div className="absolute -inset-x-10 h-32 bg-gradient-to-b from-transparent via-nx-cyan/10 to-transparent animate-scan" />
         </div>
-
         <Brackets />
 
         <motion.div
+          key={view}
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
           className="absolute top-3 left-3 chip text-xs"
@@ -87,54 +158,151 @@ export function HouseView({ devices, zones, weather }) {
         </motion.div>
 
         <div className="absolute bottom-3 left-3 font-mono text-[10px] uppercase tracking-[0.22em] text-nx-mute">
-          ◉ HUNSTEIN 48c
+          ◉ {view === 'home' ? 'HUNSTEIN 48c' : 'HALSANESET'} · LIVE
         </div>
 
-        {ROOM_PINS.map(p => (
-          <RoomPin
-            key={p.zone}
-            label={p.label}
-            temp={findTempForZone(p.zone, devices, zones)}
-            xPct={p.xPct}
-            yPct={p.yPct}
-            labelDX={p.labelDX ?? 0}
-            labelDY={p.labelDY ?? -16}
-          />
-        ))}
+        {/* Render pins for current view */}
+        {cur.pins.map((p, i) => {
+          if (p.kind === 'zone') {
+            const z = zoneStatus.find(s => s.name === p.zoneName);
+            return <ZonePin key={i} zone={z || { name: p.zoneName, summary: '—' }} pos={p} />;
+          }
+          if (p.kind === 'tesla') return tesla
+            ? <TeslaPin key={i} tesla={tesla} pos={p} />
+            : null;
+          if (p.kind === 'solar') return tibber
+            ? <SolarPin key={i} solarAmps={solarPower} pos={p} />
+            : null;
+          if (p.kind === 'sauna') return <LabelPin key={i} label="SAUNA" sub="Halsaneset" pos={p} Icon={Flame} />;
+          if (p.kind === 'pier')  return <LabelPin key={i} label="BRYGGE" sub="Sjøside" pos={p} Icon={Anchor} />;
+          if (p.kind === 'boathouse') return <LabelPin key={i} label="BÅTHUS" sub="Verkstedslys" pos={p} Icon={Anchor} />;
+          if (p.kind === 'label')  return <LabelPin key={i} label={p.label} sub={p.sub} pos={p} Icon={Music} />;
+          return null;
+        })}
       </div>
+
+      <p className="mt-2 text-[10px] uppercase tracking-[0.22em] text-nx-mute font-mono">
+        {view === 'home' ? 'Hjem · Hunstein 48c' : 'Hytte · Halsaneset'} · pin-koordinater i HouseView.jsx
+      </p>
     </div>
   );
 }
 
-const RoomPin = memo(function RoomPin({ label, temp, xPct, yPct, labelDX, labelDY }) {
-  const display = Number.isFinite(temp) ? `${temp.toFixed(1)}°C` : '—';
+const ZonePin = memo(function ZonePin({ zone, pos }) {
+  const hasAlarm = zone.motion || zone.openContact;
+  const allLocked = zone.locks > 0 && zone.locked === zone.locks;
+  return (
+    <PinShell pos={pos} hasAlarm={hasAlarm} ariaLabel={`${zone.name}: ${zone.summary || '—'}`}>
+      <div className="text-[8px] tracking-[0.18em] text-nx-mute font-mono leading-none">
+        {zone.name?.toUpperCase()}
+      </div>
+      {zone.temp != null && (
+        <div className="text-[12px] font-mono text-nx-cyan leading-tight">
+          {zone.temp.toFixed(1)}°C
+        </div>
+      )}
+      <div className="flex items-center gap-1 mt-0.5">
+        {zone.locks > 0 && (
+          allLocked
+            ? <Lock size={10} className="text-nx-green" aria-hidden="true" />
+            : <Unlock size={10} className="text-nx-amber" aria-hidden="true" />
+        )}
+        {zone.cameras > 0 && (
+          <CameraIcon size={10} className={zone.motion ? 'text-nx-red' : 'text-nx-mute'} aria-hidden="true" />
+        )}
+        {zone.openContact > 0 && <DoorOpen size={10} className="text-nx-amber" aria-hidden="true" />}
+      </div>
+    </PinShell>
+  );
+});
+
+function TeslaPin({ tesla, pos }) {
+  const battery = capValue(tesla, 'measure_battery');
+  const charging = String(capValue(tesla, 'ev_charging_state') || '').toLowerCase().includes('charging');
+  return (
+    <PinShell pos={pos} ariaLabel={`Tesla ${tesla.name}: batteri ${battery}%`} accent="cyan">
+      <div className="text-[8px] tracking-[0.18em] text-nx-mute font-mono leading-none flex items-center gap-1">
+        <Car size={9} aria-hidden="true" /> {tesla.name?.toUpperCase()}
+      </div>
+      {battery != null && (
+        <div className="text-[12px] font-mono text-nx-cyan leading-tight">
+          {Math.round(battery)}%
+          {charging && <span className="ml-1 text-nx-green">⚡</span>}
+        </div>
+      )}
+    </PinShell>
+  );
+}
+
+function SolarPin({ solarAmps, pos }) {
+  const producing = solarAmps != null && solarAmps < 0;
+  return (
+    <PinShell pos={pos} ariaLabel="Solcelleanlegg" accent={producing ? 'green' : 'cyan'}>
+      <div className="text-[8px] tracking-[0.18em] text-nx-mute font-mono leading-none flex items-center gap-1">
+        <Sun size={9} aria-hidden="true" /> SOL
+      </div>
+      <div className={['text-[12px] font-mono leading-tight', producing ? 'text-nx-green' : 'text-nx-mute'].join(' ')}>
+        {producing ? `+${Math.abs(solarAmps).toFixed(1)} A` : 'idle'}
+      </div>
+    </PinShell>
+  );
+}
+
+function LabelPin({ label, sub, pos, Icon }) {
+  return (
+    <PinShell pos={pos} ariaLabel={`${label}${sub ? ' — ' + sub : ''}`}>
+      <div className="text-[8px] tracking-[0.18em] text-nx-mute font-mono leading-none flex items-center gap-1">
+        {Icon && <Icon size={9} aria-hidden="true" />} {label}
+      </div>
+      {sub && <div className="text-[10px] font-mono text-nx-cyan leading-tight truncate max-w-[120px]">{sub}</div>}
+    </PinShell>
+  );
+}
+
+function PinShell({ pos, ariaLabel, hasAlarm = false, accent = 'cyan', children }) {
+  const isAlarm = hasAlarm;
   return (
     <div
       className="absolute"
-      style={{ left: `${xPct}%`, top: `${yPct}%`, transform: 'translate(-50%, -50%)' }}
+      style={{ left: `${pos.x}%`, top: `${pos.y}%`, transform: 'translate(-50%, -50%)' }}
       role="img"
-      aria-label={`${label} temperatur ${display}`}
+      aria-label={ariaLabel}
     >
-      <span aria-hidden="true" className="absolute inset-0 -m-1 rounded-full border border-nx-cyan/60 animate-pulseGlow" />
-      <span aria-hidden="true" className="relative block h-2.5 w-2.5 rounded-full bg-nx-cyan shadow-[0_0_12px_rgba(34,230,255,0.9)]" />
+      <span aria-hidden="true" className={[
+        'absolute inset-0 -m-1 rounded-full border animate-pulseGlow',
+        isAlarm ? 'border-nx-red/70'
+                : accent === 'green' ? 'border-nx-green/60'
+                : 'border-nx-cyan/60'
+      ].join(' ')} />
+      <span aria-hidden="true" className={[
+        'relative block h-2.5 w-2.5 rounded-full',
+        isAlarm ? 'bg-nx-red shadow-[0_0_12px_rgba(255,92,122,0.9)]'
+                : accent === 'green' ? 'bg-nx-green shadow-[0_0_12px_rgba(61,220,132,0.9)]'
+                : 'bg-nx-cyan shadow-[0_0_12px_rgba(34,230,255,0.9)]'
+      ].join(' ')} />
       <div
         className="absolute pointer-events-none"
-        style={{
-          left: `${labelDX}%`,
-          top: `${labelDY}px`,
-          transform: 'translateY(-100%)'
-        }}
+        style={{ left: `${pos.dx ?? 0}%`, top: `${pos.dy ?? -16}px`, transform: 'translateY(-100%)' }}
         aria-hidden="true"
       >
-        <div className="rounded-md border border-nx-cyan/45 bg-nx-bg/85 backdrop-blur-sm px-2 py-1 shadow-glow-soft">
-          <div className="text-[8px] tracking-[0.18em] text-nx-mute font-mono leading-none">{label}</div>
-          <div className="text-[12px] font-mono text-nx-cyan leading-tight">{display}</div>
+        <div className={[
+          'rounded-md border bg-nx-bg/85 backdrop-blur-sm px-2 py-1 shadow-glow-soft min-w-[80px]',
+          isAlarm ? 'border-nx-red/55'
+                  : accent === 'green' ? 'border-nx-green/45'
+                  : 'border-nx-cyan/45'
+        ].join(' ')}>
+          {children}
         </div>
-        <div className="absolute left-1/2 top-full h-3 w-px bg-nx-cyan/50" />
+        <div className={[
+          'absolute left-1/2 top-full h-3 w-px',
+          isAlarm ? 'bg-nx-red/60'
+                  : accent === 'green' ? 'bg-nx-green/60'
+                  : 'bg-nx-cyan/50'
+        ].join(' ')} />
       </div>
     </div>
   );
-});
+}
 
 function Brackets() {
   const cls = 'absolute h-5 w-5 border-nx-cyan/70';
@@ -154,7 +322,44 @@ function Stat({ icon, label, value, tone }) {
       <div className="text-[10px] uppercase tracking-[0.18em] text-nx-mute flex items-center gap-1.5 justify-end">
         {icon}{label}
       </div>
-      <div className={['font-mono text-base', tone === 'green' ? 'text-nx-green' : 'text-nx-text'].join(' ')}>{value}</div>
+      <div className={[
+        'font-mono text-base',
+        tone === 'green' ? 'text-nx-green' :
+        tone === 'amber' ? 'text-nx-amber' :
+        'text-nx-text'
+      ].join(' ')}>{value}</div>
     </div>
   );
+}
+
+function buildZoneStatus(devices, zones) {
+  const list = Object.values(devices || {});
+  const result = {};
+  for (const d of list) {
+    const zone = zones?.[d.zone];
+    if (!zone) continue;
+    if (!result[zone.id]) {
+      result[zone.id] = { id: zone.id, name: zone.name, temps: [], locks: 0, locked: 0, cameras: 0, motion: 0, openContact: 0 };
+    }
+    const s = result[zone.id];
+    const t = capValue(d, 'measure_temperature');
+    if (Number.isFinite(t)) s.temps.push(t);
+    if (d.class === 'lock') {
+      s.locks++;
+      if (capValue(d, 'locked')) s.locked++;
+    }
+    if (d.class === 'camera') s.cameras++;
+    if (capValue(d, 'alarm_motion') === true) s.motion++;
+    if (hasCap(d, 'alarm_contact') && capValue(d, 'alarm_contact') === true) s.openContact++;
+  }
+  return Object.values(result).map(s => ({
+    ...s,
+    temp: s.temps.length ? s.temps.reduce((a,b)=>a+b,0) / s.temps.length : null,
+    summary: [
+      s.temps.length && `${(s.temps.reduce((a,b)=>a+b,0) / s.temps.length).toFixed(1)}°`,
+      s.locks > 0 && `${s.locked}/${s.locks} låst`,
+      s.openContact > 0 && `${s.openContact} åpen`,
+      s.motion > 0 && `${s.motion} bevegelse`
+    ].filter(Boolean).join(' · ') || 'OK'
+  }));
 }
