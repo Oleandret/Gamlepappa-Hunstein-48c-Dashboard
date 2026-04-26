@@ -73,7 +73,7 @@ export function FrontSensorEditor({ sensors, devices, zones }) {
 
       {/* Liste over eksisterende */}
       {sensors.list.length > 0 ? (
-        <ul className="mb-3 divide-y divide-nx-line/40 border border-nx-line/40 rounded-lg overflow-hidden">
+        <ul className="mb-3 divide-y divide-nx-line/40 border border-nx-line/40 rounded-lg">
           {sensors.list.map((s, i) => {
             const dev = devices?.[s.deviceId];
             return (

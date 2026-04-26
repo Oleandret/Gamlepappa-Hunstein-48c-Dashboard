@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Lightbulb, Lock, Unlock, Thermometer, Activity, DoorOpen, Camera, Power, X, Music, Zap } from 'lucide-react';
 import { capValue, hasCap, classLabel, formatCapability } from '../lib/deviceUtils.js';
+import { PIN_CATEGORIES } from './views/FloorPlanView.jsx';
 
 /**
  * Pin på en plantegning. To moduser:
@@ -325,18 +326,30 @@ function Popover({ children, onClose }) {
 function EditTools({ pin, onUpdate, onRemove }) {
   return (
     <div
-      className="absolute left-1/2 -translate-x-1/2 mt-2 -bottom-2 translate-y-full flex items-center gap-1 bg-nx-bg/95 border border-nx-cyan/45 rounded-md px-1 py-0.5 z-30"
-      style={{ top: '100%' }}
+      className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 bg-nx-bg/95 border border-nx-cyan/55 rounded-md p-1 shadow-glow-soft z-30 whitespace-nowrap"
+      style={{ top: 'calc(100% + 12px)' }}
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
     >
       <input
         type="text"
-        value={pin.label}
+        value={pin.label || ''}
         onChange={(e) => onUpdate({ label: e.target.value })}
-        placeholder="label"
-        className="w-20 bg-transparent border-none text-[10px] font-mono text-nx-cyan focus:outline-none placeholder:text-nx-mute"
+        placeholder="vist navn..."
+        className="w-32 bg-nx-panel/60 border border-nx-line/40 rounded px-1.5 py-0.5 text-[11px] font-mono text-nx-cyan focus:outline-none focus:border-nx-cyan/60 placeholder:text-nx-mute"
+        title="Kort navn som vises på plantegninga"
       />
+      <select
+        value={pin.category || 'auto'}
+        onChange={(e) => onUpdate({ category: e.target.value })}
+        className="bg-nx-panel/60 border border-nx-line/40 rounded px-1 py-0.5 text-[10px] font-mono text-nx-cyan focus:outline-none"
+        title="Hvilken fane denne pin-en vises i"
+      >
+        <option value="auto">auto</option>
+        {PIN_CATEGORIES.map(c => (
+          <option key={c.id} value={c.id}>{c.label.toLowerCase()}</option>
+        ))}
+      </select>
       <button
         type="button"
         onClick={() => {
@@ -344,16 +357,17 @@ function EditTools({ pin, onUpdate, onRemove }) {
           const next = placements[(placements.indexOf(pin.placement || 'top') + 1) % placements.length];
           onUpdate({ placement: next });
         }}
-        className="text-[10px] font-mono text-nx-mute hover:text-nx-cyan px-1"
-        title="Roter info-side"
+        className="text-[12px] font-mono text-nx-mute hover:text-nx-cyan px-1.5"
+        title="Roter side label-en flyter på"
       >↻</button>
       <button
         type="button"
         onClick={onRemove}
         aria-label="Fjern pin"
-        className="text-nx-mute hover:text-nx-red"
+        className="text-nx-mute hover:text-nx-red px-1"
+        title="Fjern pin"
       >
-        <X size={10} />
+        <X size={12} />
       </button>
     </div>
   );

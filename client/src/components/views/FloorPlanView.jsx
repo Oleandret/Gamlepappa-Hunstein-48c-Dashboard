@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { Home as HomeIcon, Anchor, Building2, Upload, Lock, Unlock, Camera as CameraIcon, DoorOpen, FileSpreadsheet, ZoomIn, ZoomOut, Thermometer, ShieldAlert, Lightbulb, Layers, Edit2, Plus, Wifi, Cpu } from 'lucide-react';
+import { Home as HomeIcon, Anchor, Building2, Upload, Lock, Unlock, Camera as CameraIcon, DoorOpen, FileSpreadsheet, ZoomIn, ZoomOut, Thermometer, ShieldAlert, Lightbulb, Layers, Edit2, Plus, Wifi, Cpu, Music } from 'lucide-react';
 import { capValue, hasCap, classLabel } from '../../lib/deviceUtils.js';
 import { FloorPlanPin } from '../FloorPlanPin.jsx';
 import { RichDevicePicker } from '../RichDevicePicker.jsx';
@@ -106,9 +106,14 @@ const VIEW_MODES = [
   { id: 'temp',     label: 'Temperatur',   Icon: Thermometer },
   { id: 'security', label: 'Sikkerhet',    Icon: ShieldAlert },
   { id: 'light',    label: 'Lys',          Icon: Lightbulb },
+  { id: 'music',    label: 'Musikk',       Icon: Music },
   { id: 'wifi',     label: 'Wifi',         Icon: Wifi },
   { id: 'tech',     label: 'Teknisk',      Icon: Cpu }
 ];
+
+// Kategori-listen for pins (uten 'all' siden alle pins per definisjon
+// vises i 'all'-fanen).
+export const PIN_CATEGORIES = VIEW_MODES.filter(m => m.id !== 'all');
 
 /**
  * "Teknisk" = enheter som ikke faller naturlig inn under lys, sikkerhet eller
@@ -133,29 +138,33 @@ function isTechnicalDevice(d) {
 }
 
 /**
- * Avgjør om en pin (med referert enhet) tilhører gjeldende view-mode.
- * Brukes til å filtrere brukerens egne pins slik at hver tegning kun
- * viser pins som hører til kategorien.
+ * Auto-kategoriser en enhet i én eksklusiv kategori. Brukes som default
+ * når en pin ikke har eksplisitt category. Prioritert rekkefølge slik at
+ * f.eks. Hue-lampe → 'light' (ikke 'wifi') og Sonos-høyttaler → 'music'.
  */
-function pinMatchesViewMode(device, viewMode) {
+function autoCategoryFor(d) {
+  if (!d) return 'tech';
+  if (d.class === 'light' || hasCap(d, 'dim')) return 'light';
+  if (d.class === 'lock' || d.class === 'camera') return 'security';
+  if (hasCap(d, 'alarm_motion') || hasCap(d, 'alarm_contact')
+   || hasCap(d, 'alarm_smoke')  || hasCap(d, 'alarm_water')) return 'security';
+  if (d.class === 'speaker' || d.class === 'tv'
+   || hasCap(d, 'speaker_playing') || hasCap(d, 'volume_set')) return 'music';
+  if (hasCap(d, 'target_temperature') || hasCap(d, 'measure_temperature')) return 'temp';
+  if (isWifiDevice(d)) return 'wifi';
+  return 'tech';
+}
+
+/**
+ * Avgjør om en pin tilhører gjeldende view-mode. Brukerens eksplisitte
+ * pin.category vinner — hvis pin ble lagt til på Wifi-fanen, vises den
+ * KUN i Wifi-fanen, uavhengig av enhetens type. 'auto' faller tilbake til
+ * autoCategoryFor.
+ */
+function pinMatchesViewMode(device, viewMode, pin) {
   if (viewMode === 'all') return true;
-  if (!device) return false; // ukjent enhet — vis bare i 'all'
-  switch (viewMode) {
-    case 'temp':
-      return hasCap(device, 'measure_temperature') || hasCap(device, 'target_temperature');
-    case 'security':
-      return device.class === 'lock' || device.class === 'camera'
-          || hasCap(device, 'alarm_motion') || hasCap(device, 'alarm_contact')
-          || hasCap(device, 'alarm_smoke')  || hasCap(device, 'alarm_water');
-    case 'light':
-      return device.class === 'light' || hasCap(device, 'dim');
-    case 'wifi':
-      return isWifiDevice(device);
-    case 'tech':
-      return isTechnicalDevice(device);
-    default:
-      return true;
-  }
+  const cat = (pin?.category && pin.category !== 'auto') ? pin.category : autoCategoryFor(device);
+  return cat === viewMode;
 }
 
 // Heuristikk for wifi-enheter: Homey-flags + kjente wifi/cloud-driver-mønstre.
@@ -318,11 +327,17 @@ export function FloorPlanView({ devices, zones, location = 'home', floorPlanPins
           planId={plan.id}
           devices={devices}
           zones={zones}
-          existingPins={floorPlanPins.getPins(plan.id)}
+          viewMode={viewMode}
+          existingPins={floorPlanPins.getPins(plan.id).filter(p =>
+            pinMatchesViewMode(devices?.[p.deviceId], viewMode, p)
+          )}
           onAdd={(pin) => floorPlanPins.addPin(plan.id, pin)}
           onResetPlan={() => {
-            if (confirm('Fjerne ALLE pins fra denne plantegninga?')) {
-              floorPlanPins.resetPlan(plan.id);
+            if (confirm(`Fjerne alle pins i ${VIEW_MODES.find(m => m.id === viewMode)?.label || 'denne'}-fanen?`)) {
+              const idsToRemove = floorPlanPins.getPins(plan.id)
+                .filter(p => pinMatchesViewMode(devices?.[p.deviceId], viewMode, p))
+                .map(p => p.id);
+              idsToRemove.forEach(id => floorPlanPins.removePin(plan.id, id));
             }
           }}
         />
@@ -386,12 +401,10 @@ function ReferenceImage({ plan }) {
 }
 
 function FloorPlanCanvas({ plan, rooms, showAutoRooms = false, pins, devices, zones, editing, viewMode = 'all', floorPlanPins, onSetCapability }) {
-  // I edit-modus viser vi alltid alle pins så brukeren kan flytte/endre dem.
-  // I visningsmodus filtrerer vi etter view-mode slik at f.eks. 'Wifi'-fanen
-  // bare viser wifi-pins, 'Lys' viser lys-pins, osv.
-  const visiblePins = editing
-    ? pins
-    : pins.filter(p => pinMatchesViewMode(devices?.[p.deviceId], viewMode));
+  // Filtrer pins etter view-mode i BÅDE visning og edit. Da blir hver fane
+  // ryddig — du ser kun pins som hører til den fanen du står på, og kan
+  // legge til nye uten å bli forstyrret av pins fra andre kategorier.
+  const visiblePins = pins.filter(p => pinMatchesViewMode(devices?.[p.deviceId], viewMode, p));
   const containerRef = useRef(null);
   const [draggingId, setDraggingId] = useState(null);
 
@@ -482,27 +495,35 @@ function FloorPlanCanvas({ plan, rooms, showAutoRooms = false, pins, devices, zo
   );
 }
 
-function AddPinPanel({ planId, devices, zones, existingPins, onAdd, onResetPlan }) {
+function AddPinPanel({ planId, devices, zones, viewMode = 'all', existingPins, onAdd, onResetPlan }) {
   const [deviceId, setDeviceId] = useState('');
   const [label, setLabel] = useState('');
 
+  const currentMode = VIEW_MODES.find(m => m.id === viewMode);
+
   const handleAdd = () => {
     if (!deviceId) return;
-    onAdd({ deviceId, label: label.trim() });
+    // Hvis brukeren er på en spesifikk fane, fest pin-en til den fanen.
+    // Hvis på 'Alle', la category være 'auto' så autoCategoryFor avgjør.
+    const category = viewMode === 'all' ? 'auto' : viewMode;
+    onAdd({ deviceId, label: label.trim(), category });
     setDeviceId(''); setLabel('');
   };
 
   return (
     <div className="mt-3 panel p-3 border border-nx-cyan/30">
       <div className="flex items-center justify-between gap-2 mb-2">
-        <p className="panel-title">Legg til enhet på plantegning ({existingPins.length} plassert)</p>
+        <p className="panel-title">
+          Legg til på <span className="text-nx-cyan">{currentMode?.label || 'fanen'}</span>
+          <span className="text-nx-mute font-normal ml-1">({existingPins.length} plassert)</span>
+        </p>
         <button
           type="button"
           onClick={onResetPlan}
           className="text-[10px] uppercase tracking-[0.18em] font-mono text-nx-mute hover:text-nx-red"
-          title="Fjern alle pins fra denne plantegninga"
+          title={viewMode === 'all' ? 'Fjern ALLE pins fra denne plantegninga' : `Fjern pins i ${currentMode?.label}-fanen`}
         >
-          Tøm alt
+          Tøm fanen
         </button>
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -519,14 +540,14 @@ function AddPinPanel({ planId, devices, zones, existingPins, onAdd, onResetPlan 
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           placeholder="kort label (valgfri)"
-          className="w-40 bg-nx-panel/60 border border-nx-line/60 rounded px-2 py-1 text-xs text-nx-text font-mono"
+          className="w-44 bg-nx-panel/60 border border-nx-line/60 rounded px-2 py-1.5 text-xs text-nx-text font-mono"
         />
         <button
           type="button"
           onClick={handleAdd}
           disabled={!deviceId}
           className={[
-            'inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-mono uppercase tracking-[0.16em] transition-colors',
+            'inline-flex items-center gap-1 px-3 py-1.5 rounded text-xs font-mono uppercase tracking-[0.16em] transition-colors',
             deviceId ? 'bg-nx-cyan/15 text-nx-cyan hover:bg-nx-cyan/25' : 'text-nx-mute opacity-50 cursor-not-allowed'
           ].join(' ')}
         >
@@ -534,7 +555,9 @@ function AddPinPanel({ planId, devices, zones, existingPins, onAdd, onResetPlan 
         </button>
       </div>
       <p className="mt-2 text-[10px] text-nx-mute">
-        Pin-en plasseres på midten av plantegninga — dra den til riktig posisjon. Lagres umiddelbart.
+        {viewMode === 'all'
+          ? 'Pin-en plasseres på midten — dra til riktig sted. Pin-en auto-kategoriseres etter enhetens type.'
+          : `Pin-en festes til ${currentMode?.label}-fanen. Vises ikke i andre faner. Dra til riktig sted.`}
       </p>
     </div>
   );

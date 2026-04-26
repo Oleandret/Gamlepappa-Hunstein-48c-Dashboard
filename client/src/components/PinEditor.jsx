@@ -297,7 +297,7 @@ function PinList({ pins, zones, devices, onCyclePlacement, onUpdate, onRemove })
     return <p className="mt-3 text-xs text-nx-mute italic">Ingen pins her ennå. Legg til under.</p>;
   }
   return (
-    <ul className="mt-3 divide-y divide-nx-line/40 border border-nx-line/40 rounded-lg overflow-hidden">
+    <ul className="mt-3 divide-y divide-nx-line/40 border border-nx-line/40 rounded-lg">
       {pins.map((p) => {
         const meta = KIND_LABELS[p.kind] || { label: p.kind, Icon: MapPin };
         const PlacementIcon = PLACEMENT_ICON[p.placement || 'top'] || ArrowUp;

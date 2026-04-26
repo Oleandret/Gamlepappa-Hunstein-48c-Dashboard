@@ -18,13 +18,17 @@ function sanitizePin(p) {
   if (!p || typeof p !== 'object') return null;
   if (typeof p.deviceId !== 'string' || !p.deviceId) return null;
   const placements = ['top', 'bottom', 'left', 'right'];
+  const categories = ['auto', 'light', 'security', 'temp', 'music', 'wifi', 'tech'];
   return {
     id: typeof p.id === 'string' ? p.id : newId(),
     deviceId: p.deviceId,
     x: Number.isFinite(p.x) ? Math.max(0, Math.min(100, p.x)) : 50,
     y: Number.isFinite(p.y) ? Math.max(0, Math.min(100, p.y)) : 50,
     placement: placements.includes(p.placement) ? p.placement : 'top',
-    label: typeof p.label === 'string' ? p.label : ''
+    label: typeof p.label === 'string' ? p.label : '',
+    // Hvilken view-fane pin-en hører til. 'auto' = auto-kategoriser via
+    // device-class. Brukeren kan overstyre per pin.
+    category: categories.includes(p.category) ? p.category : 'auto'
   };
 }
 
