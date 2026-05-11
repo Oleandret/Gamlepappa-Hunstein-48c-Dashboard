@@ -1,4 +1,4 @@
-import { Home, LayoutGrid, Boxes, Workflow, Zap, ShieldCheck, Star, Settings, Music, Map, Bot, Anchor, Wrench, Bookmark, Activity } from 'lucide-react';
+import { Home, LayoutGrid, Boxes, Workflow, Zap, ShieldCheck, Star, Settings, Music, Map, Bot, Anchor, Wrench, Bookmark, Activity, Sparkles } from 'lucide-react';
 
 /** Single source of truth for top-level navigation. */
 export const SECTIONS = [
@@ -17,5 +17,6 @@ export const SECTIONS = [
   { id: 'lenker',            label: 'Lenker',          Icon: Bookmark },
   { id: 'vedlikehold',       label: 'Vedlikehold',     Icon: Wrench },
   { id: 'innsikt',           label: 'Innsikt',         Icon: Activity },
+  { id: 'ai-flows',          label: 'AI-flows',        Icon: Sparkles },
   { id: 'innstillinger',     label: 'Innstillinger',   Icon: Settings }
 ];

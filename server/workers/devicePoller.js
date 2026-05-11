@@ -2,6 +2,7 @@ import { homeyClient } from '../lib/homeyClient.js';
 import { isDemoMode } from '../config.js';
 import { MOCK_DEVICES, MOCK_ZONES } from '../lib/mockData.js';
 import { isEnabled, query } from '../lib/db.js';
+import { onDeviceChanges } from '../lib/autoFlowExecutor.js';
 
 /**
  * Server-side poller som hver POLL_MS-millisekund henter device-status
@@ -155,6 +156,8 @@ async function pollOnce() {
     const transitionRows = [];
     const snapshotRows = [];
     const shouldSnapshot = (Date.now() - lastSnapshotTs) >= SNAPSHOT_EVERY_MS;
+    // Samle alle endringer for executor — { deviceId, capability, prev, next }
+    const allChanges = [];
 
     for (const d of devArr) {
       const caps = capObj(d);
@@ -174,6 +177,13 @@ async function pollOnce() {
           prev_value: c.prev,
           kind: 'transition',
           ...ctx
+        });
+        allChanges.push({
+          deviceId: d.id,
+          deviceName: d.name,
+          capability: c.capability,
+          prev: c.prev,
+          next: c.next
         });
       }
 
@@ -204,9 +214,23 @@ async function pollOnce() {
     snapshots = await insertEvents(snapshotRows);
     if (shouldSnapshot && snapshotRows.length > 0) lastSnapshotTs = Date.now();
 
+    // Trigger eventuelle auto-flows som matcher disse endringene
+    let firedFlows = 0;
+    if (allChanges.length > 0) {
+      try {
+        const flowResult = await onDeviceChanges(allChanges);
+        firedFlows = flowResult.fired || 0;
+      } catch (err) {
+        console.warn('[poller] auto-flow executor error:', err.message);
+      }
+    }
+
     lastPollAt = startedAt;
-    lastPollResult = { ok: true, polledDevices, transitions, snapshots, durationMs: Date.now() - startedAt };
-    console.log(`[poller] ok — ${polledDevices} devs, ${transitions} transitions, ${snapshots} snapshots, ${Date.now() - startedAt}ms`);
+    lastPollResult = {
+      ok: true, polledDevices, transitions, snapshots, firedFlows,
+      durationMs: Date.now() - startedAt
+    };
+    console.log(`[poller] ok — ${polledDevices} devs, ${transitions} transitions, ${snapshots} snapshots, ${firedFlows} flows fired, ${Date.now() - startedAt}ms`);
     return lastPollResult;
   } catch (err) {
     lastPollAt = startedAt;

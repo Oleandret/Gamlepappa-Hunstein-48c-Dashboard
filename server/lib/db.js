@@ -144,6 +144,40 @@ export async function runMigrations() {
     `);
     await p.query(`CREATE INDEX IF NOT EXISTS idx_suggestions_status ON suggestions (status, generated_at DESC)`);
 
+    // Auto-flows: AI-genererte automatiseringer som faktisk kjøres av serveren
+    await p.query(`
+      CREATE TABLE IF NOT EXISTS auto_flows (
+        id                   BIGSERIAL PRIMARY KEY,
+        title                TEXT NOT NULL,
+        description          TEXT,
+        source_suggestion_id BIGINT,
+        trigger              JSONB NOT NULL,   -- { type: 'device_change'|'time', ... }
+        actions              JSONB NOT NULL,   -- [{ type: 'set_capability', deviceId, capability, value }]
+        enabled              BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        last_run_at          TIMESTAMPTZ,
+        last_run_ok          BOOLEAN,
+        last_error           TEXT,
+        run_count            INT NOT NULL DEFAULT 0,
+        min_interval_seconds INT NOT NULL DEFAULT 5   -- throttling: ikke kjør oftere enn dette
+      )
+    `);
+    await p.query(`CREATE INDEX IF NOT EXISTS idx_auto_flows_enabled ON auto_flows (enabled)`);
+
+    // Run-historikk for hver auto-flow-kjøring
+    await p.query(`
+      CREATE TABLE IF NOT EXISTS auto_flow_runs (
+        id              BIGSERIAL PRIMARY KEY,
+        flow_id         BIGINT NOT NULL REFERENCES auto_flows(id) ON DELETE CASCADE,
+        run_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        trigger_event   JSONB,
+        actions_result  JSONB,
+        ok              BOOLEAN,
+        duration_ms     INT
+      )
+    `);
+    await p.query(`CREATE INDEX IF NOT EXISTS idx_auto_flow_runs_flow_ts ON auto_flow_runs (flow_id, run_at DESC)`);
+
     migrationsRan = true;
     console.log('[db] migrations ok — timescale:', hasTimescale ? 'yes' : 'no');
     return true;

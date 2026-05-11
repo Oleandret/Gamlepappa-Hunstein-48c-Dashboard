@@ -61,6 +61,25 @@ export const api = {
     }).then(r => {
       if (!r.ok) throw new Error(`PATCH suggestion → ${r.status}`);
       return r.json();
+    }),
+
+    // Auto-flows (AI-genererte automatiseringer som faktisk kjøres av serveren)
+    autoFlows:        (signal) => jget('/events/auto-flows', signal),
+    autoFlowRuns:     (id, signal) => jget(`/events/auto-flows/${id}/runs`, signal),
+    compileSuggestion: (id) => jpost(`/events/suggestions/${id}/compile`),
+    updateAutoFlow:   (id, patch) => fetch(`${BASE}/api/events/auto-flows/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch)
+    }).then(r => {
+      if (!r.ok) throw new Error(`PATCH auto-flow → ${r.status}`);
+      return r.json();
+    }),
+    deleteAutoFlow:   (id) => fetch(`${BASE}/api/events/auto-flows/${id}`, {
+      method: 'DELETE'
+    }).then(r => {
+      if (!r.ok) throw new Error(`DELETE auto-flow → ${r.status}`);
+      return r.json();
     })
   },
 

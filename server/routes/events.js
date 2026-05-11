@@ -8,6 +8,8 @@ import { runSuggestionEngine } from '../workers/suggestionEngine.js';
 import { openaiEnabled } from '../lib/openaiClient.js';
 import { configPath } from '../lib/configStore.js';
 import { cfg, isDemoMode } from '../config.js';
+import { compileSuggestionToFlow } from '../lib/autoFlowCompiler.js';
+import { invalidateFlowCache } from '../lib/autoFlowExecutor.js';
 
 export const eventsRoutes = Router();
 
@@ -200,6 +202,115 @@ eventsRoutes.patch('/suggestions/:id', async (req, res, next) => {
       `UPDATE suggestions SET status = $1, reviewed_at = NOW() WHERE id = $2`,
       [status, id]
     );
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// ── Auto-flows ───────────────────────────────────────────────────────────
+
+eventsRoutes.get('/auto-flows', async (_req, res, next) => {
+  try {
+    if (!isEnabled()) return res.json({ flows: [], _disabled: true });
+    const result = await query(`
+      SELECT id, title, description, trigger, actions, enabled,
+             created_at, last_run_at, last_run_ok, last_error, run_count,
+             min_interval_seconds, source_suggestion_id
+      FROM auto_flows
+      ORDER BY enabled DESC, created_at DESC
+    `);
+    res.json({ flows: result.rows });
+  } catch (err) { next(err); }
+});
+
+eventsRoutes.get('/auto-flows/:id/runs', async (req, res, next) => {
+  try {
+    if (!isEnabled()) return res.json({ runs: [], _disabled: true });
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'invalid id' });
+    const result = await query(`
+      SELECT id, run_at, trigger_event, actions_result, ok, duration_ms
+      FROM auto_flow_runs
+      WHERE flow_id = $1
+      ORDER BY run_at DESC
+      LIMIT 50
+    `, [id]);
+    res.json({ runs: result.rows });
+  } catch (err) { next(err); }
+});
+
+/**
+ * Kompiler en suggestion til en auto-flow med LLM, lagre med enabled=false
+ * som default — brukeren slår den på etter å ha sjekket.
+ */
+eventsRoutes.post('/suggestions/:id/compile', async (req, res, next) => {
+  try {
+    if (!isEnabled()) return res.status(400).json({ error: 'database not configured' });
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'invalid id' });
+    const sres = await query(`SELECT * FROM suggestions WHERE id = $1`, [id]);
+    const sugg = sres.rows[0];
+    if (!sugg) return res.status(404).json({ error: 'suggestion not found' });
+
+    const result = await compileSuggestionToFlow(sugg);
+    if (!result.ok) return res.status(400).json({ error: result.error, raw: result.raw });
+
+    const insertResult = await query(
+      `INSERT INTO auto_flows (title, description, source_suggestion_id, trigger, actions, enabled)
+       VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, false)
+       RETURNING id`,
+      [
+        result.flow.title || sugg.title,
+        result.flow.description || sugg.description,
+        sugg.id,
+        JSON.stringify(result.flow.trigger),
+        JSON.stringify(result.flow.actions)
+      ]
+    );
+    await query(`UPDATE suggestions SET status = 'accepted', reviewed_at = NOW() WHERE id = $1`, [id]);
+    invalidateFlowCache();
+    res.json({ flowId: insertResult.rows[0].id, flow: result.flow });
+  } catch (err) { next(err); }
+});
+
+eventsRoutes.patch('/auto-flows/:id', async (req, res, next) => {
+  try {
+    if (!isEnabled()) return res.status(400).json({ error: 'database not configured' });
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'invalid id' });
+    const patch = req.body || {};
+    const fields = [];
+    const values = [];
+    if (typeof patch.enabled === 'boolean') {
+      values.push(patch.enabled);
+      fields.push(`enabled = $${values.length}`);
+    }
+    if (typeof patch.title === 'string') {
+      values.push(patch.title);
+      fields.push(`title = $${values.length}`);
+    }
+    if (typeof patch.description === 'string') {
+      values.push(patch.description);
+      fields.push(`description = $${values.length}`);
+    }
+    if (typeof patch.min_interval_seconds === 'number') {
+      values.push(Math.max(1, Math.min(3600, Math.floor(patch.min_interval_seconds))));
+      fields.push(`min_interval_seconds = $${values.length}`);
+    }
+    if (fields.length === 0) return res.status(400).json({ error: 'nothing to update' });
+    values.push(id);
+    await query(`UPDATE auto_flows SET ${fields.join(', ')} WHERE id = $${values.length}`, values);
+    invalidateFlowCache();
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+eventsRoutes.delete('/auto-flows/:id', async (req, res, next) => {
+  try {
+    if (!isEnabled()) return res.status(400).json({ error: 'database not configured' });
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'invalid id' });
+    await query(`DELETE FROM auto_flows WHERE id = $1`, [id]);
+    invalidateFlowCache();
     res.json({ ok: true });
   } catch (err) { next(err); }
 });

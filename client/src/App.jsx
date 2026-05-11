@@ -26,6 +26,7 @@ import { FlowFavoritesView } from './components/views/FlowFavoritesView.jsx';
 import { MaintenanceView } from './components/views/MaintenanceView.jsx';
 import { LinksView } from './components/views/LinksView.jsx';
 import { InsightsView } from './components/views/InsightsView.jsx';
+import { AutoFlowsView } from './components/views/AutoFlowsView.jsx';
 import { QuickControls } from './components/QuickControls.jsx';
 import { WeatherWidget } from './components/WeatherWidget.jsx';
 import { SecurityWidget } from './components/SecurityWidget.jsx';
@@ -400,6 +401,9 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
 
     case 'innsikt':
       return wrapper(<InsightsView />, false);
+
+    case 'ai-flows':
+      return wrapper(<AutoFlowsView />, false);
 
     case 'energi':
       return wrapper(

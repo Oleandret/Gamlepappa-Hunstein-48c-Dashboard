@@ -103,6 +103,25 @@ export function InsightsView() {
     }
   };
 
+  const [compilingId, setCompilingId] = useState(null);
+  const compileSuggestion = async (id) => {
+    setCompilingId(id);
+    setError(null);
+    try {
+      const result = await api.events.compileSuggestion(id);
+      if (result?.flowId) {
+        setSuggestions(prev => prev.map(s => s.id === id ? { ...s, status: 'accepted' } : s));
+        alert(`Auto-flow opprettet (id ${result.flowId})! Gå til "AI-flows"-fanen for å skru den på.`);
+      } else if (result?.error) {
+        setError(new Error(result.error));
+      }
+    } catch (err) {
+      setError(err);
+    } finally {
+      setCompilingId(null);
+    }
+  };
+
   const dbEnabled = status?.db === true;
   const pollerRunning = status?.poller?.running === true;
 
@@ -217,7 +236,12 @@ export function InsightsView() {
             Generer forslag
           </button>
         </div>
-        <SuggestionList suggestions={suggestions} onStatus={setSuggestionStatus} />
+        <SuggestionList
+          suggestions={suggestions}
+          onStatus={setSuggestionStatus}
+          onCompile={compileSuggestion}
+          compiling={compilingId}
+        />
       </div>
 
       {/* Patterns — under */}
@@ -558,7 +582,7 @@ function formatValue(v) {
   return String(v).slice(0, 24);
 }
 
-function SuggestionList({ suggestions, onStatus }) {
+function SuggestionList({ suggestions, onStatus, onCompile, compiling }) {
   // Skill mellom pending (vises store) og besluttede (vises som kompakt liste)
   const pending = suggestions.filter(s => s.status === 'pending');
   const reviewed = suggestions.filter(s => s.status !== 'pending');
@@ -574,7 +598,7 @@ function SuggestionList({ suggestions, onStatus }) {
   return (
     <>
       <ul className="space-y-2">
-        {pending.map(s => <SuggestionCard key={s.id} s={s} onStatus={onStatus} />)}
+        {pending.map(s => <SuggestionCard key={s.id} s={s} onStatus={onStatus} onCompile={onCompile} compiling={compiling === s.id} />)}
       </ul>
       {reviewed.length > 0 && (
         <details className="mt-3">
@@ -603,7 +627,7 @@ function SuggestionList({ suggestions, onStatus }) {
   );
 }
 
-function SuggestionCard({ s, onStatus }) {
+function SuggestionCard({ s, onStatus, onCompile, compiling }) {
   const conf = s.confidence || 'medium';
   const confClass = conf === 'high' ? 'text-nx-green' : conf === 'low' ? 'text-nx-mute' : 'text-nx-amber';
   return (
@@ -636,7 +660,16 @@ function SuggestionCard({ s, onStatus }) {
           Hvorfor: {s.why}
         </p>
       )}
-      <div className="flex items-center gap-1.5 mt-2">
+      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+        <button
+          onClick={() => onCompile?.(s.id)}
+          disabled={compiling}
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-mono uppercase tracking-[0.16em] bg-nx-cyan/15 text-nx-cyan hover:bg-nx-cyan/25 shadow-glow-soft disabled:opacity-50 disabled:cursor-wait"
+          title="Kompiler til auto-flow som serveren kjører"
+        >
+          {compiling ? <Loader size={11} className="animate-spin" /> : <Sparkles size={11} />}
+          Lag og aktiver
+        </button>
         <button
           onClick={() => onStatus(s.id, 'accepted')}
           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-mono uppercase tracking-[0.16em] bg-nx-green/15 text-nx-green hover:bg-nx-green/25"
