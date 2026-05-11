@@ -13,7 +13,8 @@ const ALLOWED_NS = new Set([
   'links',              // lenker-fanen
   'floorPlanPins',      // pins på plantegninger
   'floorPlanFlows',     // favoritt-flows per plantegning
-  'flowsSidebarFlows'   // brukervalgte flows i høyre-sidebar (kommer senere)
+  'flowsSidebarFlows',  // brukervalgte flows i høyre-sidebar (kommer senere)
+  'frontSpecials'       // hvilke spesial-kort (Tesla/Tibber/Støvsuger) som vises på Oversikt
 ]);
 
 function valid(ns) { return ALLOWED_NS.has(ns); }

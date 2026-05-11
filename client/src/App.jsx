@@ -11,6 +11,7 @@ import { useFlowFavorites } from './lib/useFlowFavorites.js';
 import { useLinks } from './lib/useLinks.js';
 import { useFloorPlanPins } from './lib/useFloorPlanPins.js';
 import { useFloorPlanFlows } from './lib/useFloorPlanFlows.js';
+import { useFrontSpecials } from './lib/useFrontSpecials.js';
 import { pushEvent, diffDevicesAndLog } from './lib/activityLog.js';
 import { ActivityLogPanel } from './components/ActivityLogPanel.jsx';
 import { Sidebar } from './components/Sidebar.jsx';
@@ -21,6 +22,7 @@ import { PinEditor } from './components/PinEditor.jsx';
 import { FrontImageConfig } from './components/FrontImageConfig.jsx';
 import { FrontSensors } from './components/FrontSensors.jsx';
 import { FrontSensorEditor } from './components/FrontSensorEditor.jsx';
+import { FrontSpecialsEditor } from './components/FrontSpecialsEditor.jsx';
 import { SecurityActivityLog } from './components/SecurityActivityLog.jsx';
 import { FlowFavoritesView } from './components/views/FlowFavoritesView.jsx';
 import { MaintenanceView } from './components/views/MaintenanceView.jsx';
@@ -75,6 +77,7 @@ export default function App() {
   const links = useLinks();
   const floorPlanPins = useFloorPlanPins();
   const planFlows = useFloorPlanFlows();
+  const frontSpecials = useFrontSpecials();
   const prevDevicesRef = useRef(null);
 
   useEffect(() => {
@@ -227,6 +230,7 @@ export default function App() {
               links={links}
               floorPlanPins={floorPlanPins}
               planFlows={planFlows}
+              frontSpecials={frontSpecials}
             />
           )}
 
@@ -271,7 +275,7 @@ export default function App() {
   );
 }
 
-function SectionView({ section, system, data, counts, setCapability, runFlow, favorites, pinConfig, imageConfig, frontSensors, flowFavorites, links, floorPlanPins, planFlows }) {
+function SectionView({ section, system, data, counts, setCapability, runFlow, favorites, pinConfig, imageConfig, frontSensors, flowFavorites, links, floorPlanPins, planFlows, frontSpecials }) {
   const userName = system?.user || 'Ole';
   const greetingPanel = (
     <div className="col-span-12 lg:col-span-3 panel p-5">
@@ -474,6 +478,13 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
             zones={data.zones || {}}
           />
         </div>
+        <div className="col-span-12 panel p-5">
+          <FrontSpecialsEditor
+            specials={frontSpecials}
+            devices={data.devices || {}}
+            zones={data.zones || {}}
+          />
+        </div>
         <div className="col-span-12 lg:col-span-5 panel p-5">
           <FrontImageConfig imageConfig={imageConfig} />
         </div>
@@ -498,18 +509,31 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
 
     case 'oversikt':
     default: {
-      // Foretrekk Model X hvis flere Tesla-enheter er registrert.
-      const allTeslas = data.devices
-        ? Object.values(data.devices).filter(d => d.class === 'car' || /tesla/i.test(d.driverUri || ''))
-        : [];
-      const tesla = allTeslas.find(d => /model\s*x/i.test(d.name || '')) || allTeslas[0] || null;
-      // Foretrekk Roborock Q-serien (Q5/Q7/Q8/Q-revo osv.) hvis flere
-      // støvsugere er registrert.
-      const allVacuums = data.devices
-        ? Object.values(data.devices).filter(d => d.class === 'vacuumcleaner')
-        : [];
-      const roborock = allVacuums.find(d => /\bq[\s\-]?(?:\d|revo)/i.test(d.name || '')) || allVacuums[0] || null;
-      const tibber = findFirst(data.devices, d => /tibber/i.test(d.driverUri || ''));
+      // Spesial-kortene (Tesla / Tibber / Støvsuger) styres fra Innstillinger.
+      // Verdi 'auto' bruker auto-deteksjon, 'none' skjuler kortet, ellers
+      // en spesifikk deviceId.
+      const specials = frontSpecials?.config || { tesla: 'auto', tibber: 'auto', vacuum: 'none' };
+      const resolveSlot = (slotValue, filter, autoPicker) => {
+        if (!slotValue || slotValue === 'none') return null;
+        if (slotValue === 'auto') {
+          const candidates = data.devices ? Object.values(data.devices).filter(filter) : [];
+          return autoPicker ? autoPicker(candidates) : (candidates[0] || null);
+        }
+        return data.devices?.[slotValue] || null;
+      };
+      const tesla = resolveSlot(
+        specials.tesla,
+        (d) => d.class === 'car' || /tesla/i.test(d.driverUri || ''),
+        (arr) => arr.find(d => /model\s*x/i.test(d.name || '')) || arr[0] || null
+      );
+      const roborock = resolveSlot(
+        specials.vacuum,
+        (d) => d.class === 'vacuumcleaner'
+      );
+      const tibber = resolveSlot(
+        specials.tibber,
+        (d) => /tibber/i.test(d.driverUri || '')
+      );
       return (
         <motion.div
           key={section}
