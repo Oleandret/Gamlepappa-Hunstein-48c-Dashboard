@@ -13,7 +13,8 @@ export const eventsRoutes = Router();
 
 /**
  * Inspiser disk-lagring rundt config-filen (Railway volume eller lokalt
- * filsystem). Returnerer størrelse på filen + ledig plass i mappa.
+ * filsystem). Prøver å OPPRETTE config-mappa hvis den ikke finnes — slik
+ * vet vi om filsystemet er skrivbart selv før første save har skjedd.
  */
 async function inspectStorage() {
   const fp = configPath();
@@ -26,30 +27,37 @@ async function inspectStorage() {
     writable: false,
     freeBytes: null,
     totalBytes: null,
-    error: null
+    error: null,
+    hint: null
   };
+
+  // Forsøk å opprette mappa (idempotent). Hvis dette feiler er FS read-only.
   try {
-    await fs.access(dir);
+    await fs.mkdir(dir, { recursive: true });
     result.dirExists = true;
-  } catch { /* dir doesn't exist yet */ }
+  } catch (err) {
+    result.error = `Kunne ikke opprette ${dir}: ${err.message}`;
+    result.hint = 'På Railway: legg til en Volume, mount den på /data, og sett CONFIG_PATH=/data/config.json som env-variabel.';
+    return result;
+  }
+
+  // Test skriv ved å lage og slette en probe-fil
+  try {
+    const probe = path.join(dir, '.write-test');
+    await fs.writeFile(probe, '', { flag: 'w' });
+    await fs.unlink(probe);
+    result.writable = true;
+  } catch (err) {
+    result.error = err.message;
+    result.hint = 'På Railway: filsystemet rundt deploy-mappa er typisk ikke skrivbar. Legg til en Volume og pek CONFIG_PATH dit.';
+  }
+
   try {
     const st = await fs.stat(fp);
     result.fileExists = true;
     result.fileSizeBytes = st.size;
-  } catch { /* file doesn't exist yet */ }
-  // Test write-permissions ved å skrive en tom .write-test
-  try {
-    if (result.dirExists) {
-      const probe = path.join(dir, '.write-test');
-      await fs.writeFile(probe, '', { flag: 'w' });
-      await fs.unlink(probe);
-      result.writable = true;
-    }
-  } catch (err) {
-    result.writable = false;
-    result.error = err.message;
-  }
-  // statfs (Node 18+) for ledig diskplass
+  } catch { /* file doesn't exist yet — normalt */ }
+
   try {
     if (typeof fs.statfs === 'function' && result.dirExists) {
       const sfs = await fs.statfs(dir);
@@ -57,6 +65,7 @@ async function inspectStorage() {
       result.totalBytes = sfs.blocks * sfs.bsize;
     }
   } catch { /* statfs might not be supported */ }
+
   return result;
 }
 

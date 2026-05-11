@@ -421,11 +421,13 @@ function SystemHealthBanner({ status }) {
           okText={storage.freeBytes != null
             ? `Skrivbar · ${formatBytes(storage.freeBytes)} ledig`
             : 'Skrivbar'}
-          failText={storage.error || 'Ikke skrivbar'}
+          failText="Ikke skrivbar"
           tone="green"
-          extra={storage.fileSizeBytes != null
-            ? `config.json: ${formatBytes(storage.fileSizeBytes)}`
-            : null}
+          extra={storageOk
+            ? (storage.fileSizeBytes != null
+                ? `${storage.configPath} (${formatBytes(storage.fileSizeBytes)})`
+                : storage.configPath)
+            : (storage.hint || storage.error || storage.configPath)}
         />
         <HealthCard
           Icon={ServerCog}
@@ -470,7 +472,7 @@ function HealthCard({ Icon, label, ok, okText, failText, extra, tone = 'green' }
     ? (tone === 'cyan'
         ? 'border-nx-cyan/45 bg-nx-cyan/10 text-nx-cyan'
         : 'border-nx-green/45 bg-nx-green/10 text-nx-green')
-    : 'border-nx-red/40 bg-nx-red/5 text-nx-red';
+    : 'border-nx-amber/45 bg-nx-amber/10 text-nx-amber';
   return (
     <div className={`rounded-lg border p-2.5 ${colorClasses}`}>
       <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-nx-mute">
@@ -483,7 +485,12 @@ function HealthCard({ Icon, label, ok, okText, failText, extra, tone = 'green' }
         <span className="text-xs font-semibold truncate">{ok ? okText : failText}</span>
       </div>
       {extra && (
-        <p className="mt-0.5 text-[10px] font-mono text-nx-mute truncate" title={extra}>{extra}</p>
+        <p
+          className={`mt-0.5 text-[10px] font-mono ${ok ? 'text-nx-mute' : 'text-nx-amber/80'} leading-snug`}
+          title={extra}
+        >
+          {extra}
+        </p>
       )}
     </div>
   );
