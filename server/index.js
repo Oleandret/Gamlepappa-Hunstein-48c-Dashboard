@@ -8,6 +8,9 @@ import { homeyRoutes } from './routes/homey.js';
 import { weatherRoutes } from './routes/weather.js';
 import { systemRoutes } from './routes/system.js';
 import { configRoutes } from './routes/config.js';
+import { eventsRoutes } from './routes/events.js';
+import { runMigrations, isEnabled as dbEnabled } from './lib/db.js';
+import { startDevicePoller } from './workers/devicePoller.js';
 import { cfg, isDemoMode } from './config.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -43,6 +46,7 @@ app.use('/api/system', systemRoutes);
 app.use('/api/homey', homeyRoutes);
 app.use('/api/weather', weatherRoutes);
 app.use('/api/config', configRoutes);
+app.use('/api/events', eventsRoutes);
 
 // Healthcheck — Railway uses this for restart policy
 app.get('/healthz', (_req, res) =>
@@ -96,14 +100,21 @@ function sanitizeError(s) {
 }
 
 const patSet = Boolean(cfg('HOMEY_PAT'));
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   const banner = [
     '',
     '  ⚡  Gamlepappa Smarthus backend ready on port ' + PORT,
     '     mode: ' + (isDemoMode() ? 'DEMO (mock data)' : 'LIVE (Homey)'),
     '     PAT:  ' + (patSet ? 'set ✓' : 'missing — fill in server/config.js or HOMEY_PAT env'),
+    '     db:   ' + (dbEnabled() ? 'configured (DATABASE_URL set)' : 'disabled (no DATABASE_URL)'),
     '     env:  ' + (isProd ? 'production' : 'development'),
     ''
   ].join('\n');
   console.log(banner);
+
+  // Initialiser databasen + start device-poller hvis konfigurert
+  if (dbEnabled()) {
+    const ok = await runMigrations();
+    if (ok) startDevicePoller();
+  }
 });

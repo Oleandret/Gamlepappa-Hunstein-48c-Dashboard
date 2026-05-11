@@ -34,6 +34,17 @@ export const api = {
   runFlow: (flowId) =>
     jpost(`/homey/flows/${encodeURIComponent(flowId)}/run`),
 
+  // Event-store: device-state-historikk for AI-analyse
+  events: {
+    status:  (signal) => jget('/events/status', signal),
+    recent:  (params = {}, signal) => {
+      const q = new URLSearchParams(params).toString();
+      return jget(`/events/recent${q ? '?' + q : ''}`, signal);
+    },
+    summary: (signal) => jget('/events/summary', signal),
+    pollNow: () => jpost('/events/poll-now')
+  },
+
   // Config-store: server-persistert bruker-config per namespace
   config: {
     getAll: (signal) => jget('/config', signal),
