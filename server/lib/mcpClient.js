@@ -67,23 +67,55 @@ async function rpc(method, params = {}, { withSession = true } = {}) {
   let payload;
 
   if (contentType.includes('text/event-stream')) {
-    // SSE — les til vi får en data-melding som matcher vår id
+    // SSE — hent hele streamen og parse events korrekt:
+    //   * Events er separert med \n\n
+    //   * Innenfor et event har vi 'data:' / 'event:' / 'id:' / 'retry:' linjer
+    //   * Flere data:-linjer i samme event skal konkateneres med \n
     const text = await res.text();
-    const lines = text.split('\n');
-    for (const line of lines) {
-      if (!line.startsWith('data:')) continue;
-      const data = line.slice(5).trim();
+    if (process.env.MCP_DEBUG === '1') {
+      console.log(`[mcp] ${method} raw SSE (${text.length} bytes):\n${text.slice(0, 2000)}${text.length > 2000 ? '...' : ''}`);
+    }
+
+    const events = text.split(/\r?\n\r?\n/);
+    const allParsed = [];
+    for (const evt of events) {
+      const dataLines = [];
+      for (const rawLine of evt.split(/\r?\n/)) {
+        const line = rawLine.startsWith('data:') ? rawLine.slice(5) : null;
+        if (line === null) continue;
+        // SSE spec: en optional ' ' etter ':'  ignoreres
+        dataLines.push(line.startsWith(' ') ? line.slice(1) : line);
+      }
+      if (dataLines.length === 0) continue;
+      const data = dataLines.join('\n').trim();
       if (!data) continue;
       try {
         const msg = JSON.parse(data);
-        if (msg.id === id) { payload = msg; break; }
-      } catch { /* ignore non-json data lines */ }
+        allParsed.push(msg);
+        if (msg.id === id || String(msg.id) === String(id)) {
+          payload = msg;
+          // ikke break — fortsett for å se om vi får oppdatert versjon
+        }
+      } catch (err) {
+        if (process.env.MCP_DEBUG === '1') {
+          console.log(`[mcp] ${method} unparsable SSE event:`, data.slice(0, 200), err.message);
+        }
+      }
+    }
+
+    if (!payload) {
+      // Som siste utvei: hvis vi har én JSON-RPC respons uten matchende id, bruk den
+      const candidate = allParsed.find(m => m && (m.result !== undefined || m.error !== undefined));
+      if (candidate) payload = candidate;
     }
     if (!payload) {
-      throw new Error(`MCP ${method}: ingen respons med id=${id} i SSE-stream`);
+      throw new Error(`MCP ${method}: ingen JSON-RPC respons i SSE-stream (${allParsed.length} events parset, ${text.length} bytes)`);
     }
   } else {
     payload = await res.json();
+    if (process.env.MCP_DEBUG === '1') {
+      console.log(`[mcp] ${method} JSON response:`, JSON.stringify(payload).slice(0, 500));
+    }
   }
 
   if (payload.error) {

@@ -5,7 +5,7 @@ import { listTools, callTool, toOpenAITools, mcpUrl, resetSession } from '../lib
 export const chatRoutes = Router();
 
 const DEFAULT_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini';
-const MAX_TOOL_ITERATIONS = 8;
+const MAX_TOOL_ITERATIONS = Number(process.env.CHAT_MAX_ITERATIONS) || 15;
 
 const SYSTEM_PROMPT = `Du er en smart-hus-assistent for Gamlepappa Hunstein 48c.
 Du har tilgang til Homey-verktøy som lar deg lese og styre alle enhetene i huset og på hytta.
@@ -46,14 +46,23 @@ async function callOpenAI({ messages, tools, model = DEFAULT_MODEL }) {
 
 function mcpContentToString(result) {
   // MCP tool-call resultat: { content: [{type:'text', text:'...'}, ...], isError?: bool }
-  if (!result) return '';
-  if (typeof result === 'string') return result;
-  if (Array.isArray(result.content)) {
-    return result.content
-      .map(p => p?.type === 'text' ? p.text : JSON.stringify(p))
-      .join('\n');
+  if (result === null || result === undefined) return '(verktøyet returnerte ingenting)';
+  if (typeof result === 'string') return result.length ? result : '(tom streng)';
+  if (Array.isArray(result.content) && result.content.length > 0) {
+    const parts = result.content
+      .map(p => {
+        if (p?.type === 'text' && typeof p.text === 'string') return p.text;
+        if (p?.type === 'image') return '[bilde]';
+        if (p?.type === 'resource') return `[ressurs: ${p.resource?.uri || ''}]`;
+        return JSON.stringify(p);
+      })
+      .filter(Boolean);
+    const joined = parts.join('\n');
+    return joined.length ? joined : '(tomt content-array)';
   }
-  return JSON.stringify(result);
+  // Fallback — vis hele resultat-objektet
+  const s = JSON.stringify(result);
+  return s && s !== '{}' && s !== '[]' ? s : '(tomt resultat)';
 }
 
 chatRoutes.get('/status', async (_req, res) => {

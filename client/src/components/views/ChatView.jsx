@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Send, RotateCcw, Wrench, Loader, AlertCircle, User, Bot, ChevronDown, ChevronRight } from 'lucide-react';
+import { Send, RotateCcw, Wrench, Loader, AlertCircle, User, Bot, ChevronDown, ChevronRight, Globe, Server, ExternalLink } from 'lucide-react';
 import { api } from '../../lib/api.js';
 
 /**
@@ -97,7 +97,27 @@ export function ChatView() {
           </div>
         )}
 
-        <div className="mt-3 flex items-center gap-2 flex-wrap">
+        {/* Tydelig statuslinje med MCP-URL og Altibox-lenke for å sjekke brannmur */}
+        <div className="mt-3 rounded-lg border border-nx-line/50 bg-nx-panel/40 px-3 py-2 flex items-center gap-2 flex-wrap text-xs">
+          <Server size={12} className="text-nx-cyan shrink-0" aria-hidden="true" />
+          <span className="font-mono text-nx-mute">Homey MCP:</span>
+          <code className="font-mono text-nx-cyan break-all">{status?.mcpUrl || '—'}</code>
+          <a
+            href="https://www.altibox.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] font-mono text-nx-mute hover:text-nx-cyan"
+            title="Sjekk fast IP og brannmur-innstillinger hos Altibox"
+          >
+            <Globe size={10} /> (sjekk brannmur er åpen) <ExternalLink size={9} />
+          </a>
+          <span className="text-nx-mute ml-auto">
+            <span className="text-[10px] font-mono">modell:</span>{' '}
+            <span className="text-nx-cyan font-mono">{status?.model || '—'}</span>
+          </span>
+        </div>
+
+        <div className="mt-2 flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setToolsExpanded(e => !e)}
             className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-mono text-nx-mute hover:text-nx-cyan"
@@ -106,9 +126,6 @@ export function ChatView() {
             {toolsExpanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
             <Wrench size={10} /> {tools.length} verktøy fra MCP
           </button>
-          <span className="text-[10px] font-mono text-nx-mute truncate">
-            {status?.mcpUrl} · {status?.model}
-          </span>
         </div>
         {toolsExpanded && tools.length > 0 && (
           <ul className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 max-h-48 overflow-y-auto">
