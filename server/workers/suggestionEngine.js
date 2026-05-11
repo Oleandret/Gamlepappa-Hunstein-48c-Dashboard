@@ -3,6 +3,17 @@ import { chat, openaiEnabled } from '../lib/openaiClient.js';
 import { homeyClient } from '../lib/homeyClient.js';
 import { isDemoMode } from '../config.js';
 import { MOCK_FLOWS } from '../lib/mockData.js';
+import { getNamespace } from '../lib/configStore.js';
+
+async function getSuggestionsModel() {
+  try {
+    const cfg = await getNamespace('aiModels');
+    if (cfg?.suggestions && typeof cfg.suggestions === 'string' && cfg.suggestions.trim()) {
+      return cfg.suggestions.trim();
+    }
+  } catch { /* ignore */ }
+  return undefined;  // chat()-funksjonen bruker sin egen default da
+}
 
 /**
  * Lag 3 — leser topp-rangerte patterns fra databasen, beriker med kontekst
@@ -92,6 +103,8 @@ export async function runSuggestionEngine() {
   }
   const flows = await loadExistingFlows();
 
+  const model = await getSuggestionsModel();
+
   let response;
   try {
     response = await chat({
@@ -99,7 +112,8 @@ export async function runSuggestionEngine() {
       user: buildUserPrompt(patterns, flows),
       temperature: 0.3,
       maxTokens: 2500,
-      json: true
+      json: true,
+      ...(model ? { model } : {})
     });
   } catch (err) {
     console.error('[suggestion-engine] LLM call failed:', err.message);

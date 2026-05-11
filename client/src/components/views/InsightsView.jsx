@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Activity, Database, RefreshCw, AlertCircle, CheckCircle2, Clock, Layers, Filter, Loader, Sparkles, ListChecks, Check, X, Pause, Cpu, Brain, HardDrive, Wifi, ServerCog } from 'lucide-react';
 import { api } from '../../lib/api.js';
+import { useAiModels, AVAILABLE_MODELS } from '../../lib/useAiModels.js';
 
 /**
  * Innsikt — admin-view for device-event-historikken.
@@ -103,6 +104,7 @@ export function InsightsView() {
     }
   };
 
+  const aiModels = useAiModels();
   const [compilingId, setCompilingId] = useState(null);
   const compileSuggestion = async (id) => {
     setCompilingId(id);
@@ -220,21 +222,36 @@ export function InsightsView() {
                 : 'Sett OPENAI_API_KEY på serveren for å aktivere'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={!dbEnabled || !status?.llm || generating}
-            className={[
-              'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-[0.16em] transition-colors border',
-              (dbEnabled && status?.llm)
-                ? 'border-nx-cyan/55 bg-nx-cyan/15 text-nx-cyan hover:bg-nx-cyan/25'
-                : 'border-nx-line/40 text-nx-mute opacity-50 cursor-not-allowed'
-            ].join(' ')}
-            title={!status?.llm ? 'OPENAI_API_KEY må settes på serveren' : 'Generer nye forslag med GPT'}
-          >
-            {generating ? <Loader size={12} className="animate-spin" /> : <Brain size={12} />}
-            Generer forslag
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={aiModels.config.suggestions}
+              onChange={(e) => aiModels.set('suggestions', e.target.value)}
+              className="bg-nx-panel/60 border border-nx-line/60 rounded px-2 py-1 text-[11px] text-nx-cyan font-mono"
+              title="Velg AI-modell for forslags-generering"
+            >
+              {AVAILABLE_MODELS.map(m => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
+              {!AVAILABLE_MODELS.find(m => m.id === aiModels.config.suggestions) && (
+                <option value={aiModels.config.suggestions}>{aiModels.config.suggestions}</option>
+              )}
+            </select>
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={!dbEnabled || !status?.llm || generating}
+              className={[
+                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-[0.16em] transition-colors border',
+                (dbEnabled && status?.llm)
+                  ? 'border-nx-cyan/55 bg-nx-cyan/15 text-nx-cyan hover:bg-nx-cyan/25'
+                  : 'border-nx-line/40 text-nx-mute opacity-50 cursor-not-allowed'
+              ].join(' ')}
+              title={!status?.llm ? 'OPENAI_API_KEY må settes på serveren' : 'Generer nye forslag med GPT'}
+            >
+              {generating ? <Loader size={12} className="animate-spin" /> : <Brain size={12} />}
+              Generer forslag
+            </button>
+          </div>
         </div>
         <SuggestionList
           suggestions={suggestions}

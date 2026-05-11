@@ -1,11 +1,26 @@
 import { Router } from 'express';
 import { openaiEnabled } from '../lib/openaiClient.js';
 import { listTools, callTool, toOpenAITools, mcpUrl, resetSession } from '../lib/mcpClient.js';
+import { getNamespace } from '../lib/configStore.js';
 
 export const chatRoutes = Router();
 
-const DEFAULT_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini';
+const FALLBACK_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini';
 const MAX_TOOL_ITERATIONS = Number(process.env.CHAT_MAX_ITERATIONS) || 15;
+
+/**
+ * Hent chat-modellen fra config (slot 'chat'). Faller tilbake til env og
+ * deretter til hardcoded default. Leses ved hver request slik at endring
+ * i Innstillinger trer i kraft umiddelbart.
+ */
+async function getChatModel() {
+  try {
+    const cfg = await getNamespace('aiModels');
+    const m = cfg?.chat;
+    if (typeof m === 'string' && m.trim()) return m.trim();
+  } catch { /* ignore */ }
+  return FALLBACK_MODEL;
+}
 
 const SYSTEM_PROMPT = `Du er en smart-hus-assistent for Gamlepappa Hunstein 48c.
 Du har tilgang til Homey-verktøy som lar deg lese og styre alle enhetene i huset og på hytta.
@@ -20,7 +35,7 @@ Når brukeren ber deg gjøre noe:
 
 Ikke finn opp enheter eller resultater. Hvis et verktøy feiler, si fra hva som gikk galt.`;
 
-async function callOpenAI({ messages, tools, model = DEFAULT_MODEL }) {
+async function callOpenAI({ messages, tools, model }) {
   const body = {
     model,
     messages,
@@ -66,10 +81,12 @@ function mcpContentToString(result) {
 }
 
 chatRoutes.get('/status', async (_req, res) => {
+  const model = await getChatModel();
   res.json({
     llm: openaiEnabled(),
     mcpUrl: mcpUrl(),
-    model: DEFAULT_MODEL
+    model,
+    fallbackModel: FALLBACK_MODEL
   });
 });
 
@@ -119,8 +136,9 @@ chatRoutes.post('/message', async (req, res, next) => {
     const newMessages = []; // det vi sender tilbake til klienten
     const toolCallsExecuted = [];
 
+    const model = await getChatModel();
     for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
-      const openaiResponse = await callOpenAI({ messages, tools: openaiTools });
+      const openaiResponse = await callOpenAI({ messages, tools: openaiTools, model });
       const choice = openaiResponse.choices?.[0];
       if (!choice) throw new Error('OpenAI returnerte ingen choices');
       const assistantMsg = choice.message;

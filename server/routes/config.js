@@ -14,7 +14,8 @@ const ALLOWED_NS = new Set([
   'floorPlanPins',      // pins på plantegninger
   'floorPlanFlows',     // favoritt-flows per plantegning
   'flowsSidebarFlows',  // brukervalgte flows i høyre-sidebar (kommer senere)
-  'frontSpecials'       // hvilke spesial-kort (Tesla/Tibber/Støvsuger) som vises på Oversikt
+  'frontSpecials',      // hvilke spesial-kort (Tesla/Tibber/Støvsuger) som vises på Oversikt
+  'aiModels'            // hvilken OpenAI-modell som brukes for chat og suggestion-engine
 ]);
 
 function valid(ns) { return ALLOWED_NS.has(ns); }

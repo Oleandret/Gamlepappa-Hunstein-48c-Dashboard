@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Send, RotateCcw, Wrench, Loader, AlertCircle, User, Bot, ChevronDown, ChevronRight, Globe, Server, ExternalLink } from 'lucide-react';
+import { Send, RotateCcw, Wrench, Loader, AlertCircle, User, Bot, ChevronDown, ChevronRight, Globe, Server, ExternalLink, Cpu } from 'lucide-react';
 import { api } from '../../lib/api.js';
+import { useAiModels, AVAILABLE_MODELS } from '../../lib/useAiModels.js';
 
 /**
  * AI-chat-fane som lar brukeren snakke med Homey via MCP-tools.
@@ -18,6 +19,7 @@ export function ChatView() {
   const [status, setStatus] = useState(null);
   const [tools, setTools] = useState([]);
   const [toolsExpanded, setToolsExpanded] = useState(false);
+  const aiModels = useAiModels();
   const listRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -111,10 +113,23 @@ export function ChatView() {
           >
             <Globe size={10} /> (sjekk brannmur er åpen) <ExternalLink size={9} />
           </a>
-          <span className="text-nx-mute ml-auto">
-            <span className="text-[10px] font-mono">modell:</span>{' '}
-            <span className="text-nx-cyan font-mono">{status?.model || '—'}</span>
-          </span>
+          <div className="ml-auto flex items-center gap-1.5">
+            <Cpu size={12} className="text-nx-cyan" aria-hidden="true" />
+            <select
+              value={aiModels.config.chat}
+              onChange={(e) => aiModels.set('chat', e.target.value)}
+              className="bg-nx-panel/60 border border-nx-line/60 rounded px-1.5 py-0.5 text-[11px] text-nx-cyan font-mono focus:outline-none focus:border-nx-cyan/60"
+              title="Velg AI-modell for chat"
+            >
+              {AVAILABLE_MODELS.map(m => (
+                <option key={m.id} value={m.id}>{m.label} — {m.tier}</option>
+              ))}
+              {/* Vis nåværende verdi hvis den ikke er i listen (custom model) */}
+              {!AVAILABLE_MODELS.find(m => m.id === aiModels.config.chat) && (
+                <option value={aiModels.config.chat}>{aiModels.config.chat} (egendefinert)</option>
+              )}
+            </select>
+          </div>
         </div>
 
         <div className="mt-2 flex items-center gap-2 flex-wrap">
