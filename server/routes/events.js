@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { isEnabled, query } from '../lib/db.js';
 import { pollerStatus, triggerPollNow } from '../workers/devicePoller.js';
+import { runDetection } from '../lib/patternDetector.js';
+import { runSuggestionEngine } from '../workers/suggestionEngine.js';
+import { openaiEnabled } from '../lib/openaiClient.js';
 
 export const eventsRoutes = Router();
 
@@ -11,8 +14,91 @@ export const eventsRoutes = Router();
 eventsRoutes.get('/status', async (_req, res) => {
   res.json({
     db: isEnabled(),
-    poller: pollerStatus()
+    poller: pollerStatus(),
+    llm: openaiEnabled()
   });
+});
+
+// ── Patterns ─────────────────────────────────────────────────────────────
+
+/**
+ * Hent aktive (eller alle) patterns sortert etter score.
+ */
+eventsRoutes.get('/patterns', async (req, res, next) => {
+  try {
+    if (!isEnabled()) return res.json({ patterns: [], _disabled: true });
+    const onlyActive = req.query.all !== 'true';
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+    const sql = `
+      SELECT id, detected_at, kind, description, data, confidence, support, score, active, user_feedback
+      FROM patterns
+      ${onlyActive ? 'WHERE active = true' : ''}
+      ORDER BY score DESC NULLS LAST
+      LIMIT $1
+    `;
+    const result = await query(sql, [limit]);
+    res.json({ patterns: result.rows });
+  } catch (err) { next(err); }
+});
+
+/**
+ * Trigger pattern-detection nå (synkront — kan ta noen sekunder).
+ */
+eventsRoutes.post('/patterns/analyze', async (_req, res, next) => {
+  try {
+    const result = await runDetection();
+    res.json({ result });
+  } catch (err) { next(err); }
+});
+
+// ── Suggestions ──────────────────────────────────────────────────────────
+
+eventsRoutes.get('/suggestions', async (req, res, next) => {
+  try {
+    if (!isEnabled()) return res.json({ suggestions: [], _disabled: true });
+    const status = req.query.status; // 'pending' | 'accepted' | 'rejected' | 'later' | undefined
+    const where = status ? `WHERE status = $1` : '';
+    const params = status ? [status] : [];
+    const sql = `
+      SELECT id, generated_at, title, description, trigger_text, action_text, why,
+             confidence, pattern_ids, model, status, reviewed_at
+      FROM suggestions
+      ${where}
+      ORDER BY generated_at DESC, id DESC
+      LIMIT 50
+    `;
+    const result = await query(sql, params);
+    res.json({ suggestions: result.rows });
+  } catch (err) { next(err); }
+});
+
+/**
+ * Trigger LLM-forslag nå (synkront — typisk 3-8 sekunder).
+ */
+eventsRoutes.post('/suggestions/generate', async (_req, res, next) => {
+  try {
+    const result = await runSuggestionEngine();
+    res.json({ result });
+  } catch (err) { next(err); }
+});
+
+/**
+ * Endre status på en suggestion (accepted/rejected/later).
+ */
+eventsRoutes.patch('/suggestions/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'invalid id' });
+    const status = req.body?.status;
+    if (!['accepted', 'rejected', 'later', 'pending'].includes(status)) {
+      return res.status(400).json({ error: 'invalid status' });
+    }
+    await query(
+      `UPDATE suggestions SET status = $1, reviewed_at = NOW() WHERE id = $2`,
+      [status, id]
+    );
+    res.json({ ok: true });
+  } catch (err) { next(err); }
 });
 
 /**

@@ -107,6 +107,43 @@ export async function runMigrations() {
     await p.query(`CREATE INDEX IF NOT EXISTS idx_dev_events_zone_ts    ON device_events (zone, ts DESC)`);
     await p.query(`CREATE INDEX IF NOT EXISTS idx_dev_events_kind_ts    ON device_events (kind, ts DESC)`);
 
+    // Patterns: oppdagede mønstre fra lag-2-detektoren
+    await p.query(`
+      CREATE TABLE IF NOT EXISTS patterns (
+        id           BIGSERIAL PRIMARY KEY,
+        detected_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        kind         TEXT NOT NULL,           -- 'co_occurrence' | 'time_based' | 'sequence'
+        description  TEXT NOT NULL,
+        data         JSONB NOT NULL,
+        confidence   REAL,
+        support      INT,
+        score        REAL,
+        active       BOOLEAN DEFAULT TRUE,
+        user_feedback TEXT                    -- 'accepted' | 'rejected' | null
+      )
+    `);
+    await p.query(`CREATE INDEX IF NOT EXISTS idx_patterns_kind_score ON patterns (kind, score DESC)`);
+    await p.query(`CREATE INDEX IF NOT EXISTS idx_patterns_active     ON patterns (active, score DESC)`);
+
+    // Suggestions: AI-genererte automatiseringsforslag
+    await p.query(`
+      CREATE TABLE IF NOT EXISTS suggestions (
+        id            BIGSERIAL PRIMARY KEY,
+        generated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        title         TEXT NOT NULL,
+        description   TEXT NOT NULL,
+        trigger_text  TEXT,
+        action_text   TEXT,
+        why           TEXT,
+        confidence    TEXT,                   -- 'high' | 'medium' | 'low'
+        pattern_ids   BIGINT[],
+        model         TEXT,
+        status        TEXT NOT NULL DEFAULT 'pending', -- 'pending' | 'accepted' | 'later' | 'rejected'
+        reviewed_at   TIMESTAMPTZ
+      )
+    `);
+    await p.query(`CREATE INDEX IF NOT EXISTS idx_suggestions_status ON suggestions (status, generated_at DESC)`);
+
     migrationsRan = true;
     console.log('[db] migrations ok — timescale:', hasTimescale ? 'yes' : 'no');
     return true;

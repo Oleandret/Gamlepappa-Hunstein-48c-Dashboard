@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Activity, Database, RefreshCw, AlertCircle, CheckCircle2, Clock, Layers, Filter, Loader } from 'lucide-react';
+import { Activity, Database, RefreshCw, AlertCircle, CheckCircle2, Clock, Layers, Filter, Loader, Sparkles, ListChecks, Check, X, Pause, Cpu, Brain } from 'lucide-react';
 import { api } from '../../lib/api.js';
 
 /**
@@ -18,8 +18,12 @@ export function InsightsView() {
   const [status, setStatus] = useState(null);
   const [summary, setSummary] = useState(null);
   const [events, setEvents] = useState([]);
+  const [patterns, setPatterns] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [polling, setPolling] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState({ kind: '', sinceMinutes: 1440 }); // 24h default
 
@@ -27,14 +31,18 @@ export function InsightsView() {
     setLoading(true);
     setError(null);
     try {
-      const [st, sum, ev] = await Promise.all([
+      const [st, sum, ev, pats, sugs] = await Promise.all([
         api.events.status(signal),
         api.events.summary(signal).catch(() => null),
-        api.events.recent({ ...filter, limit: 200 }, signal).catch(() => ({ events: [] }))
+        api.events.recent({ ...filter, limit: 200 }, signal).catch(() => ({ events: [] })),
+        api.events.patterns(signal).catch(() => ({ patterns: [] })),
+        api.events.suggestions(undefined, signal).catch(() => ({ suggestions: [] }))
       ]);
       setStatus(st);
       setSummary(sum && !sum._disabled ? sum : null);
       setEvents(ev?.events || []);
+      setPatterns(pats?.patterns || []);
+      setSuggestions(sugs?.suggestions || []);
     } catch (err) {
       if (err.name !== 'AbortError') setError(err);
     } finally {
@@ -52,12 +60,46 @@ export function InsightsView() {
     setPolling(true);
     try {
       await api.events.pollNow();
-      // Vent 500ms før reload så DB er ferdig skrevet
       setTimeout(() => reload(), 600);
     } catch (err) {
       setError(err);
     } finally {
       setPolling(false);
+    }
+  };
+
+  const handleAnalyze = async () => {
+    setAnalyzing(true);
+    try {
+      const { result } = await api.events.analyze();
+      if (result?.error) setError(new Error(result.error));
+      setTimeout(() => reload(), 300);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    try {
+      const { result } = await api.events.generateSuggestions();
+      if (result?.error) setError(new Error(result.error));
+      setTimeout(() => reload(), 300);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const setSuggestionStatus = async (id, status) => {
+    try {
+      await api.events.updateSuggestionStatus(id, status);
+      setSuggestions(prev => prev.map(s => s.id === id ? { ...s, status } : s));
+    } catch (err) {
+      setError(err);
     }
   };
 
@@ -198,6 +240,67 @@ export function InsightsView() {
           </div>
         </>
       )}
+
+      {/* AI-forslag — øverst, viktigst */}
+      <div className="col-span-12 panel p-4 border-nx-cyan/30">
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+          <div>
+            <p className="panel-title flex items-center gap-2">
+              <Sparkles size={14} className="text-nx-cyan" /> AI-forslag til automatiseringer
+            </p>
+            <p className="text-[10px] text-nx-mute font-mono mt-0.5">
+              {status?.llm
+                ? 'GPT analyserer mønstre og foreslår nye flows'
+                : 'Sett OPENAI_API_KEY på serveren for å aktivere'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={!dbEnabled || !status?.llm || generating}
+            className={[
+              'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-[0.16em] transition-colors border',
+              (dbEnabled && status?.llm)
+                ? 'border-nx-cyan/55 bg-nx-cyan/15 text-nx-cyan hover:bg-nx-cyan/25'
+                : 'border-nx-line/40 text-nx-mute opacity-50 cursor-not-allowed'
+            ].join(' ')}
+            title={!status?.llm ? 'OPENAI_API_KEY må settes på serveren' : 'Generer nye forslag med GPT'}
+          >
+            {generating ? <Loader size={12} className="animate-spin" /> : <Brain size={12} />}
+            Generer forslag
+          </button>
+        </div>
+        <SuggestionList suggestions={suggestions} onStatus={setSuggestionStatus} />
+      </div>
+
+      {/* Patterns — under */}
+      <div className="col-span-12 panel p-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+          <div>
+            <p className="panel-title flex items-center gap-2">
+              <ListChecks size={14} className="text-nx-cyan" /> Observerte mønstre
+            </p>
+            <p className="text-[10px] text-nx-mute font-mono mt-0.5">
+              SQL-detektor finner co-occurrence og tidsbaserte mønstre i siste 30 dager
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleAnalyze}
+            disabled={!dbEnabled || analyzing}
+            className={[
+              'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-[0.16em] transition-colors border',
+              dbEnabled
+                ? 'border-nx-cyan/55 bg-nx-cyan/10 text-nx-cyan hover:bg-nx-cyan/25'
+                : 'border-nx-line/40 text-nx-mute opacity-50 cursor-not-allowed'
+            ].join(' ')}
+          >
+            {analyzing ? <Loader size={12} className="animate-spin" /> : <Cpu size={12} />}
+            Analyser nå
+          </button>
+        </div>
+        <PatternList patterns={patterns} />
+      </div>
 
       <div className="col-span-12 panel p-4">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
@@ -349,4 +452,139 @@ function formatValue(v) {
   if (typeof v === 'number') return v.toFixed(2).replace(/\.?0+$/, '');
   if (typeof v === 'object') return JSON.stringify(v).slice(0, 24);
   return String(v).slice(0, 24);
+}
+
+function SuggestionList({ suggestions, onStatus }) {
+  // Skill mellom pending (vises store) og besluttede (vises som kompakt liste)
+  const pending = suggestions.filter(s => s.status === 'pending');
+  const reviewed = suggestions.filter(s => s.status !== 'pending');
+
+  if (suggestions.length === 0) {
+    return (
+      <p className="text-xs text-nx-mute italic py-4 text-center">
+        Ingen forslag ennå. Klikk <strong>Generer forslag</strong> over når du har minst en ukes data.
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <ul className="space-y-2">
+        {pending.map(s => <SuggestionCard key={s.id} s={s} onStatus={onStatus} />)}
+      </ul>
+      {reviewed.length > 0 && (
+        <details className="mt-3">
+          <summary className="text-[10px] uppercase tracking-[0.18em] font-mono text-nx-mute cursor-pointer hover:text-nx-cyan">
+            Tidligere vurderte ({reviewed.length})
+          </summary>
+          <ul className="mt-2 space-y-1">
+            {reviewed.map(s => (
+              <li key={s.id} className="flex items-center gap-2 text-xs px-2 py-1 rounded border border-nx-line/30 opacity-70">
+                <span className={`font-mono text-[10px] uppercase tracking-[0.16em] w-16 ${
+                  s.status === 'accepted' ? 'text-nx-green' :
+                  s.status === 'rejected' ? 'text-nx-red' : 'text-nx-mute'
+                }`}>{s.status}</span>
+                <span className="truncate flex-1">{s.title}</span>
+                <button
+                  onClick={() => onStatus(s.id, 'pending')}
+                  className="text-[10px] text-nx-mute hover:text-nx-cyan"
+                  title="Marker som ulest"
+                >gjenopprett</button>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </>
+  );
+}
+
+function SuggestionCard({ s, onStatus }) {
+  const conf = s.confidence || 'medium';
+  const confClass = conf === 'high' ? 'text-nx-green' : conf === 'low' ? 'text-nx-mute' : 'text-nx-amber';
+  return (
+    <li className="rounded-xl border border-nx-cyan/30 bg-nx-panel/40 p-3">
+      <div className="flex items-start justify-between gap-2 mb-1.5 flex-wrap">
+        <h3 className="text-sm font-semibold flex-1 min-w-0">{s.title}</h3>
+        <span className={`font-mono text-[10px] uppercase tracking-[0.18em] ${confClass}`}>
+          {conf}
+        </span>
+      </div>
+      <p className="text-xs text-nx-text mb-2 leading-relaxed">{s.description}</p>
+      {(s.trigger_text || s.action_text) && (
+        <div className="text-[11px] grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
+          {s.trigger_text && (
+            <div className="rounded border border-nx-line/40 bg-nx-bg/40 p-2">
+              <div className="text-[9px] uppercase tracking-[0.18em] text-nx-mute font-mono mb-0.5">Trigger</div>
+              <div className="text-nx-cyan">{s.trigger_text}</div>
+            </div>
+          )}
+          {s.action_text && (
+            <div className="rounded border border-nx-line/40 bg-nx-bg/40 p-2">
+              <div className="text-[9px] uppercase tracking-[0.18em] text-nx-mute font-mono mb-0.5">Handling</div>
+              <div className="text-nx-cyan">{s.action_text}</div>
+            </div>
+          )}
+        </div>
+      )}
+      {s.why && (
+        <p className="text-[10px] text-nx-mute italic mb-2 leading-relaxed">
+          Hvorfor: {s.why}
+        </p>
+      )}
+      <div className="flex items-center gap-1.5 mt-2">
+        <button
+          onClick={() => onStatus(s.id, 'accepted')}
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-mono uppercase tracking-[0.16em] bg-nx-green/15 text-nx-green hover:bg-nx-green/25"
+        >
+          <Check size={11} /> Akseptert
+        </button>
+        <button
+          onClick={() => onStatus(s.id, 'later')}
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-mono uppercase tracking-[0.16em] border border-nx-line/60 text-nx-mute hover:text-nx-text"
+        >
+          <Pause size={11} /> Senere
+        </button>
+        <button
+          onClick={() => onStatus(s.id, 'rejected')}
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-mono uppercase tracking-[0.16em] border border-nx-line/60 text-nx-mute hover:text-nx-red"
+        >
+          <X size={11} /> Nei takk
+        </button>
+        <span className="ml-auto text-[9px] font-mono text-nx-mute">
+          {s.model || ''}
+        </span>
+      </div>
+    </li>
+  );
+}
+
+function PatternList({ patterns }) {
+  if (patterns.length === 0) {
+    return (
+      <p className="text-xs text-nx-mute italic py-4 text-center">
+        Ingen mønstre ennå. Klikk <strong>Analyser nå</strong> over (best resultat etter 7-14 dagers data).
+      </p>
+    );
+  }
+  return (
+    <ul className="space-y-1 max-h-[400px] overflow-y-auto pr-1">
+      {patterns.map(p => (
+        <li key={p.id} className="rounded-md border border-nx-line/40 bg-nx-panel/30 px-2 py-1.5 text-xs">
+          <div className="flex items-start gap-2">
+            <span className={[
+              'font-mono text-[9px] uppercase tracking-[0.16em] w-24 shrink-0 mt-0.5',
+              p.kind === 'co_occurrence' ? 'text-nx-cyan' : 'text-nx-purple'
+            ].join(' ')}>
+              {p.kind === 'co_occurrence' ? 'co-occur' : 'tidsbasert'}
+            </span>
+            <span className="flex-1 text-nx-text leading-snug">{p.description}</span>
+            <span className="font-mono text-[10px] text-nx-mute tabular-nums shrink-0">
+              skår {(p.score || 0).toFixed(2)}
+            </span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
 }

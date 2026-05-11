@@ -42,7 +42,26 @@ export const api = {
       return jget(`/events/recent${q ? '?' + q : ''}`, signal);
     },
     summary: (signal) => jget('/events/summary', signal),
-    pollNow: () => jpost('/events/poll-now')
+    pollNow: () => jpost('/events/poll-now'),
+
+    // Lag 2: pattern-detektor
+    patterns:    (signal) => jget('/events/patterns', signal),
+    analyze:     () => jpost('/events/patterns/analyze'),
+
+    // Lag 3: AI-forslag
+    suggestions: (status, signal) => {
+      const q = status ? `?status=${encodeURIComponent(status)}` : '';
+      return jget(`/events/suggestions${q}`, signal);
+    },
+    generateSuggestions: () => jpost('/events/suggestions/generate'),
+    updateSuggestionStatus: (id, status) => fetch(`${BASE}/api/events/suggestions/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    }).then(r => {
+      if (!r.ok) throw new Error(`PATCH suggestion → ${r.status}`);
+      return r.json();
+    })
   },
 
   // Config-store: server-persistert bruker-config per namespace
