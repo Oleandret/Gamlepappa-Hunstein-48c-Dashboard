@@ -29,6 +29,7 @@ import { MaintenanceView } from './components/views/MaintenanceView.jsx';
 import { LinksView } from './components/views/LinksView.jsx';
 import { InsightsView } from './components/views/InsightsView.jsx';
 import { AutoFlowsView } from './components/views/AutoFlowsView.jsx';
+import { ChatView } from './components/views/ChatView.jsx';
 import { QuickControls } from './components/QuickControls.jsx';
 import { WeatherWidget } from './components/WeatherWidget.jsx';
 import { SecurityWidget } from './components/SecurityWidget.jsx';
@@ -261,7 +262,7 @@ export default function App() {
           variant="compact"
           placement="bottom-right"
         ></elevenlabs-convai>
-      ) : section === 'avatar' ? null : (
+      ) : (section === 'avatar' || section === 'chat') ? null : (
         <elevenlabs-convai
           key="agent-andre"
           agent-id="agent_4501kc02r47xec2s0r87f0awxdj6"
@@ -408,6 +409,9 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
 
     case 'ai-flows':
       return wrapper(<AutoFlowsView />, false);
+
+    case 'chat':
+      return wrapper(<ChatView />, false);
 
     case 'energi':
       return wrapper(

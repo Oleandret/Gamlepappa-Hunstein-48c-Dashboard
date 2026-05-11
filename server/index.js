@@ -9,6 +9,7 @@ import { weatherRoutes } from './routes/weather.js';
 import { systemRoutes } from './routes/system.js';
 import { configRoutes } from './routes/config.js';
 import { eventsRoutes } from './routes/events.js';
+import { chatRoutes } from './routes/chat.js';
 import { runMigrations, isEnabled as dbEnabled } from './lib/db.js';
 import { startDevicePoller } from './workers/devicePoller.js';
 import { cfg, isDemoMode } from './config.js';
@@ -47,6 +48,7 @@ app.use('/api/homey', homeyRoutes);
 app.use('/api/weather', weatherRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/events', eventsRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Healthcheck — Railway uses this for restart policy
 app.get('/healthz', (_req, res) =>

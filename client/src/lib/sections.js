@@ -1,4 +1,4 @@
-import { Home, LayoutGrid, Boxes, Workflow, Zap, ShieldCheck, Star, Settings, Music, Map, Bot, Anchor, Wrench, Bookmark, Activity, Sparkles } from 'lucide-react';
+import { Home, LayoutGrid, Boxes, Workflow, Zap, ShieldCheck, Star, Settings, Music, Map, Bot, Anchor, Wrench, Bookmark, Activity, Sparkles, MessageSquare } from 'lucide-react';
 
 /** Single source of truth for top-level navigation. */
 export const SECTIONS = [
@@ -13,6 +13,7 @@ export const SECTIONS = [
   { id: 'energi',            label: 'Energi',          Icon: Zap },
   { id: 'sikkerhet',         label: 'Sikkerhet',       Icon: ShieldCheck },
   { id: 'avatar',            label: 'Avatar',          Icon: Bot },
+  { id: 'chat',              label: 'AI-chat',         Icon: MessageSquare },
   { id: 'favoritter',        label: 'Favoritter',      Icon: Star },
   { id: 'lenker',            label: 'Lenker',          Icon: Bookmark },
   { id: 'vedlikehold',       label: 'Vedlikehold',     Icon: Wrench },

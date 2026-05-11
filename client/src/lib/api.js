@@ -83,6 +83,24 @@ export const api = {
     })
   },
 
+  // AI-chat med Homey MCP tools
+  chat: {
+    status: (signal) => jget('/chat/status', signal),
+    tools:  (signal) => jget('/chat/tools', signal),
+    reset:  () => jpost('/chat/reset'),
+    send:   (messages) => fetch(`${BASE}/api/chat/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages })
+    }).then(async r => {
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error || `POST /chat/message → ${r.status}`);
+      }
+      return r.json();
+    })
+  },
+
   // Config-store: server-persistert bruker-config per namespace
   config: {
     getAll: (signal) => jget('/config', signal),
