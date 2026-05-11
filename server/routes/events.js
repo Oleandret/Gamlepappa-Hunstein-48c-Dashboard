@@ -1,22 +1,116 @@
 import { Router } from 'express';
-import { isEnabled, query } from '../lib/db.js';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { isEnabled, query, hasTimescaleDB } from '../lib/db.js';
 import { pollerStatus, triggerPollNow } from '../workers/devicePoller.js';
 import { runDetection } from '../lib/patternDetector.js';
 import { runSuggestionEngine } from '../workers/suggestionEngine.js';
 import { openaiEnabled } from '../lib/openaiClient.js';
+import { configPath } from '../lib/configStore.js';
+import { cfg, isDemoMode } from '../config.js';
 
 export const eventsRoutes = Router();
+
+/**
+ * Inspiser disk-lagring rundt config-filen (Railway volume eller lokalt
+ * filsystem). Returnerer størrelse på filen + ledig plass i mappa.
+ */
+async function inspectStorage() {
+  const fp = configPath();
+  const dir = path.dirname(fp);
+  const result = {
+    configPath: fp,
+    dirExists: false,
+    fileExists: false,
+    fileSizeBytes: null,
+    writable: false,
+    freeBytes: null,
+    totalBytes: null,
+    error: null
+  };
+  try {
+    await fs.access(dir);
+    result.dirExists = true;
+  } catch { /* dir doesn't exist yet */ }
+  try {
+    const st = await fs.stat(fp);
+    result.fileExists = true;
+    result.fileSizeBytes = st.size;
+  } catch { /* file doesn't exist yet */ }
+  // Test write-permissions ved å skrive en tom .write-test
+  try {
+    if (result.dirExists) {
+      const probe = path.join(dir, '.write-test');
+      await fs.writeFile(probe, '', { flag: 'w' });
+      await fs.unlink(probe);
+      result.writable = true;
+    }
+  } catch (err) {
+    result.writable = false;
+    result.error = err.message;
+  }
+  // statfs (Node 18+) for ledig diskplass
+  try {
+    if (typeof fs.statfs === 'function' && result.dirExists) {
+      const sfs = await fs.statfs(dir);
+      result.freeBytes = sfs.bavail * sfs.bsize;
+      result.totalBytes = sfs.blocks * sfs.bsize;
+    }
+  } catch { /* statfs might not be supported */ }
+  return result;
+}
+
+/**
+ * DB-statistikk: antall events totalt, eldste + nyeste tidsstempel,
+ * patterns og suggestions teller.
+ */
+async function inspectDb() {
+  if (!isEnabled()) return null;
+  try {
+    const ev = await query(`
+      SELECT
+        COUNT(*)::int AS total_events,
+        COUNT(*) FILTER (WHERE kind='transition')::int AS transitions,
+        COUNT(*) FILTER (WHERE kind='snapshot')::int   AS snapshots,
+        MIN(ts) AS oldest_ts,
+        MAX(ts) AS newest_ts
+      FROM device_events
+    `);
+    const pat = await query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE active)::int AS active FROM patterns`);
+    const sug = await query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE status='pending')::int AS pending FROM suggestions`);
+    return {
+      events: ev.rows[0],
+      patterns: pat.rows[0],
+      suggestions: sug.rows[0],
+      timescale: hasTimescaleDB()
+    };
+  } catch (err) {
+    return { error: err.message };
+  }
+}
 
 /**
  * Status om databasen + poller. Brukes av Innsikt-fanen for å vise om
  * lagring er konfigurert.
  */
-eventsRoutes.get('/status', async (_req, res) => {
-  res.json({
-    db: isEnabled(),
-    poller: pollerStatus(),
-    llm: openaiEnabled()
-  });
+eventsRoutes.get('/status', async (_req, res, next) => {
+  try {
+    const [storage, dbInfo] = await Promise.all([
+      inspectStorage(),
+      inspectDb()
+    ]);
+    res.json({
+      // Komponent-flagg
+      db:       isEnabled(),
+      llm:      openaiEnabled(),
+      homey:    !isDemoMode() && Boolean(cfg('HOMEY_PAT')),
+      demo:     isDemoMode(),
+      // Detaljer
+      poller:   pollerStatus(),
+      storage,
+      database: dbInfo
+    });
+  } catch (err) { next(err); }
 });
 
 // ── Patterns ─────────────────────────────────────────────────────────────

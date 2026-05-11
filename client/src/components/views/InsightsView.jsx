@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Activity, Database, RefreshCw, AlertCircle, CheckCircle2, Clock, Layers, Filter, Loader, Sparkles, ListChecks, Check, X, Pause, Cpu, Brain } from 'lucide-react';
+import { Activity, Database, RefreshCw, AlertCircle, CheckCircle2, Clock, Layers, Filter, Loader, Sparkles, ListChecks, Check, X, Pause, Cpu, Brain, HardDrive, Wifi, ServerCog } from 'lucide-react';
 import { api } from '../../lib/api.js';
 
 /**
@@ -112,12 +112,7 @@ export function InsightsView() {
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <p className="panel-title">Innsikt</p>
-            <h1 className="text-xl font-semibold mt-1 flex items-center gap-2">
-              {dbEnabled
-                ? <CheckCircle2 size={20} className="text-nx-green" />
-                : <AlertCircle size={20} className="text-nx-amber" />}
-              Device-event-historikk
-            </h1>
+            <h1 className="text-xl font-semibold mt-1">Device-event-historikk og AI-forslag</h1>
             <p className="text-xs text-nx-mute mt-1 leading-relaxed max-w-2xl">
               Server-side poller henter status fra alle Homey-enheter hvert 10. minutt og logger endringer i Postgres.
               Dette danner grunnlaget for AI-baserte forslag til nye automatiseringer.
@@ -135,9 +130,7 @@ export function InsightsView() {
                   : 'border-nx-line/40 text-nx-mute opacity-50 cursor-not-allowed'
               ].join(' ')}
             >
-              {polling
-                ? <Loader size={12} className="animate-spin" />
-                : <RefreshCw size={12} />}
+              {polling ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />}
               Poll nå
             </button>
             <button
@@ -152,53 +145,7 @@ export function InsightsView() {
           </div>
         </div>
 
-        {!dbEnabled && (
-          <div className="mt-4 rounded-lg border border-nx-amber/40 bg-nx-amber/10 p-3 text-xs text-nx-amber">
-            <strong className="block mb-1">Database ikke konfigurert</strong>
-            Sett <code className="font-mono">DATABASE_URL</code> som env-variabel på serveren. På Railway:
-            legg til Postgres-add-on og koble til denne tjenesten — variabelen settes automatisk.
-            Etter første deploy kjøres migrations idempotent på app-start.
-          </div>
-        )}
-
-        {dbEnabled && (
-          <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
-            <StatTile
-              Icon={Database}
-              label="Database"
-              value="Tilkoblet"
-              tone="green"
-            />
-            <StatTile
-              Icon={Activity}
-              label="Poller"
-              value={pollerRunning ? `Hvert ${Math.round((status.poller.intervalMs || 0) / 60000)} min` : 'Stoppet'}
-              tone={pollerRunning ? 'green' : 'amber'}
-            />
-            <StatTile
-              Icon={Layers}
-              label="Cached enheter"
-              value={status.poller?.cachedDevices || 0}
-              tone="cyan"
-            />
-            <StatTile
-              Icon={Clock}
-              label="Siste poll"
-              value={status.poller?.lastPollAt
-                ? formatRelativeTime(status.poller.lastPollAt)
-                : 'Aldri'}
-              tone="cyan"
-            />
-          </div>
-        )}
-
-        {status?.poller?.lastPollResult && (
-          <p className="mt-2 text-[10px] font-mono text-nx-mute">
-            {status.poller.lastPollResult.ok
-              ? `${status.poller.lastPollResult.transitions} transitions, ${status.poller.lastPollResult.snapshots} snapshots, ${status.poller.lastPollResult.durationMs}ms`
-              : `Feil: ${status.poller.lastPollResult.error}`}
-          </p>
-        )}
+        <SystemHealthBanner status={status} />
       </div>
 
       {summary && (
@@ -398,6 +345,156 @@ export function InsightsView() {
       )}
     </div>
   );
+}
+
+function SystemHealthBanner({ status }) {
+  if (!status) {
+    return (
+      <div className="mt-4 rounded-lg border border-nx-line/60 bg-nx-panel/30 p-3 text-xs text-nx-mute font-mono">
+        Laster status...
+      </div>
+    );
+  }
+
+  const db = status.db;
+  const pollerOk = status.poller?.running === true && status.poller?.lastPollResult?.ok !== false;
+  const storage = status.storage || {};
+  const storageOk = storage.writable === true;
+  const llm = status.llm;
+  const homey = status.homey || status.demo;
+  const dbInfo = status.database || {};
+
+  // Samlet helse
+  const allCritical = db && pollerOk && storageOk && homey;
+  const headerTone = allCritical ? 'green' : (db || storageOk) ? 'amber' : 'red';
+
+  return (
+    <div className="mt-4 space-y-2">
+      {/* Samlet status-header */}
+      <div className={[
+        'rounded-lg border px-3 py-2 flex items-center gap-2 text-sm',
+        headerTone === 'green' ? 'border-nx-green/45 bg-nx-green/10 text-nx-green'
+          : headerTone === 'amber' ? 'border-nx-amber/45 bg-nx-amber/10 text-nx-amber'
+          : 'border-nx-red/45 bg-nx-red/10 text-nx-red'
+      ].join(' ')}>
+        {headerTone === 'green'
+          ? <CheckCircle2 size={18} />
+          : <AlertCircle size={18} />}
+        <span className="font-semibold">
+          {headerTone === 'green'
+            ? 'Systemet er online og logger data'
+            : headerTone === 'amber'
+            ? 'Systemet er delvis konfigurert — se detaljer under'
+            : 'Systemet er ikke klart for innsikt'}
+        </span>
+        {llm
+          ? <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-[0.18em]"><Sparkles size={11}/> AI klar</span>
+          : <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-[0.18em] text-nx-mute">AI ikke konfigurert</span>
+        }
+      </div>
+
+      {/* Komponent-grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+        <HealthCard
+          Icon={Wifi}
+          label="Homey-tilkobling"
+          ok={homey}
+          okText={status.demo ? 'Demo-data' : 'Tilkoblet (PAT satt)'}
+          failText="PAT mangler"
+          tone={status.demo ? 'amber' : 'green'}
+        />
+        <HealthCard
+          Icon={Database}
+          label="Postgres-database"
+          ok={db}
+          okText={dbInfo.timescale ? 'Tilkoblet · TimescaleDB' : 'Tilkoblet'}
+          failText="DATABASE_URL ikke satt"
+          tone="green"
+          extra={db && dbInfo.events
+            ? `${(dbInfo.events.total_events || 0).toLocaleString('no-NO')} events lagret`
+            : null}
+        />
+        <HealthCard
+          Icon={HardDrive}
+          label="Disk-lagring"
+          ok={storageOk}
+          okText={storage.freeBytes != null
+            ? `Skrivbar · ${formatBytes(storage.freeBytes)} ledig`
+            : 'Skrivbar'}
+          failText={storage.error || 'Ikke skrivbar'}
+          tone="green"
+          extra={storage.fileSizeBytes != null
+            ? `config.json: ${formatBytes(storage.fileSizeBytes)}`
+            : null}
+        />
+        <HealthCard
+          Icon={ServerCog}
+          label="Device-poller"
+          ok={pollerOk}
+          okText={status.poller?.intervalMs
+            ? `Aktiv · hvert ${Math.round(status.poller.intervalMs / 60000)} min`
+            : 'Aktiv'}
+          failText={status.db ? 'Stoppet' : 'Krever database'}
+          tone="green"
+          extra={status.poller?.lastPollAt
+            ? `Sist: ${formatRelativeTime(status.poller.lastPollAt)} · ${status.poller.cachedDevices} enheter`
+            : 'Ikke kjørt enda'}
+        />
+        <HealthCard
+          Icon={Brain}
+          label="AI (OpenAI)"
+          ok={llm}
+          okText="API-key satt · forslag tilgjengelig"
+          failText="OPENAI_API_KEY mangler"
+          tone="cyan"
+        />
+      </div>
+
+      {/* Last-poll-info */}
+      {status?.poller?.lastPollResult && (
+        <p className="text-[10px] font-mono text-nx-mute mt-1">
+          Siste poll: {status.poller.lastPollResult.ok
+            ? `${status.poller.lastPollResult.transitions} transitions, ${status.poller.lastPollResult.snapshots} snapshots, ${status.poller.lastPollResult.durationMs}ms`
+            : `feilet — ${status.poller.lastPollResult.error}`}
+          {dbInfo.events?.oldest_ts && ` · Eldste event: ${new Date(dbInfo.events.oldest_ts).toLocaleString('no-NO')}`}
+          {dbInfo.patterns?.active > 0 && ` · ${dbInfo.patterns.active} aktive mønstre`}
+          {dbInfo.suggestions?.pending > 0 && ` · ${dbInfo.suggestions.pending} ulest forslag`}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function HealthCard({ Icon, label, ok, okText, failText, extra, tone = 'green' }) {
+  const colorClasses = ok
+    ? (tone === 'cyan'
+        ? 'border-nx-cyan/45 bg-nx-cyan/10 text-nx-cyan'
+        : 'border-nx-green/45 bg-nx-green/10 text-nx-green')
+    : 'border-nx-red/40 bg-nx-red/5 text-nx-red';
+  return (
+    <div className={`rounded-lg border p-2.5 ${colorClasses}`}>
+      <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-[0.16em] text-nx-mute">
+        <Icon size={11} aria-hidden="true" /> {label}
+      </div>
+      <div className="mt-1.5 flex items-center gap-1.5">
+        {ok
+          ? <CheckCircle2 size={13} className="shrink-0" />
+          : <AlertCircle size={13} className="shrink-0" />}
+        <span className="text-xs font-semibold truncate">{ok ? okText : failText}</span>
+      </div>
+      {extra && (
+        <p className="mt-0.5 text-[10px] font-mono text-nx-mute truncate" title={extra}>{extra}</p>
+      )}
+    </div>
+  );
+}
+
+function formatBytes(b) {
+  if (!Number.isFinite(b)) return '—';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let i = 0; let n = b;
+  while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+  return `${n.toFixed(n < 10 ? 1 : 0)} ${units[i]}`;
 }
 
 function StatTile({ Icon, label, value, tone = 'cyan' }) {
