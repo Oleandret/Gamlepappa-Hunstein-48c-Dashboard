@@ -25,46 +25,53 @@ async function getChatModel() {
 const SYSTEM_PROMPT = `Du er en smart-hus-assistent for Gamlepappa Hunstein 48c.
 Du har tilgang til Homey-verktøy via MCP som lar deg lese og styre alle enhetene i huset og på hytta.
 
-VIKTIG — SONE-HIERARKI:
-Huset har en TRESTRUKTUR av soner. "Hjem" er ROOTEN — den inneholder ingen
-direkte enheter, bare underrom. Enheter (lys, sensorer, låser osv.) er knyttet
-til SPESIFIKKE rom som Stue, Kjøkken, Soverom — IKKE til Hjem.
+KRITISK — XML-STRUKTUREN:
+get_home_structure returnerer XML der ALLE elementer har name-attributter.
+Pass GODT på element-typen før du bruker en UUID:
 
-Når brukeren sier "stuen", "kjøkkenet", "soverommet" osv., MÅ du finne
-UUID-en til det SPESIFIKKE rommet — ikke bruke root-UUID-en. Hvis du kaller
-control_zone_lights med Hjem-UUID-en får du "No lights found in zone Hjem".
+  <zone id="..." name="Stue">          ← dette er en SONE (rom)
+  <speaker id="..." name="Stue">       ← dette er en HØYTTALER som heter "Stue"!
+  <light id="..." name="Stue tak">     ← dette er en LAMPE
+  <socket id="..." name="...">         ← stikkontakt
+  <other id="..." name="...">          ← diverse
+
+Et hus kan ha en høyttaler som heter "Stue" UTEN at det finnes en zone
+med samme navn. Du må filtrere på tag-typen <zone>, ikke bare name.
+
+ZONE-ID vs DEVICE-ID:
+- zoneId i tool-args MÅ peke på et <zone>-element. Speaker-UUID-er fungerer
+  ikke som zoneId — du får "No devices found".
+- deviceId peker på en spesifikk enhet (light, socket, sensor, osv).
+- For å dimme et lys: finn først <light name="..."> elementene direkte, så
+  bruk deres deviceId i set_capability eller liknende tool.
 
 ARBEIDSFLYT:
-1. START MED 'get_home_structure' UTEN argumenter for å se trestrukturen.
-2. Identifiser SPESIFIKK underrom-UUID som matcher brukerens beskrivelse:
-   - "stuen" → finn zone som heter "Stue" (ikke "Hjem")
-   - "kjøkkenet" → finn zone som heter "Kjøkken"
-   - "soverommet" → finn zone som heter "Hovedsoverom" eller liknende
-   - "hytta" → finn zone-treet under "Halsaneset"
-3. Bruk den SPESIFIKKE underrom-UUID-en i alle påfølgende kall.
-4. Kjør så control_zone_lights, set_capability eller andre tool med riktig UUID.
+1. get_home_structure UTEN argumenter — les hele XML-treet nøye.
+2. Identifiser hva brukeren vil:
+   - "dim lyset i stuen" → finn <light> elementer enten under <zone name="Stue">
+     eller med name som inneholder "stue" / "living room". Hvis du ikke finner
+     ekte <light>-tags, sjekk om huset bruker socket-baserte lys (smart-plugger
+     med onoff+dim-capabilities).
+3. For HVER lys-enhet du fant: kall riktig tool med deviceId, capability="dim",
+   value=1.0 (eller onoff=true).
+4. Hvis det finnes et control_zone_lights-tool og en sone med <light>-barn,
+   kan du bruke zoneId — men kun hvis det FINNES en <zone> med det navnet.
 
 SPRÅK:
-- Brukeren snakker norsk. Svar ALLTID på norsk.
-- MCP-tools forstår engelske keywords. Når du SØKER:
-    "lys" → "light"
-    "stue" → "living room"
-    "soverom" → "bedroom"
-    "kjøkken" → "kitchen"
-    "dør/lås" → "door" / "lock"
-- Men SONE-NAVN i Homey er på norsk! Hvis du leter etter UUID til
-  stuen, søk etter zone med name="Stue" (norsk) i strukturen — ikke
-  "Living Room".
+- Svar ALLTID på norsk til brukeren.
+- search_tools forstår engelske keywords ("light", "lamp"), men XML-navn
+  i strukturen er som de er (typisk norsk).
 
 FEILSØKING:
-- Hvis verktøyet sier "No X found in zone Y" — du brukte feil zone-UUID,
-  sannsynligvis root i stedet for underrom. Gå tilbake til get_home_structure
-  og finn riktig underrom-UUID.
+- "No X found in zone Y" → enten brukte du UUID på en speaker/device i stedet
+  for en zone, ELLER sonen finnes men har ingen X-enheter direkte.
+- "No devices found matching the filters" → samme problem — feil zoneId-type,
+  eller filteret er for snevert.
+- Hvis du ikke finner lys-enheter i strukturen: si fra til brukeren at huset
+  ikke har <light>-tags og spør om de bruker smart-plugger (sockets) i stedet.
 - Ikke kall samme tool med samme args to ganger.
-- Hvis du gir opp, forklar konkret hva som gikk galt og hvilken UUID du
-  trengte (slik at brukeren kan korrigere deg).
 
-Ikke finn opp enheter eller resultater. Vær konsis.`;
+Ikke finn opp UUID-er. Hvis du er usikker, spør brukeren.`;
 
 async function callOpenAI({ messages, tools, model }) {
   const body = {
@@ -219,14 +226,18 @@ chatRoutes.post('/message', async (req, res, next) => {
           name,
           args,
           isError,
-          result: resultText.slice(0, 4000),
+          result: resultText.slice(0, 4000),  // 4KB i UI-debug, mer er for mye å vise
           debug: debugInfo
         });
 
+        // Send hele resultatet (eller mesteparten) til AI-en. Tidligere klippet
+        // jeg til 8KB, men get_home_structure er typisk 60KB+ med alle enhetene.
+        // Da så AI-en bare høyttalere i toppen og missa lys-enhetene dypere ned.
+        // 80KB gir rom for store strukturer uten å sprenge context-window.
         const toolMsg = {
           role: 'tool',
           tool_call_id: tc.id,
-          content: resultText.slice(0, 8000)
+          content: resultText.slice(0, 80000)
         };
         messages.push(toolMsg);
         newMessages.push(toolMsg);
