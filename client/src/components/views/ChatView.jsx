@@ -239,14 +239,26 @@ export function ChatView() {
 
 function DebugToolCall({ tc }) {
   const d = tc.debug || {};
+  // Vis args og result INLINE — alltid synlig. Bare den enorme raw body
+  // legges bak details siden den ofte er 60KB+.
+  const argsStr = JSON.stringify(tc.args || {}, null, 2);
+  const resultPreview = (tc.result || '').slice(0, 1500);
+  const resultLong = (tc.result || '').length > 1500;
+
   return (
-    <li className="rounded border border-nx-line/40 bg-nx-bg/40 px-2 py-1.5 text-[11px] font-mono">
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className={tc.isError ? 'text-nx-red' : 'text-nx-cyan'}>
+    <li className={[
+      'rounded border px-2 py-1.5 text-[11px] font-mono',
+      tc.isError
+        ? 'border-nx-red/55 bg-nx-red/10'
+        : 'border-nx-line/40 bg-nx-bg/40'
+    ].join(' ')}>
+      {/* Header med navn + status */}
+      <div className="flex items-center gap-2 flex-wrap mb-1.5">
+        <span className={tc.isError ? 'text-nx-red font-semibold' : 'text-nx-cyan font-semibold'}>
           {tc.isError ? '✗' : '✓'} {tc.name}
         </span>
         {d.status && (
-          <span className={d.status >= 400 ? 'text-nx-red' : 'text-nx-green'}>
+          <span className={d.status >= 400 ? 'text-nx-red' : 'text-nx-mute'}>
             HTTP {d.status}
           </span>
         )}
@@ -255,31 +267,37 @@ function DebugToolCall({ tc }) {
         {d.durationMs != null && <span className="text-nx-mute">{d.durationMs}ms</span>}
         {d.parsedEvents != null && <span className="text-nx-mute">{d.parsedEvents} events</span>}
       </div>
-      <details className="mt-1">
-        <summary className="cursor-pointer text-nx-mute hover:text-nx-cyan text-[10px]">Args</summary>
-        <pre className="mt-1 text-[10px] text-nx-cyan whitespace-pre-wrap break-all">
-          {JSON.stringify(tc.args, null, 2)}
+
+      {/* Args alltid synlig */}
+      <div className="mb-1.5">
+        <div className="text-[9px] uppercase tracking-[0.18em] text-nx-mute mb-0.5">Args</div>
+        <pre className="text-[10px] text-nx-cyan whitespace-pre-wrap break-all bg-nx-panel/40 rounded px-1.5 py-1 max-h-20 overflow-y-auto">
+          {argsStr === '{}' ? '(ingen)' : argsStr}
         </pre>
-      </details>
-      <details className="mt-1">
-        <summary className="cursor-pointer text-nx-mute hover:text-nx-cyan text-[10px]">Tolket resultat ({(tc.result || '').length}B)</summary>
-        <pre className="mt-1 text-[10px] text-nx-text whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
+      </div>
+
+      {/* Resultat alltid synlig (første 1500 tegn) */}
+      <div>
+        <div className="text-[9px] uppercase tracking-[0.18em] text-nx-mute mb-0.5">
+          Resultat {tc.result ? `(${tc.result.length}B)` : '(tomt)'}
+        </div>
+        <pre className={[
+          'text-[10px] whitespace-pre-wrap break-all bg-nx-panel/40 rounded px-1.5 py-1 max-h-48 overflow-y-auto',
+          tc.isError ? 'text-nx-red' : 'text-nx-text'
+        ].join(' ')}>
           {tc.result || '(tomt)'}
+          {resultLong && '\n\n[…trunkert]'}
         </pre>
-      </details>
-      {d.rawBody && (
+      </div>
+
+      {/* Raw body bak details (kan være enorm) */}
+      {d.rawBody && d.rawBody.length > 1000 && (
         <details className="mt-1">
-          <summary className="cursor-pointer text-nx-mute hover:text-nx-cyan text-[10px]">Raw HTTP body ({d.bodyBytes}B)</summary>
-          <pre className="mt-1 text-[10px] text-nx-mute whitespace-pre-wrap break-all max-h-64 overflow-y-auto">
+          <summary className="cursor-pointer text-nx-mute hover:text-nx-cyan text-[10px]">
+            Raw HTTP body ({d.bodyBytes}B)
+          </summary>
+          <pre className="mt-1 text-[10px] text-nx-mute whitespace-pre-wrap break-all max-h-64 overflow-y-auto bg-nx-panel/30 rounded px-1.5 py-1">
             {d.rawBody}
-          </pre>
-        </details>
-      )}
-      {d.parsedPayload && (
-        <details className="mt-1">
-          <summary className="cursor-pointer text-nx-mute hover:text-nx-cyan text-[10px]">Parsed JSON-RPC payload</summary>
-          <pre className="mt-1 text-[10px] text-nx-purple whitespace-pre-wrap break-all max-h-64 overflow-y-auto">
-            {d.parsedPayload}
           </pre>
         </details>
       )}
