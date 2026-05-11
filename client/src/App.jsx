@@ -503,7 +503,12 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
         ? Object.values(data.devices).filter(d => d.class === 'car' || /tesla/i.test(d.driverUri || ''))
         : [];
       const tesla = allTeslas.find(d => /model\s*x/i.test(d.name || '')) || allTeslas[0] || null;
-      const roborock = findFirst(data.devices, d => d.class === 'vacuumcleaner');
+      // Foretrekk Roborock Q-serien (Q5/Q7/Q8/Q-revo osv.) hvis flere
+      // støvsugere er registrert.
+      const allVacuums = data.devices
+        ? Object.values(data.devices).filter(d => d.class === 'vacuumcleaner')
+        : [];
+      const roborock = allVacuums.find(d => /\bq[\s\-]?(?:\d|revo)/i.test(d.name || '')) || allVacuums[0] || null;
       const tibber = findFirst(data.devices, d => /tibber/i.test(d.driverUri || ''));
       return (
         <motion.div
