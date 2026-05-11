@@ -107,16 +107,23 @@ async function insertEvents(rows) {
   const placeholders = [];
   rows.forEach((r, i) => {
     const base = i * 11;
+    // Kolonnerekkefølge: device_id, device_name, zone, class, capability,
+    // value (jsonb), prev_value (jsonb), kind, hour_of_day, day_of_week, is_weekend
     placeholders.push(
-      `($${base+1}, $${base+2}, $${base+3}, $${base+4}, $${base+5}::jsonb, $${base+6}::jsonb, $${base+7}, $${base+8}, $${base+9}, $${base+10}, $${base+11})`
+      `($${base+1}, $${base+2}, $${base+3}, $${base+4}, $${base+5}, $${base+6}::jsonb, $${base+7}::jsonb, $${base+8}, $${base+9}, $${base+10}, $${base+11})`
     );
     values.push(
-      r.device_id, r.device_name || null, r.zone || null, r.class || null,
+      r.device_id,
+      r.device_name || null,
+      r.zone || null,
+      r.class || null,
       r.capability,
-      r.value === undefined ? null : JSON.stringify(r.value),
-      r.prev_value === undefined ? null : JSON.stringify(r.prev_value),
+      r.value === undefined || r.value === null ? null : JSON.stringify(r.value),
+      r.prev_value === undefined || r.prev_value === null ? null : JSON.stringify(r.prev_value),
       r.kind || 'transition',
-      r.hour_of_day, r.day_of_week, r.is_weekend
+      r.hour_of_day,
+      r.day_of_week,
+      r.is_weekend
     );
   });
   const sql = `
