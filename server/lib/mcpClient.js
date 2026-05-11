@@ -34,9 +34,14 @@ export function mcpConfigured() {
   return Boolean(mcpUrl());
 }
 
+// Siste rå-respons fra en RPC, eksponert til chat-endepunktet for debug
+let lastRawResponse = null;
+export function getLastRawResponse() { return lastRawResponse; }
+
 /**
  * Send en JSON-RPC request. Returnerer parsed result (eller kaster).
- * Håndterer både SSE-respons og vanlig JSON-respons.
+ * Håndterer både SSE-respons og vanlig JSON-respons. Fanger raw body
+ * i lastRawResponse for diagnostikk.
  */
 async function rpc(method, params = {}, { withSession = true } = {}) {
   const url = mcpUrl();
@@ -47,6 +52,7 @@ async function rpc(method, params = {}, { withSession = true } = {}) {
     'Accept': 'application/json, text/event-stream'
   };
   if (withSession && sessionId) headers['Mcp-Session-Id'] = sessionId;
+  const startedAt = Date.now();
 
   const res = await fetch(url, {
     method: 'POST',
@@ -58,32 +64,48 @@ async function rpc(method, params = {}, { withSession = true } = {}) {
   const newSession = res.headers.get('Mcp-Session-Id');
   if (newSession) sessionId = newSession;
 
+  const contentType = res.headers.get('content-type') || '';
+
+  // Les body som tekst FØRST slik at vi kan logge selv hvis JSON-parsing feiler
+  const rawText = await res.text().catch(() => '');
+  lastRawResponse = {
+    method,
+    requestId: id,
+    status: res.status,
+    contentType,
+    sessionId: newSession || sessionId,
+    bodyBytes: rawText.length,
+    rawBody: rawText.slice(0, 4000),
+    durationMs: Date.now() - startedAt
+  };
+
+  console.log(`[mcp] ${method} (id=${id}) → ${res.status} ${contentType} ${rawText.length}B in ${Date.now() - startedAt}ms`);
+
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`MCP ${method} → ${res.status}: ${text.slice(0, 300)}`);
+    throw new Error(`MCP ${method} → ${res.status}: ${rawText.slice(0, 300)}`);
   }
 
-  const contentType = res.headers.get('content-type') || '';
   let payload;
 
-  if (contentType.includes('text/event-stream')) {
-    // SSE — hent hele streamen og parse events korrekt:
+  // 202 Accepted med tom body = response kommer asynkront via en separat GET
+  // (modern MCP Streamable HTTP). Vi støtter ikke det per nå — gi tydelig feil.
+  if (res.status === 202 && !rawText) {
+    throw new Error(`MCP ${method}: serveren returnerte 202 Accepted uten body. Krever async SSE-stream på separat GET — ikke støttet ennå.`);
+  }
+
+  if (contentType.includes('text/event-stream') || rawText.trimStart().startsWith('event:') || rawText.trimStart().startsWith('data:')) {
+    // SSE — parse events korrekt:
     //   * Events er separert med \n\n
     //   * Innenfor et event har vi 'data:' / 'event:' / 'id:' / 'retry:' linjer
     //   * Flere data:-linjer i samme event skal konkateneres med \n
-    const text = await res.text();
-    if (process.env.MCP_DEBUG === '1') {
-      console.log(`[mcp] ${method} raw SSE (${text.length} bytes):\n${text.slice(0, 2000)}${text.length > 2000 ? '...' : ''}`);
-    }
-
-    const events = text.split(/\r?\n\r?\n/);
+    const events = rawText.split(/\r?\n\r?\n/);
     const allParsed = [];
+    let unparsable = 0;
     for (const evt of events) {
       const dataLines = [];
       for (const rawLine of evt.split(/\r?\n/)) {
-        const line = rawLine.startsWith('data:') ? rawLine.slice(5) : null;
-        if (line === null) continue;
-        // SSE spec: en optional ' ' etter ':'  ignoreres
+        if (!rawLine.startsWith('data:')) continue;
+        const line = rawLine.slice(5);
         dataLines.push(line.startsWith(' ') ? line.slice(1) : line);
       }
       if (dataLines.length === 0) continue;
@@ -92,31 +114,32 @@ async function rpc(method, params = {}, { withSession = true } = {}) {
       try {
         const msg = JSON.parse(data);
         allParsed.push(msg);
-        if (msg.id === id || String(msg.id) === String(id)) {
-          payload = msg;
-          // ikke break — fortsett for å se om vi får oppdatert versjon
-        }
-      } catch (err) {
-        if (process.env.MCP_DEBUG === '1') {
-          console.log(`[mcp] ${method} unparsable SSE event:`, data.slice(0, 200), err.message);
-        }
+        if (msg.id === id || String(msg.id) === String(id)) payload = msg;
+      } catch {
+        unparsable++;
       }
     }
+    lastRawResponse.parsedEvents = allParsed.length;
+    lastRawResponse.unparsableEvents = unparsable;
 
     if (!payload) {
-      // Som siste utvei: hvis vi har én JSON-RPC respons uten matchende id, bruk den
       const candidate = allParsed.find(m => m && (m.result !== undefined || m.error !== undefined));
       if (candidate) payload = candidate;
     }
     if (!payload) {
-      throw new Error(`MCP ${method}: ingen JSON-RPC respons i SSE-stream (${allParsed.length} events parset, ${text.length} bytes)`);
+      throw new Error(`MCP ${method}: ingen JSON-RPC respons i SSE-stream (${allParsed.length} events parset, ${unparsable} feilet, ${rawText.length} bytes)`);
+    }
+  } else if (rawText) {
+    try {
+      payload = JSON.parse(rawText);
+    } catch (err) {
+      throw new Error(`MCP ${method}: kunne ikke parse JSON-respons: ${err.message}. Body: ${rawText.slice(0, 200)}`);
     }
   } else {
-    payload = await res.json();
-    if (process.env.MCP_DEBUG === '1') {
-      console.log(`[mcp] ${method} JSON response:`, JSON.stringify(payload).slice(0, 500));
-    }
+    throw new Error(`MCP ${method}: tom respons fra serveren (status ${res.status})`);
   }
+
+  lastRawResponse.parsedPayload = payload ? JSON.stringify(payload).slice(0, 2000) : null;
 
   if (payload.error) {
     throw new Error(`MCP ${method} error: ${payload.error.message || JSON.stringify(payload.error)}`);

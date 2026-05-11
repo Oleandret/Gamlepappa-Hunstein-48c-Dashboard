@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { openaiEnabled } from '../lib/openaiClient.js';
-import { listTools, callTool, toOpenAITools, mcpUrl, resetSession } from '../lib/mcpClient.js';
+import { listTools, callTool, toOpenAITools, mcpUrl, resetSession, getLastRawResponse } from '../lib/mcpClient.js';
 import { getNamespace } from '../lib/configStore.js';
 
 export const chatRoutes = Router();
@@ -23,17 +23,40 @@ async function getChatModel() {
 }
 
 const SYSTEM_PROMPT = `Du er en smart-hus-assistent for Gamlepappa Hunstein 48c.
-Du har tilgang til Homey-verktøy som lar deg lese og styre alle enhetene i huset og på hytta.
-Brukeren snakker norsk. Vær konsis og hjelpsom.
+Du har tilgang til Homey-verktøy via MCP som lar deg lese og styre alle enhetene i huset og på hytta.
 
-Når brukeren ber deg gjøre noe:
-1. Bruk passende verktøy for å hente nødvendig informasjon eller utføre handlinger.
-2. Bekreft kort hva du gjorde (eller hva du fant), uten å lire opp tekniske detaljer.
-3. Hvis du er usikker på hvilken enhet brukeren mener, spør.
-4. For "skru på/av" — bruk verktøy som styrer onoff-capability på riktig enhet.
-5. For statusforespørsler — bruk read-verktøy og gi et menneskelig sammendrag.
+VIKTIG OM SPRÅK:
+- Brukeren snakker norsk. Svar ALLTID på norsk.
+- MEN: MCP-verktøyene er engelske og forstår kun engelske nøkkelord.
+  Når du søker eller filtrerer, bruk engelske termer:
+    "lys" → "light"
+    "stue" → "living room"
+    "soverom" → "bedroom"
+    "kjøkken" → "kitchen"
+    "dør/lås" → "door" / "lock"
+    "bevegelse" → "motion"
+    "temperatur" → "temperature"
+    "av/på" → "onoff"
+- Når du svarer brukeren, oversett tilbake til norsk navn.
 
-Ikke finn opp enheter eller resultater. Hvis et verktøy feiler, si fra hva som gikk galt.`;
+ARBEIDSFLYT:
+1. For å forstå huset: START MED 'get_home_structure' UTEN argumenter.
+   Det gir deg lista av soner, rom og enheter med deres UUID-er.
+2. Bruk UUID-er (ikke navn som "Hjem" eller "Stue") som zoneId/deviceId
+   i påfølgende kall.
+3. For å finne en spesifikk enhet, bruk search_tools med ENGELSKE nøkkelord
+   (f.eks. "light" eller "lamp", ikke "lys").
+4. For å styre noe, bruk det aktuelle set/control-verktøyet med riktig
+   UUID og verdi.
+5. Bekreft kort hva du gjorde — på norsk, uten å vise tekniske ID-er.
+
+FEILSØKING:
+- Hvis et verktøy returnerer tomt resultat, prøv å reformulere argumentene
+  eller starte med get_home_structure for å hente riktig kontekst.
+- Ikke kall samme verktøy med samme argumenter to ganger på rad.
+- Si fra til brukeren hva som gikk galt — ikke bare prøv blindt.
+
+Ikke finn opp enheter eller resultater. Vær konsis.`;
 
 async function callOpenAI({ messages, tools, model }) {
   const body = {
@@ -173,15 +196,24 @@ chatRoutes.post('/message', async (req, res, next) => {
         catch { args = {}; }
 
         let resultText, isError = false;
+        let debugInfo = null;
         try {
           const result = await callTool(name, args);
           resultText = mcpContentToString(result);
           if (result?.isError) isError = true;
+          debugInfo = getLastRawResponse();
         } catch (err) {
           resultText = `Verktøy-feil: ${err.message}`;
           isError = true;
+          debugInfo = getLastRawResponse();
         }
-        toolCallsExecuted.push({ name, args, isError, result: resultText.slice(0, 4000) });
+        toolCallsExecuted.push({
+          name,
+          args,
+          isError,
+          result: resultText.slice(0, 4000),
+          debug: debugInfo
+        });
 
         const toolMsg = {
           role: 'tool',

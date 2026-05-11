@@ -19,6 +19,8 @@ export function ChatView() {
   const [status, setStatus] = useState(null);
   const [tools, setTools] = useState([]);
   const [toolsExpanded, setToolsExpanded] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
+  const [lastToolCalls, setLastToolCalls] = useState([]);
   const aiModels = useAiModels();
   const listRef = useRef(null);
   const inputRef = useRef(null);
@@ -46,6 +48,7 @@ export function ChatView() {
       const result = await api.chat.send(next);
       const newMessages = Array.isArray(result?.messages) ? result.messages : [];
       setMessages(prev => [...prev, ...newMessages]);
+      setLastToolCalls(Array.isArray(result?.toolCalls) ? result.toolCalls : []);
     } catch (err) {
       setError(err);
       // Sett user-melding tilbake i input så den ikke går tapt
@@ -132,7 +135,7 @@ export function ChatView() {
           </div>
         </div>
 
-        <div className="mt-2 flex items-center gap-2 flex-wrap">
+        <div className="mt-2 flex items-center gap-3 flex-wrap">
           <button
             onClick={() => setToolsExpanded(e => !e)}
             className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-mono text-nx-mute hover:text-nx-cyan"
@@ -141,6 +144,15 @@ export function ChatView() {
             {toolsExpanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
             <Wrench size={10} /> {tools.length} verktøy fra MCP
           </button>
+          <label className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-mono text-nx-mute cursor-pointer">
+            <input
+              type="checkbox"
+              checked={debugMode}
+              onChange={(e) => setDebugMode(e.target.checked)}
+              className="accent-nx-cyan"
+            />
+            Debug-modus (vis raw MCP-respons)
+          </label>
         </div>
         {toolsExpanded && tools.length > 0 && (
           <ul className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 max-h-48 overflow-y-auto">
@@ -153,6 +165,19 @@ export function ChatView() {
           </ul>
         )}
       </div>
+
+      {debugMode && lastToolCalls.length > 0 && (
+        <div className="col-span-12 panel p-3 border border-nx-purple/40 bg-nx-purple/5">
+          <p className="panel-title flex items-center gap-2 mb-2">
+            <Wrench size={12} className="text-nx-purple" /> Debug: siste {lastToolCalls.length} MCP-kall
+          </p>
+          <ul className="space-y-1.5 max-h-72 overflow-y-auto">
+            {lastToolCalls.map((tc, i) => (
+              <DebugToolCall key={i} tc={tc} />
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="col-span-12 panel p-0 overflow-hidden flex flex-col" style={{ minHeight: 'calc(100vh - 320px)' }}>
         <div ref={listRef} className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -209,6 +234,56 @@ export function ChatView() {
         </div>
       </div>
     </div>
+  );
+}
+
+function DebugToolCall({ tc }) {
+  const d = tc.debug || {};
+  return (
+    <li className="rounded border border-nx-line/40 bg-nx-bg/40 px-2 py-1.5 text-[11px] font-mono">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className={tc.isError ? 'text-nx-red' : 'text-nx-cyan'}>
+          {tc.isError ? '✗' : '✓'} {tc.name}
+        </span>
+        {d.status && (
+          <span className={d.status >= 400 ? 'text-nx-red' : 'text-nx-green'}>
+            HTTP {d.status}
+          </span>
+        )}
+        {d.contentType && <span className="text-nx-mute">{d.contentType.split(';')[0]}</span>}
+        {d.bodyBytes != null && <span className="text-nx-mute">{d.bodyBytes}B</span>}
+        {d.durationMs != null && <span className="text-nx-mute">{d.durationMs}ms</span>}
+        {d.parsedEvents != null && <span className="text-nx-mute">{d.parsedEvents} events</span>}
+      </div>
+      <details className="mt-1">
+        <summary className="cursor-pointer text-nx-mute hover:text-nx-cyan text-[10px]">Args</summary>
+        <pre className="mt-1 text-[10px] text-nx-cyan whitespace-pre-wrap break-all">
+          {JSON.stringify(tc.args, null, 2)}
+        </pre>
+      </details>
+      <details className="mt-1">
+        <summary className="cursor-pointer text-nx-mute hover:text-nx-cyan text-[10px]">Tolket resultat ({(tc.result || '').length}B)</summary>
+        <pre className="mt-1 text-[10px] text-nx-text whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
+          {tc.result || '(tomt)'}
+        </pre>
+      </details>
+      {d.rawBody && (
+        <details className="mt-1">
+          <summary className="cursor-pointer text-nx-mute hover:text-nx-cyan text-[10px]">Raw HTTP body ({d.bodyBytes}B)</summary>
+          <pre className="mt-1 text-[10px] text-nx-mute whitespace-pre-wrap break-all max-h-64 overflow-y-auto">
+            {d.rawBody}
+          </pre>
+        </details>
+      )}
+      {d.parsedPayload && (
+        <details className="mt-1">
+          <summary className="cursor-pointer text-nx-mute hover:text-nx-cyan text-[10px]">Parsed JSON-RPC payload</summary>
+          <pre className="mt-1 text-[10px] text-nx-purple whitespace-pre-wrap break-all max-h-64 overflow-y-auto">
+            {d.parsedPayload}
+          </pre>
+        </details>
+      )}
+    </li>
   );
 }
 
