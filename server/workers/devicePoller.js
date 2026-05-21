@@ -13,15 +13,23 @@ import { onDeviceChanges } from '../lib/autoFlowExecutor.js';
  * bakgrunnen og blokkerer aldri HTTP-handlere.
  */
 
-const POLL_MS = Number(process.env.DEVICE_POLL_MS) || (10 * 60 * 1000); // 10 min default
+const DEFAULT_POLL_MS = Number(process.env.DEVICE_POLL_MS) || (10 * 60 * 1000); // 10 min default
 // Snapshots for slow-moving sensor-verdier (temp, batteri) — én gang per time
 const SNAPSHOT_EVERY_MS = 60 * 60 * 1000;
+// Backoff: hvis polls feiler gjentatte ganger, doble intervallet opp til denne maks
+const MAX_BACKOFF_MS = 60 * 60 * 1000; // 1 time
 
 let lastState = new Map();       // device_id → { capability → value }
 let lastSnapshotTs = 0;
 let pollTimer = null;
 let lastPollAt = null;
 let lastPollResult = null;       // {ok, polledDevices, transitions, snapshots, error?}
+
+// Runtime-kontroll
+let pollIntervalMs = DEFAULT_POLL_MS;
+let pollerEnabled = true;        // kan skrus av fra UI uten å restarte serveren
+let consecutiveFailures = 0;     // for backoff
+let currentBackoffMs = 0;        // ekstra ventetid etter feil
 
 function capObj(d) {
   // Normaliser capability-payload til { cap: value } map
@@ -139,8 +147,10 @@ async function insertEvents(rows) {
 /**
  * Én poll-syklus.
  */
-async function pollOnce() {
+async function pollOnce({ manual = false } = {}) {
   if (!isEnabled()) return null;
+  // Hopp over auto-polls hvis poller er pauset (men tillat manuelle 'Poll nå')
+  if (!pollerEnabled && !manual) return lastPollResult;
   const startedAt = Date.now();
   let polledDevices = 0;
   let transitions = 0;
@@ -225,6 +235,13 @@ async function pollOnce() {
       }
     }
 
+    // Vellykket poll — nullstill backoff
+    consecutiveFailures = 0;
+    if (currentBackoffMs > 0) {
+      currentBackoffMs = 0;
+      rescheduleTimer();
+    }
+
     lastPollAt = startedAt;
     lastPollResult = {
       ok: true, polledDevices, transitions, snapshots, firedFlows,
@@ -233,11 +250,32 @@ async function pollOnce() {
     console.log(`[poller] ok — ${polledDevices} devs, ${transitions} transitions, ${snapshots} snapshots, ${firedFlows} flows fired, ${Date.now() - startedAt}ms`);
     return lastPollResult;
   } catch (err) {
+    // Feil — øk backoff slik at vi ikke hamrer en Homey som sliter
+    consecutiveFailures++;
+    if (consecutiveFailures >= 3) {
+      const prev = currentBackoffMs || pollIntervalMs;
+      currentBackoffMs = Math.min(prev * 2, MAX_BACKOFF_MS);
+      rescheduleTimer();
+      console.warn(`[poller] ${consecutiveFailures} feil på rad — backoff til ${(pollIntervalMs + currentBackoffMs) / 1000}s`);
+    }
     lastPollAt = startedAt;
-    lastPollResult = { ok: false, polledDevices, transitions, snapshots, error: err.message, durationMs: Date.now() - startedAt };
+    lastPollResult = {
+      ok: false, polledDevices, transitions, snapshots, error: err.message,
+      consecutiveFailures, durationMs: Date.now() - startedAt
+    };
     console.error('[poller] error:', err.message);
     return lastPollResult;
   }
+}
+
+function effectiveInterval() {
+  return pollIntervalMs + currentBackoffMs;
+}
+
+function rescheduleTimer() {
+  if (!pollTimer) return;
+  clearInterval(pollTimer);
+  pollTimer = setInterval(() => pollOnce(), effectiveInterval());
 }
 
 export function startDevicePoller() {
@@ -246,10 +284,9 @@ export function startDevicePoller() {
     return;
   }
   if (pollTimer) return;
-  console.log(`[poller] starting — every ${POLL_MS / 1000}s`);
-  // Første poll etter 15s slik at serveren rekker å starte ferdig
-  setTimeout(pollOnce, 15_000);
-  pollTimer = setInterval(pollOnce, POLL_MS);
+  console.log(`[poller] starting — every ${pollIntervalMs / 1000}s (enabled=${pollerEnabled})`);
+  setTimeout(() => pollOnce(), 15_000);
+  pollTimer = setInterval(() => pollOnce(), effectiveInterval());
 }
 
 export function stopDevicePoller() {
@@ -259,11 +296,33 @@ export function stopDevicePoller() {
   }
 }
 
+/** Skru poller av/på i farten (auto-polls hopper over når av). */
+export function setPollerEnabled(enabled) {
+  pollerEnabled = Boolean(enabled);
+  console.log(`[poller] ${pollerEnabled ? 'enabled' : 'PAUSED'} via runtime-kontroll`);
+  return pollerEnabled;
+}
+
+/** Endre poll-intervall i farten (minutter). */
+export function setPollIntervalMinutes(minutes) {
+  const m = Math.max(1, Math.min(120, Number(minutes) || 10));
+  pollIntervalMs = m * 60 * 1000;
+  currentBackoffMs = 0;
+  consecutiveFailures = 0;
+  rescheduleTimer();
+  console.log(`[poller] intervall satt til ${m} min`);
+  return m;
+}
+
 export function pollerStatus() {
   return {
     enabled: isEnabled(),
     running: Boolean(pollTimer),
-    intervalMs: POLL_MS,
+    paused: !pollerEnabled,
+    intervalMs: pollIntervalMs,
+    effectiveIntervalMs: effectiveInterval(),
+    backoffMs: currentBackoffMs,
+    consecutiveFailures,
     lastPollAt,
     lastPollResult,
     cachedDevices: lastState.size
@@ -272,5 +331,5 @@ export function pollerStatus() {
 
 // Trigger en poll umiddelbart (brukes av /api/events/poll-now-endepunkt)
 export async function triggerPollNow() {
-  return pollOnce();
+  return pollOnce({ manual: true });
 }

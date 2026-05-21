@@ -2,7 +2,7 @@ import { Router } from 'express';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { isEnabled, query, hasTimescaleDB } from '../lib/db.js';
-import { pollerStatus, triggerPollNow } from '../workers/devicePoller.js';
+import { pollerStatus, triggerPollNow, setPollerEnabled, setPollIntervalMinutes } from '../workers/devicePoller.js';
 import { runDetection } from '../lib/patternDetector.js';
 import { runSuggestionEngine } from '../workers/suggestionEngine.js';
 import { openaiEnabled } from '../lib/openaiClient.js';
@@ -405,5 +405,17 @@ eventsRoutes.post('/poll-now', async (_req, res, next) => {
   try {
     const result = await triggerPollNow();
     res.json({ result });
+  } catch (err) { next(err); }
+});
+
+/**
+ * Pause/start poller i farten + endre intervall. Body: { enabled?, intervalMinutes? }
+ */
+eventsRoutes.post('/poller/control', async (req, res, next) => {
+  try {
+    const { enabled, intervalMinutes } = req.body || {};
+    if (typeof enabled === 'boolean') setPollerEnabled(enabled);
+    if (intervalMinutes != null) setPollIntervalMinutes(intervalMinutes);
+    res.json({ poller: pollerStatus() });
   } catch (err) { next(err); }
 });

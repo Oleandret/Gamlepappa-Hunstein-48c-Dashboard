@@ -139,7 +139,40 @@ export function InsightsView() {
               Dette danner grunnlaget for AI-baserte forslag til nye automatiseringer.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {dbEnabled && (
+              <>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await api.events.pollerControl({ enabled: status?.poller?.paused });
+                    setTimeout(() => reload(), 300);
+                  }}
+                  className={[
+                    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-[0.16em] transition-colors border',
+                    status?.poller?.paused
+                      ? 'border-nx-green/55 bg-nx-green/10 text-nx-green hover:bg-nx-green/25'
+                      : 'border-nx-amber/55 bg-nx-amber/10 text-nx-amber hover:bg-nx-amber/25'
+                  ].join(' ')}
+                  title={status?.poller?.paused ? 'Start automatisk polling igjen' : 'Pause automatisk polling (test om det er poller-en som overbelaster Homey)'}
+                >
+                  {status?.poller?.paused ? '▶ Start poller' : '⏸ Pause poller'}
+                </button>
+                <select
+                  value={Math.round((status?.poller?.intervalMs || 600000) / 60000)}
+                  onChange={async (e) => {
+                    await api.events.pollerControl({ intervalMinutes: Number(e.target.value) });
+                    setTimeout(() => reload(), 300);
+                  }}
+                  className="bg-nx-panel/60 border border-nx-line/60 rounded px-2 py-1.5 text-xs text-nx-cyan font-mono"
+                  title="Hvor ofte poller-en sjekker Homey"
+                >
+                  {[5, 10, 15, 30, 60].map(m => (
+                    <option key={m} value={m}>hvert {m}. min</option>
+                  ))}
+                </select>
+              </>
+            )}
             <button
               type="button"
               onClick={handlePollNow}
@@ -473,15 +506,19 @@ function SystemHealthBanner({ status }) {
         <HealthCard
           Icon={ServerCog}
           label="Device-poller"
-          ok={pollerOk}
+          ok={pollerOk && !status.poller?.paused}
           okText={status.poller?.intervalMs
             ? `Aktiv · hvert ${Math.round(status.poller.intervalMs / 60000)} min`
             : 'Aktiv'}
-          failText={status.db ? 'Stoppet' : 'Krever database'}
+          failText={status.poller?.paused ? 'Pauset av deg' : status.db ? 'Stoppet' : 'Krever database'}
           tone="green"
-          extra={status.poller?.lastPollAt
-            ? `Sist: ${formatRelativeTime(status.poller.lastPollAt)} · ${status.poller.cachedDevices} enheter`
-            : 'Ikke kjørt enda'}
+          extra={
+            status.poller?.backoffMs > 0
+              ? `⚠ Backoff aktiv (${status.poller.consecutiveFailures} feil) → ${Math.round(status.poller.effectiveIntervalMs / 60000)} min`
+              : status.poller?.lastPollAt
+                ? `Sist: ${formatRelativeTime(status.poller.lastPollAt)} · ${status.poller.cachedDevices} enheter`
+                : 'Ikke kjørt enda'
+          }
         />
         <HealthCard
           Icon={Brain}

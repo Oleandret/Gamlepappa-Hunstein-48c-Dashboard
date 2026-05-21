@@ -43,6 +43,7 @@ export const api = {
     },
     summary: (signal) => jget('/events/summary', signal),
     pollNow: () => jpost('/events/poll-now'),
+    pollerControl: (body) => jpost('/events/poller/control', body),
 
     // Lag 2: pattern-detektor
     patterns:    (signal) => jget('/events/patterns', signal),
