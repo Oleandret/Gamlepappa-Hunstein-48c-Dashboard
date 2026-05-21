@@ -8,6 +8,7 @@
  */
 import fetch from 'node-fetch';
 import { cfg } from '../config.js';
+import { enqueueCommand } from './commandQueue.js';
 
 const ATHOM_API = 'https://api.athom.com';
 const REQUEST_TIMEOUT_MS = 12000;
@@ -77,13 +78,24 @@ export const homeyClient = {
   listZones:   () => homeyFetch('/manager/zones/zone'),
   listFlows:   () => homeyFetch('/manager/flow/flow'),
   listAlarms:  () => homeyFetch('/manager/alarms/alarm'),
+  // Skriving går gjennom kommando-køen (rate-limit) for å skåne BLE-mesh
+  // som Plejd. Lesing (listDevices osv.) går direkte.
   setCapability: (deviceId, capabilityId, value) =>
-    homeyFetch(
-      `/manager/devices/device/${encodeURIComponent(deviceId)}/capability/${encodeURIComponent(capabilityId)}`,
-      { method: 'PUT', body: JSON.stringify({ value }) }
+    enqueueCommand(
+      () => homeyFetch(
+        `/manager/devices/device/${encodeURIComponent(deviceId)}/capability/${encodeURIComponent(capabilityId)}`,
+        { method: 'PUT', body: JSON.stringify({ value }) }
+      ),
+      `setCapability ${deviceId}/${capabilityId}`
     ),
+  // Alias slik at både setCapability og setCapabilityValue fungerer
+  setCapabilityValue: (deviceId, capabilityId, value) =>
+    homeyClient.setCapability(deviceId, capabilityId, value),
   runFlow: (flowId) =>
-    homeyFetch(`/manager/flow/flow/${encodeURIComponent(flowId)}/trigger`, { method: 'POST' }),
+    enqueueCommand(
+      () => homeyFetch(`/manager/flow/flow/${encodeURIComponent(flowId)}/trigger`, { method: 'POST' }),
+      `runFlow ${flowId}`
+    ),
   getEnergyReport: (scope = 'today') =>
     homeyFetch(`/manager/energy/report/${encodeURIComponent(scope)}`)
 };

@@ -10,6 +10,7 @@ import { configPath } from '../lib/configStore.js';
 import { cfg, isDemoMode } from '../config.js';
 import { compileSuggestionToFlow } from '../lib/autoFlowCompiler.js';
 import { invalidateFlowCache } from '../lib/autoFlowExecutor.js';
+import { queueStatus } from '../lib/commandQueue.js';
 
 export const eventsRoutes = Router();
 
@@ -118,6 +119,7 @@ eventsRoutes.get('/status', async (_req, res, next) => {
       demo:     isDemoMode(),
       // Detaljer
       poller:   pollerStatus(),
+      commandQueue: queueStatus(),
       storage,
       database: dbInfo
     });
