@@ -28,9 +28,7 @@ export function DiscoveryPanel() {
   async function downloadFull() {
     setDownloading(true);
     try {
-      const r = await fetch(`/api/homey/inventory?full=true`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const json = await r.json();
+      const json = await api.inventory(undefined, true);
       const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

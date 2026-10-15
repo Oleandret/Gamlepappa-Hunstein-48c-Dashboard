@@ -2,7 +2,7 @@
 
 Et sci-fi smart-home-dashboard kalt **Gamlepappa Smarthus**, koblet til **Homey Pro** på Hunstein 48c og deployet via **Railway**.
 
-![Gamlepappa Smarthus preview](https://img.shields.io/badge/UI-Gamlepappa Smarthus-22e6ff?style=flat-square) ![Node](https://img.shields.io/badge/Node-20+-3ddc84?style=flat-square) ![Stack](https://img.shields.io/badge/stack-React%20%2B%20Express-7d5cff?style=flat-square)
+![Gamlepappa Smarthus preview](https://img.shields.io/badge/UI-Gamlepappa Smarthus-22e6ff?style=flat-square) ![Node](https://img.shields.io/badge/Node-22+-3ddc84?style=flat-square) ![Stack](https://img.shields.io/badge/stack-React%20%2B%20Express-7d5cff?style=flat-square)
 
 ## Funksjoner
 
@@ -23,7 +23,7 @@ Et sci-fi smart-home-dashboard kalt **Gamlepappa Smarthus**, koblet til **Homey 
 | Frontend | React 18, Vite 5, Tailwind 3, Recharts, framer-motion, lucide-react |
 | Backend  | Node 20, Express 4, node-fetch                      |
 | API      | Homey Web API (cloud relay) + met.no                |
-| Deploy   | Railway / Nixpacks                                  |
+| Deploy   | Railway / Docker (Node 22)                                  |
 
 ## Kjør lokalt
 
@@ -34,7 +34,7 @@ cd nexora-hunstein-dashboard
 
 # 2) Konfigurer
 cp .env.example .env
-# Fyll inn HOMEY_PAT (eller la den stå tom for demo-modus)
+# Sett DEMO_MODE=true for isolert demo, eller HOMEY_PAT og AUTH_TOKENS_JSON for live-modus
 
 # 3) Installer
 npm run install:all
@@ -57,53 +57,23 @@ npm run dev
 
 Du trenger ikke `HOMEY_CLOUD_ID` — backenden slår den opp automatisk via PAT-en. Men hvis du vil låse den fast finner du Homey-ID-en på samme side.
 
-## Deploy til Railway (åpne uten innlogging)
+## Deploy til Railway (innlogging kreves)
 
-Dashbordet har **ingen innlogging** — du åpner bare Railway-URL-en, og er rett inne.
+API-et krever en tilgangsnøkkel i produksjon. Administrator setter `AUTH_TOKENS_JSON` sikkert i Railway Variables som et JSON-objekt med rollene som skal brukes: `viewer`, `operator` og/eller `admin`. Hver nøkkel må være unik og minst 24 tegn. Ikke legg faktiske nøkler i kildekode, GitHub, logger eller chat.
 
-1. Push prosjektet til GitHub (privat eller offentlig — du kan gjøre dette uten secrets i koden):
+- `viewer`: lese avlesninger, historikk og konfigurasjon.
+- `operator`: i tillegg styre enheter, kjøre flows, bruke chat og kjøre/angre lagrede stemninger.
+- `admin`: i tillegg lagre favoritter, pinner, lenker og sceneoppsett, samt administrere automasjoner.
 
-   ```bash
-   git init
-   git add .
-   git commit -m "feat: Gamlepappa Smarthus dashboard"
-   git branch -M main
-   git remote add origin https://github.com/<din-bruker>/nexora-hunstein-dashboard.git
-   git push -u origin main
-   ```
+Åpne Railway-URL-en og logg inn med nøkkelen administrator har gitt deg. Nettleseren beholder den bare i økten; «Logg ut» fjerner den. Andre API-klienter må sende `Authorization: Bearer <tilgangsnøkkel>`. Manglende innlogging gir 401, og utilstrekkelig rolle gir 403. Rollene er delte tilgangsnøkler, ikke personlige brukerkontoer eller SSO.
 
-2. Logg inn på [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo** → velg dette repoet.
+Behold `HOMEY_PAT` og eventuelt `OPENAI_API_KEY` som miljøvariabler. Homey-tokenet er separat fra dashboardets tilgangsnøkkel og skal aldri gis til nettleseren. Hardkodede credentials støttes ikke.
 
-3. Under **Variables** (Railway-fanen for miljøvariabler), lim inn:
+`railway.json` bruker Dockerfile med Node 22, startkommando `node index.js` og readiness `/readyz`. Uten gyldig tilgangsoppsett blir produksjonsdeployen ikke klar. Behold eksisterende configfil på volumet, og kontroller at Docker-brukeren har nødvendige rettigheter før utrulling.
 
-   ```
-   HOMEY_PAT=<din PAT fra my.homey.app/me>
-   NODE_ENV=production
-   ```
+Følg [utrullingsplanen](docs/ROLLOUT.md) og [konfigurasjonslisten](docs/RELEASE-CONFIG-CHECKLIST.md) før merge til Railway-overvåket branch. DB-backup, migrering, TLS og eksisterende klienter må være verifisert. `DEMO_MODE=true` gir bare innloggingsfritak i et isolert miljø som ikke kjører med `NODE_ENV=production`.
 
-   Valgfritt:
-   ```
-   HOME_LAT=60.3913
-   HOME_LON=5.3221
-   HOME_PLACE=Hunstein 48c
-   USER_NAME=Ole
-   DEMO_MODE=false
-   ```
-
-4. Railway plukker automatisk opp `nixpacks.toml` og `railway.json` (build = `npm run build`, start = `npm start`).
-
-5. Under **Settings → Networking → Generate Domain** får du en URL som `https://din-app.up.railway.app`. Bokmerk den — det er bare å åpne, ingen pålogging.
-
-> **Hvorfor Railway Variables og ikke kode?** Tokenet gir full kontroll over Homey-en din. Selv om du har et privat repo kan tokens lekke (forks, screenshots, samarbeidstilganger). Med Variables ligger det kryptert hos Railway og berøres aldri av git.
-
-### Alternativ: hardkode i `server/config.js`
-
-Hvis du *virkelig* vil ha det i koden (push-and-go uten å sette variabler), åpne `server/config.js` og lim inn PAT-en i `HOMEY_PAT`-feltet. Da vil koden bruke den uansett.
-**Husk:** sett repoet til **Private** på GitHub (Settings → Danger Zone → Change visibility) før du committer. Hvis tokenet lekker, gå til my.homey.app/me → API Keys → slett, og lag et nytt.
-
-### Første-deploy uten PAT
-
-Vil du se at alt funker først? Sett `DEMO_MODE=true` i Railway, deploy, åpne URL-en — du får full demo med mock-data. Bytt deretter til `false` og legg inn `HOMEY_PAT` for live-modus.
+Taleassistenten er foreløpig ikke konfigurert. Chat har separat status. Den gamle widgeten lastes ikke inn i dokumentet med øktnøkkelen; se [planen for isolert tale](docs/VOICE-ISOLATION.md).
 
 ## Prosjektstruktur
 

@@ -4,7 +4,7 @@
 
 At original commit d28cb8f63680e92f18d0269de2b327dfd4f0f721, client/index.html loaded the unversioned `https://unpkg.com/@elevenlabs/convai-widget-embed` in the authenticated document. App.jsx:251–274 created an `elevenlabs-convai` custom element: one existing agent on overview, a second on other sections, no widget on avatar/chat. Both used compact/bottom-right presentation and cyan/purple orb colors. Agent identifiers are in that original source; they are identifiers, not dashboard credentials. No signed URL, ElevenLabs API key, dynamic variables, client tools or parent messaging contract was found in this integration.
 
-AIConnection.jsx:15–44 polls for custom-element registration and treats the call event as active for an arbitrary 90 seconds. Registration does not prove connectivity; that timer does not prove a call ended. With the loader removed it indefinitely says “tilkobler”. This indicator must be replaced when wiring restored voice; a separate-origin component will never register its custom element in the parent.
+The original AIConnection.jsx polled for custom-element registration and treated the call event as active for an arbitrary 90 seconds. Registration did not prove connectivity and the timer did not prove a call ended. The follow-up fix replaces this with “Taleassistent ikke konfigurert”, with no polling/listeners or claim about the separate chat connection. A future isolated voice component must show its actual status inside its own origin.
 
 Provider-side agent tools, public/private status and domain allowlists were not inspected. Existing source alone cannot prove they are still public or that voice commands are harmless. No real agent was called.
 
