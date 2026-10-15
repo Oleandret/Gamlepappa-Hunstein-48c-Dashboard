@@ -44,6 +44,8 @@ import { DevicesView } from './components/views/DevicesView.jsx';
 import { FavoritesView } from './components/views/FavoritesView.jsx';
 import { AudioView } from './components/views/AudioView.jsx';
 import { FloorPlanView } from './components/views/FloorPlanView.jsx';
+// 3D-visningen drar inn three.js (~700 kB) — lastes først når fanen åpnes.
+const House3DView = lazy(() => import('./components/views/House3DView.jsx'));
 import { DiscoveryPanel } from './components/DiscoveryPanel.jsx';
 import { TeslaCard } from './components/special/TeslaCard.jsx';
 import { RoborockCard } from './components/special/RoborockCard.jsx';
@@ -327,6 +329,19 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
           onRunFlow={runFlow}
           onSetCapability={setCapability}
         />,
+        false
+      );
+
+    case 'hus-3d':
+      return wrapper(
+        <Suspense fallback={<p className="p-6 font-mono text-xs text-nx-mute">Laster 3D-modell …</p>}>
+          <House3DView
+            devices={data.devices || {}}
+            zones={data.zones || {}}
+            floorPlanPins={floorPlanPins}
+            onSetCapability={setCapability}
+          />
+        </Suspense>,
         false
       );
 
