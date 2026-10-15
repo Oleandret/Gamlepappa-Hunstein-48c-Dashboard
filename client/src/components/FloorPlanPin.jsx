@@ -187,7 +187,7 @@ function PinPopover({ pin, device, onSet, onClose }) {
   );
 }
 
-function DeviceControls({ device, onSet }) {
+export function DeviceControls({ device, onSet }) {
   const onoff = capValue(device, 'onoff');
   const dim = capValue(device, 'dim');
   const locked = capValue(device, 'locked');

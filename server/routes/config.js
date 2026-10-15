@@ -13,6 +13,7 @@ const ALLOWED_NS = new Set([
   'links',              // lenker-fanen
   'floorPlanPins',      // pins på plantegninger
   'floorPlanFlows',     // favoritt-flows per plantegning
+  'house3dRooms',       // kobling rom i 3D-modellen ↔ Homey-soner
   'flowsSidebarFlows',  // brukervalgte flows i høyre-sidebar (kommer senere)
   'frontSpecials',      // hvilke spesial-kort (Tesla/Tibber/Støvsuger) som vises på Oversikt
   'aiModels'            // hvilken OpenAI-modell som brukes for chat og suggestion-engine
