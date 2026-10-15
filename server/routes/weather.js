@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import fetch from 'node-fetch';
+import { fetchJson } from '../lib/http.js';
 import { cfg } from '../config.js';
 
 export const weatherRoutes = Router();
@@ -9,6 +9,7 @@ const MET_API = 'https://api.met.no/weatherapi/locationforecast/2.0/compact';
 let cache = { ts: 0, data: null };
 
 weatherRoutes.get('/', async (_req, res) => {
+  if (process.env.DEMO_MODE === 'true') return res.status(503).json({_quality:'unavailable',error:'Ingen eksterne værkall i demo'});
   const HOME_LAT = cfg('HOME_LAT') || '60.3913';
   const HOME_LON = cfg('HOME_LON') || '5.3221';
   const PLACE = cfg('HOME_PLACE') || 'Hunstein 48c';
@@ -18,11 +19,9 @@ weatherRoutes.get('/', async (_req, res) => {
       return res.json({ ...cache.data, cached: true });
     }
     const url = `${MET_API}?lat=${HOME_LAT}&lon=${HOME_LON}`;
-    const r = await fetch(url, {
+    const json = await fetchJson(url, {
       headers: { 'User-Agent': 'Gamlepappa-Smarthus-Hunstein-Dashboard/1.0 (oleandretorjussen@gmail.com)' }
     });
-    if (!r.ok) throw new Error(`met.no ${r.status}`);
-    const json = await r.json();
     const series = json.properties?.timeseries || [];
     const now0 = series[0];
     const days = pickNextDays(series, 5);
@@ -38,21 +37,10 @@ weatherRoutes.get('/', async (_req, res) => {
       forecast: days
     };
     cache = { ts: now, data };
-    res.json(data);
+    res.json({...data,_quality:'live',_updatedAt:new Date(now).toISOString()});
   } catch (err) {
-    res.json({
-      place: PLACE,
-      now: { temp: 12, humidity: 67, wind: 3.4, symbol: 'partlycloudy_day' },
-      forecast: [
-        { day: 'Man', tempMax: 13, tempMin: 7, symbol: 'partlycloudy_day' },
-        { day: 'Tir', tempMax: 14, tempMin: 8, symbol: 'cloudy' },
-        { day: 'Ons', tempMax: 12, tempMin: 8, symbol: 'rain' },
-        { day: 'Tor', tempMax: 11, tempMin: 6, symbol: 'rain' },
-        { day: 'Fre', tempMax: 13, tempMin: 7, symbol: 'partlycloudy_day' }
-      ],
-      _fallback: true,
-      _error: err.message
-    });
+    if (cache.data) return res.json({...cache.data, _quality:'stale', _updatedAt:new Date(cache.ts).toISOString()});
+    res.status(503).json({_quality:'unavailable',error:'Værdata er utilgjengelige'});
   }
 });
 

@@ -33,6 +33,7 @@ export function AutoFlowsView() {
   }, [reload]);
 
   const toggleEnabled = async (flow) => {
+    if (!flow.enabled && !confirm(`Aktivere ${flow.title}? Se trigger og handlinger først; kjør gjerne en tørrkjøring i Huspuls.`)) return;
     try {
       await api.events.updateAutoFlow(flow.id, { enabled: !flow.enabled });
       setFlows(prev => prev.map(f => f.id === flow.id ? { ...f, enabled: !flow.enabled } : f));
@@ -104,7 +105,7 @@ export function AutoFlowsView() {
             <Sparkles size={28} className="mx-auto text-nx-cyan mb-2" />
             <p className="text-sm">Ingen AI-flows ennå.</p>
             <p className="text-xs text-nx-mute mt-2 max-w-md mx-auto leading-relaxed">
-              Gå til <strong>Innsikt</strong>-fanen, generer AI-forslag, og klikk <strong>Lag og aktiver</strong> på de du vil at serveren skal kjøre.
+              Gå til <strong>Innsikt</strong>-fanen, generer AI-forslag, og klikk <strong>Lag deaktivert forslag</strong> på de du vil at serveren skal kjøre.
             </p>
           </div>
         )}

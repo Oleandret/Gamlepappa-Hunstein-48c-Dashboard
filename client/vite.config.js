@@ -14,13 +14,12 @@ export default defineConfig({
     chunkSizeWarningLimit: 800,
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Split heavy vendors so the initial bundle stays small.
-          // Recharts is loaded only when the energy chart actually mounts.
-          'recharts':       ['recharts'],
-          'framer-motion':  ['framer-motion'],
-          'react-vendor':   ['react', 'react-dom'],
-          'icons':          ['lucide-react']
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          if (id.includes('/recharts/') || id.includes('/d3-')) return 'recharts';
+          if (id.includes('/framer-motion/')) return 'framer-motion';
+          if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/')) return 'react-vendor';
+          if (id.includes('/lucide-react/')) return 'icons';
         }
       }
     }

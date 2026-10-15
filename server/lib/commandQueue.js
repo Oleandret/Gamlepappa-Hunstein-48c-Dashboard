@@ -11,7 +11,7 @@
  * COMMAND_MIN_GAP_MS env-variabel.
  */
 
-const MIN_GAP_MS = Number(process.env.COMMAND_MIN_GAP_MS) || 250;
+const MIN_GAP_MS = Math.max(100, Math.min(10000, Number(process.env.COMMAND_MIN_GAP_MS) || 250));
 
 const queue = [];
 let processing = false;
@@ -28,6 +28,7 @@ async function processQueue() {
     if (gap < MIN_GAP_MS) await delay(MIN_GAP_MS - gap);
 
     const job = queue.shift();
+    if (Date.now() - job.enqueuedAt > 30000) { job.reject(new Error('Kommando utløpt i kø')); continue; }
     lastRunAt = Date.now();
     try {
       const result = await job.fn();
@@ -46,9 +47,10 @@ async function processQueue() {
  * faktisk er utført (etter rate-limit-ventetid).
  */
 export function enqueueCommand(fn, label = 'cmd') {
+  if (queue.length >= 50) return Promise.reject(Object.assign(new Error('Kommandokøen er full'), {status:429}));
   stats.queued++;
   return new Promise((resolve, reject) => {
-    queue.push({ fn, label, resolve, reject });
+    queue.push({ fn, label, resolve, reject, enqueuedAt:Date.now() });
     stats.maxQueueLen = Math.max(stats.maxQueueLen, queue.length);
     processQueue();
   });

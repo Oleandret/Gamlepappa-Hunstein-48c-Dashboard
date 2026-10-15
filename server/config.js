@@ -1,16 +1,5 @@
-/**
- * ────────────────────────────────────────────────────────────────────────────
- * Gamlepappa Smarthus — hardkodet konfig (fallback)
- * ────────────────────────────────────────────────────────────────────────────
- *  Verdiene under brukes hvis env-variabler IKKE er satt på Railway.
- *  Anbefalt: la dette stå og sett HOMEY_PAT i Railway → Variables.
- *
- *  ⚠️  SIKKERHET ⚠️  — Hardkodet PAT gir full kontroll over Homey.
- *     Sett repoet til Private på GitHub før du committer en ekte verdi.
- * ────────────────────────────────────────────────────────────────────────────
- */
+// Secrets are environment-only. Never place credentials in source control.
 export const config = {
-  HOMEY_PAT: '<<LIM_INN_PAT_HER>>',
   HOMEY_CLOUD_ID: '',
   HOME_LAT: '60.3913',
   HOME_LON: '5.3221',
@@ -44,6 +33,6 @@ export function cfg(key) {
 /** Single source of truth for "should we serve mock data?" */
 export function isDemoMode() {
   if (cfg('DEMO_MODE') === true) return true;
-  if (!cfg('HOMEY_PAT')) return true;
+
   return false;
 }

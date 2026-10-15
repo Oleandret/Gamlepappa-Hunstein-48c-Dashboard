@@ -2,6 +2,7 @@ import { Home, LayoutGrid, Boxes, Workflow, Zap, ShieldCheck, Star, Settings, Mu
 
 /** Single source of truth for top-level navigation. */
 export const SECTIONS = [
+  {id:'huspuls',label:'Huspuls',Icon:Activity},
   { id: 'oversikt',          label: 'Oversikt',        Icon: Home },
   { id: 'rom',               label: 'Rom',             Icon: LayoutGrid },
   { id: 'plantegning-hus',   label: 'Plan hus',        Icon: Map },

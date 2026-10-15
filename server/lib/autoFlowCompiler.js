@@ -1,3 +1,4 @@
+import { validateFlow } from './validation.js';
 import { chat, openaiEnabled } from './openaiClient.js';
 import { homeyClient } from './homeyClient.js';
 import { isDemoMode } from '../config.js';
@@ -107,6 +108,7 @@ Konverter dette til en strukturert flow-JSON.`;
     if (!parsed?.trigger?.type || !Array.isArray(parsed?.actions) || parsed.actions.length === 0) {
       return { ok: false, error: 'LLM returnerte ugyldig flow-struktur', raw: response.raw };
     }
+    validateFlow(parsed, devices, isDemoMode() ? {} : await homeyClient.listFlows());
     return { ok: true, flow: parsed, raw: response.raw, model: response.model };
   } catch (err) {
     return { ok: false, error: err.message };

@@ -19,6 +19,8 @@ const SNAPSHOT_EVERY_MS = 60 * 60 * 1000;
 // Backoff: hvis polls feiler gjentatte ganger, doble intervallet opp til denne maks
 const MAX_BACKOFF_MS = 60 * 60 * 1000; // 1 time
 
+let inFlight = null;
+let startupTimer = null;
 let lastState = new Map();       // device_id → { capability → value }
 let lastSnapshotTs = 0;
 let pollTimer = null;
@@ -95,7 +97,8 @@ function valuesEqual(a, b) {
 }
 
 function nowContext() {
-  const d = new Date();
+  const local = new Date().toLocaleString('en-US', { timeZone: 'Europe/Oslo' });
+  const d = new Date(local);
   return {
     hour_of_day: d.getHours(),
     day_of_week: d.getDay(),
@@ -115,11 +118,11 @@ async function insertEvents(rows) {
   const values = [];
   const placeholders = [];
   rows.forEach((r, i) => {
-    const base = i * 11;
+    const base = i * 14;
     // Kolonnerekkefølge: device_id, device_name, zone, class, capability,
     // value (jsonb), prev_value (jsonb), kind, hour_of_day, day_of_week, is_weekend
     placeholders.push(
-      `($${base+1}, $${base+2}, $${base+3}, $${base+4}, $${base+5}, $${base+6}::jsonb, $${base+7}::jsonb, $${base+8}, $${base+9}, $${base+10}, $${base+11})`
+      `($${base+1}, $${base+2}, $${base+3}, $${base+4}, $${base+5}, $${base+6}::jsonb, $${base+7}::jsonb, $${base+8}, $${base+9}, $${base+10}, $${base+11}, $${base+12}, $${base+13}, $${base+14})`
     );
     values.push(
       r.device_id,
@@ -132,12 +135,13 @@ async function insertEvents(rows) {
       r.kind || 'transition',
       r.hour_of_day,
       r.day_of_week,
-      r.is_weekend
+      r.is_weekend,
+      r.sourceTs || new Date().toISOString(), new Date().toISOString(), r.sourceTs ? 'device' : 'poll'
     );
   });
   const sql = `
     INSERT INTO device_events
-      (device_id, device_name, zone, class, capability, value, prev_value, kind, hour_of_day, day_of_week, is_weekend)
+      (device_id, device_name, zone, class, capability, value, prev_value, kind, hour_of_day, day_of_week, is_weekend, ts, observed_at, time_source)
     VALUES ${placeholders.join(', ')}
   `;
   await query(sql, values);
@@ -147,7 +151,12 @@ async function insertEvents(rows) {
 /**
  * Én poll-syklus.
  */
-async function pollOnce({ manual = false } = {}) {
+function pollOnce(options = {}) {
+  if (!inFlight) inFlight = performPoll(options).finally(() => { inFlight = null; });
+  return inFlight;
+}
+
+async function performPoll({ manual = false } = {}) {
   if (!isEnabled()) return null;
   // Hopp over auto-polls hvis poller er pauset (men tillat manuelle 'Poll nå')
   if (!pollerEnabled && !manual) return lastPollResult;
@@ -163,6 +172,7 @@ async function pollOnce({ manual = false } = {}) {
     polledDevices = devArr.length;
 
     const ctx = nowContext();
+    const nextState = new Map();
     const transitionRows = [];
     const snapshotRows = [];
     const shouldSnapshot = (Date.now() - lastSnapshotTs) >= SNAPSHOT_EVERY_MS;
@@ -172,7 +182,7 @@ async function pollOnce({ manual = false } = {}) {
     for (const d of devArr) {
       const caps = capObj(d);
       const prev = lastState.get(d.id) || {};
-      const changes = diffCaps(prev, caps);
+      const changes = lastState.has(d.id) ? diffCaps(prev, caps) : [];
 
       const zoneName = zoneById.get(d.zone)?.name || null;
 
@@ -211,17 +221,19 @@ async function pollOnce({ manual = false } = {}) {
               value: caps[cap],
               prev_value: null,
               kind: 'snapshot',
-              ...ctx
+              sourceTs: sourceTimestamp(d.capabilitiesObj?.[c.capability]?.lastUpdated),
+            ...ctx
             });
           }
         }
       }
 
-      lastState.set(d.id, caps);
+      nextState.set(d.id, structuredClone(caps));
     }
 
     transitions = await insertEvents(transitionRows);
     snapshots = await insertEvents(snapshotRows);
+    lastState = nextState;
     if (shouldSnapshot && snapshotRows.length > 0) lastSnapshotTs = Date.now();
 
     // Trigger eventuelle auto-flows som matcher disse endringene
@@ -285,11 +297,12 @@ export function startDevicePoller() {
   }
   if (pollTimer) return;
   console.log(`[poller] starting — every ${pollIntervalMs / 1000}s (enabled=${pollerEnabled})`);
-  setTimeout(() => pollOnce(), 15_000);
+  startupTimer = setTimeout(() => pollOnce(), 15_000);
   pollTimer = setInterval(() => pollOnce(), effectiveInterval());
 }
 
 export function stopDevicePoller() {
+  clearTimeout(startupTimer);
   if (pollTimer) {
     clearInterval(pollTimer);
     pollTimer = null;
@@ -332,4 +345,10 @@ export function pollerStatus() {
 // Trigger en poll umiddelbart (brukes av /api/events/poll-now-endepunkt)
 export async function triggerPollNow() {
   return pollOnce({ manual: true });
+}
+
+function sourceTimestamp(value) {
+  if (typeof value !== 'string') return null;
+  const ts = Date.parse(value);
+  return Number.isFinite(ts) && ts <= Date.now() && ts >= Date.now() - effectiveInterval() * 2 ? new Date(ts).toISOString() : null;
 }

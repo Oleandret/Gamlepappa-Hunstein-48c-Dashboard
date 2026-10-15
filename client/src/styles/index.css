@@ -1,6 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../../tailwind.config.js";
 
 :root {
   color-scheme: dark;
@@ -58,7 +57,7 @@ body {
     @apply inline-flex items-center justify-center gap-2 rounded-xl border border-nx-line/80 bg-nx-panel/60 px-3 py-2 text-sm hover:border-nx-cyan/60 hover:text-nx-cyan transition-colors;
   }
   .btn-primary {
-    @apply btn border-nx-cyan/50 bg-nx-cyan/10 text-nx-cyan hover:bg-nx-cyan/20;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors border-nx-cyan/50 bg-nx-cyan/10 text-nx-cyan hover:bg-nx-cyan/20;
   }
   .stat {
     @apply flex items-baseline gap-1 font-mono;

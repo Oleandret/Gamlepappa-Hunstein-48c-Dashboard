@@ -1,3 +1,7 @@
+import { accessControl, authConfigured } from './lib/auth.js';
+import { experienceRoutes } from './routes/experience.js';
+import { stopDevicePoller } from './workers/devicePoller.js';
+import { shutdown } from './lib/db.js';
 import 'dotenv/config';
 import express from 'express';
 import compression from 'compression';
@@ -18,6 +22,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+let ready = false;
 const PORT = process.env.PORT || 8080;
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -26,6 +31,7 @@ app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
 app.use(compression());
+app.use((_req,res,next) => { res.set({'X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin','X-Frame-Options':'DENY', 'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; frame-src https://artimis-ai-production.up.railway.app; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"}); next(); });
 
 // CORS — same-origin in prod (frontend served by this server), permissive in dev
 const allowedOrigin = process.env.CORS_ORIGIN
@@ -42,6 +48,9 @@ app.use((req, _res, next) => {
   next();
 });
 
+app.use('/api', accessControl);
+app.use('/api/experience', experienceRoutes);
+app.get('/api/session', (req,res) => res.json({role:req.user.role}));
 // API routes
 app.use('/api/system', systemRoutes);
 app.use('/api/homey', homeyRoutes);
@@ -54,6 +63,8 @@ app.use('/api/chat', chatRoutes);
 app.get('/healthz', (_req, res) =>
   res.json({ ok: true, demo: isDemoMode(), ts: Date.now() })
 );
+
+app.get('/readyz', (_req,res) => res.status(ready ? 200 : 503).json({ready}));
 
 // JSON 404 for unknown API paths (instead of Express's default HTML)
 app.use('/api', (_req, res) => {
@@ -89,7 +100,7 @@ app.get('*', (req, res, next) => {
 app.use((err, _req, res, _next) => {
   const safeMessage = sanitizeError(err.message || 'Internal server error');
   console.error('[server] error:', safeMessage);
-  res.status(err.status || 500).json({ error: safeMessage });
+  res.status(err.status || 500).json({ error: err.status && err.status < 500 ? safeMessage : 'Tjenesten kunne ikke fullføre forespørselen' });
 });
 
 function sanitizeError(s) {
@@ -102,7 +113,7 @@ function sanitizeError(s) {
 }
 
 const patSet = Boolean(cfg('HOMEY_PAT'));
-app.listen(PORT, async () => {
+const server = app.listen(PORT, async () => {
   const banner = [
     '',
     '  ⚡  Gamlepappa Smarthus backend ready on port ' + PORT,
@@ -117,6 +128,13 @@ app.listen(PORT, async () => {
   // Initialiser databasen + start device-poller hvis konfigurert
   if (dbEnabled()) {
     const ok = await runMigrations();
-    if (ok) startDevicePoller();
+    if (ok && !isDemoMode() && authConfigured()) startDevicePoller();
+    if (!ok) return;
   }
+  ready = authConfigured() || (!isProd && process.env.DEMO_MODE === 'true');
+});
+for (const signal of ['SIGTERM','SIGINT']) process.on(signal, () => {
+  ready = false; stopDevicePoller();
+  server.close(async () => { await shutdown(); process.exit(0); });
+  setTimeout(() => process.exit(1), 15000).unref();
 });

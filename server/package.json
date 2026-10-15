@@ -16,5 +16,11 @@
     "express": "^4.21.2",
     "node-fetch": "^3.3.2",
     "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10"
+  },
+  "overrides": {
+    "qs": "^6.16.1"
   }
 }

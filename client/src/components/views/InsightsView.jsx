@@ -722,7 +722,7 @@ function SuggestionCard({ s, onStatus, onCompile, compiling }) {
           title="Kompiler til auto-flow som serveren kjører"
         >
           {compiling ? <Loader size={11} className="animate-spin" /> : <Sparkles size={11} />}
-          Lag og aktiver
+          Lag deaktivert forslag
         </button>
         <button
           onClick={() => onStatus(s.id, 'accepted')}

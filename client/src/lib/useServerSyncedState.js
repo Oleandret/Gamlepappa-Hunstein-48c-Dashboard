@@ -36,7 +36,8 @@ export function useServerSyncedState(namespace, defaultValue, { storageKey = nul
   const [saving, setSaving] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const debounceRef = useRef(null);
-  const skipNextWriteRef = useRef(false);
+  const editedRef = useRef(false);
+  const saveQueueRef = useRef(Promise.resolve());
   const mountedRef = useRef(true);
   const valueRef = useRef(value);
   valueRef.current = value;
@@ -49,9 +50,9 @@ export function useServerSyncedState(namespace, defaultValue, { storageKey = nul
     api.config.get(namespace, ctrl.signal)
       .then(({ value: serverValue }) => {
         if (cancelled) return;
+        if (editedRef.current) { setSynced(true); return; }
         if (serverValue !== null && serverValue !== undefined) {
           // Server har en verdi — den vinner
-          skipNextWriteRef.current = true; // ikke push tilbake umiddelbart
           setValue(serverValue);
           try { localStorage.setItem(lsKey, JSON.stringify(serverValue)); } catch {}
         }
@@ -67,7 +68,10 @@ export function useServerSyncedState(namespace, defaultValue, { storageKey = nul
       cancelled = true;
       mountedRef.current = false;
       ctrl.abort();
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        saveQueueRef.current = saveQueueRef.current.catch(() => {}).then(() => api.config.put(namespace, valueRef.current)).catch(() => {});
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [namespace]);
@@ -78,7 +82,6 @@ export function useServerSyncedState(namespace, defaultValue, { storageKey = nul
       if (e.key !== lsKey || e.newValue == null) return;
       try {
         const parsed = JSON.parse(e.newValue);
-        skipNextWriteRef.current = true;
         setValue(parsed);
       } catch {}
     };
@@ -92,7 +95,9 @@ export function useServerSyncedState(namespace, defaultValue, { storageKey = nul
     if (mountedRef.current) setSaving(true);
     setError(null);
     try {
-      await api.config.put(namespace, next);
+      const task = saveQueueRef.current.catch(() => {}).then(() => api.config.put(namespace, next));
+      saveQueueRef.current = task;
+      await task;
       if (mountedRef.current) {
         setLastSavedAt(Date.now());
         setSaving(false);
@@ -109,15 +114,13 @@ export function useServerSyncedState(namespace, defaultValue, { storageKey = nul
 
   // Sync ved hver setState
   const setSyncedValue = useCallback((updater) => {
+    editedRef.current = true;
     setValue(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
+      valueRef.current = next;
       // Skriv localStorage umiddelbart (rask, synkron)
       try { localStorage.setItem(lsKey, JSON.stringify(next)); } catch {}
       // Debounced PUT til server
-      if (skipNextWriteRef.current) {
-        skipNextWriteRef.current = false;
-        return next;
-      }
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => { doSave(next).catch(() => {}); }, DEBOUNCE_MS);
       return next;

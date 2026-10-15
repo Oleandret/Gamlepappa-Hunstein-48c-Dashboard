@@ -1,3 +1,4 @@
+import { ExperienceView } from './components/views/ExperienceView.jsx';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { api } from './lib/api.js';
@@ -85,15 +86,18 @@ export default function App() {
     let cancelled = false;
     const controller = new AbortController();
 
+    let inFlight = false;
     async function load(initial = false) {
+      if (inFlight) return;
+      inFlight = true;
       try {
         const sig = controller.signal;
         const [system, zones, devices, flows, energy, activity, security, weather] = await Promise.all([
           api.systemInfo(sig).catch(() => null),
           api.zones(sig).catch(() => ({ zones: {} })),
-          api.devices(sig).catch(() => ({ devices: {} })),
+          api.devices(sig).catch(() => ({ _quality:'unavailable' })),
           api.flows(sig).catch(() => ({ flows: {} })),
-          api.energy(sig).catch(() => ({ report: null })),
+          api.energy(sig).catch(() => ({ report: null, _quality:'unavailable' })),
           api.activity(sig).catch(() => ({ activity: [] })),
           api.security(sig).catch(() => ({ devices: [], armed: false })),
           api.weather(sig).catch(() => null)
@@ -106,20 +110,21 @@ export default function App() {
           diffDevicesAndLog(prevDevicesRef.current, devices.devices, zones?.zones || {});
         }
         if (devices?.devices) prevDevicesRef.current = devices.devices;
-        setData({
+        setData(previous => ({
           zones: zones?.zones,
-          devices: devices?.devices,
+          devices: devices?.devices || previous.devices,
+          quality: {devices:devices?._quality,energy:energy?._quality},
           flows: flows?.flows,
           energy: energy?.report,
           activity: activity?.activity,
           security,
           weather
-        });
+        }));
         if (initial) setLoaded(true);
       } catch (err) {
         if (err.name !== 'AbortError') console.error('load error', err);
         if (initial && !cancelled) setLoaded(true);
-      }
+      } finally { inFlight = false; }
     }
 
     load(true);
@@ -134,39 +139,21 @@ export default function App() {
   }, [visible]);
 
   const setCapability = useCallback(async (deviceId, capability, value) => {
-    let deviceName = deviceId;
-    setData(d => {
-      if (!d.devices?.[deviceId]) return d;
-      deviceName = d.devices[deviceId].name || deviceId;
-      const next = { ...d, devices: { ...d.devices } };
-      const dv = { ...d.devices[deviceId] };
-      dv.capabilities = { ...dv.capabilities, [capability]: value };
-      if (dv.capabilitiesObj?.[capability]) {
-        dv.capabilitiesObj = {
-          ...dv.capabilitiesObj,
-          [capability]: { ...dv.capabilitiesObj[capability], value }
-        };
-      }
-      next.devices[deviceId] = dv;
-      return next;
-    });
-    pushEvent({
-      type: capability === 'onoff' ? (value ? 'on' : 'off') : capability === 'locked' ? 'security' : 'info',
-      text: `${deviceName} → ${capability}=${formatValue(value)}`,
-      source: 'manuell'
-    });
-    try { await api.setCapability(deviceId, capability, value); }
-    catch (e) {
-      console.error('setCapability failed:', e.message);
-      pushEvent({ type: 'alarm', text: `Klarte ikke styre ${deviceName}: ${e.message}`, source: 'feil' });
-    }
-  }, []);
+    if (data.quality?.devices !== 'live' && data.quality?.devices !== 'demo') { pushEvent({type:'alarm',text:'Styring krever ferske enhetsdata',source:'feil'}); return; }
+    pushEvent({type:'info',text:`Sender ${capability} til enhet`,source:'venter'});
+    try {
+      const result = await api.setCapability(deviceId, capability, value);
+      const fresh = await api.devices();
+      setData(d=>({...d,devices:fresh.devices || d.devices}));
+      pushEvent({type:'info',text: result.confirmed ? 'Enhetstilstand bekreftet' : 'Kommando mottatt; tilstanden er ikke bekreftet ennå',source:result.confirmed?'bekreftet':'venter'});
+    } catch(e) { pushEvent({type:'alarm',text:`Styring feilet: ${e.message}`,source:'feil'}); }
+
+  }, [data.quality?.devices]);
 
   const runFlow = useCallback(async (flowId) => {
     let flowName = flowId;
     setData(d => { flowName = d.flows?.[flowId]?.name || flowId; return d; });
-    pushEvent({ type: 'flow', text: `Kjørte flow: ${flowName}`, source: 'manuell' });
-    try { await api.runFlow(flowId); }
+    try { await api.runFlow(flowId); pushEvent({type:'flow',text:`Homey mottok flow: ${flowName}. Sluttresultat er ikke bekreftet.`,source:'manuell'}); }
     catch (e) {
       console.error('runFlow failed:', e.message);
       pushEvent({ type: 'alarm', text: `Flow feilet: ${flowName} (${e.message})`, source: 'feil' });
@@ -215,6 +202,7 @@ export default function App() {
             </div>
           )}
 
+          {loaded && (data.quality?.devices !== 'live' || data.quality?.energy !== 'live') && <p role="status" className="panel p-3 my-3 text-nx-amber">Datakvalitet: enheter {data.quality?.devices || 'ukjent'} · energi {data.quality?.energy || 'ukjent'}. Utdaterte data må ikke brukes som bekreftet status.</p>}
           {loaded && (
             <SectionView
               section={section}
@@ -248,35 +236,13 @@ export default function App() {
         />
       </div>
 
-      {/* ElevenLabs ConvAI — to ulike agenter avhengig av side.
-          `key` tvinger remount når man bytter mellom oversikt og andre seksjoner,
-          slik at widgeten plukker opp den nye agent-id-en.
-          Skrudd av på 'avatar' siden den siden allerede er en pratebar avatar.
-          Orb-fargene matcher dashboardets nx-cyan / nx-purple. */}
-      {section === 'oversikt' ? (
-        <elevenlabs-convai
-          key="agent-oversikt"
-          agent-id="SCOI5nAeUm2P90tPlhxJ"
-          avatar-orb-color-1="#22e6ff"
-          avatar-orb-color-2="#7d5cff"
-          variant="compact"
-          placement="bottom-right"
-        ></elevenlabs-convai>
-      ) : (section === 'avatar' || section === 'chat') ? null : (
-        <elevenlabs-convai
-          key="agent-andre"
-          agent-id="agent_4501kc02r47xec2s0r87f0awxdj6"
-          avatar-orb-color-1="#22e6ff"
-          avatar-orb-color-2="#7d5cff"
-          variant="compact"
-          placement="bottom-right"
-        ></elevenlabs-convai>
-      )}
+
     </div>
   );
 }
 
 function SectionView({ section, system, data, counts, setCapability, runFlow, favorites, pinConfig, imageConfig, frontSensors, flowFavorites, links, floorPlanPins, planFlows, frontSpecials }) {
+  if (section === 'huspuls') return <ExperienceView devices={data.devices || {}} />;
   const userName = system?.user || 'Ole';
   const greetingPanel = (
     <div className="col-span-12 lg:col-span-3 panel p-5">
@@ -285,7 +251,7 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
         God kveld, <span className="neon-text">{userName}</span>!
       </h1>
       <p className="mt-1 text-sm text-nx-mute">
-        Alt er bra ut, hjemmet ditt er trygt og alle systemer fungerer.
+        Se Huspuls for avvik og datakvalitet basert på siste avlesning.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <span className="chip">

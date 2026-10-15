@@ -1,3 +1,4 @@
+import { fetchJson } from './http.js';
 /**
  * Minimal OpenAI Chat Completions-klient. Bruker fetch direkte for å unngå
  * å dra inn en SDK med tunge avhengigheter.
@@ -28,7 +29,7 @@ export async function chat({ system, user, model = DEFAULT_MODEL, json = true, t
   };
   if (json) body.response_format = { type: 'json_object' };
 
-  const res = await fetch(API_URL, {
+  const data = await fetchJson(API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -37,12 +38,6 @@ export async function chat({ system, user, model = DEFAULT_MODEL, json = true, t
     body: JSON.stringify(body)
   });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`OpenAI ${res.status}: ${text.slice(0, 300)}`);
-  }
-
-  const data = await res.json();
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error('OpenAI response had no content');
 

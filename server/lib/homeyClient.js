@@ -2,42 +2,30 @@
  * Lightweight client for the Homey Web API.
  * Authenticates with a Personal Access Token from
  *   1. process.env.HOMEY_PAT   (Railway Variables — preferred)
- *   2. config.HOMEY_PAT        (server/config.js — hardcoded fallback)
  *
  * The Auth header is never logged. Errors are sanitised in routes/homey.js.
  */
-import fetch from 'node-fetch';
+import { fetchJson } from './http.js';
+import { cachedReader } from './readCache.js';
+import { validateCapability } from './validation.js';
 import { cfg } from '../config.js';
 import { enqueueCommand } from './commandQueue.js';
 
 const ATHOM_API = 'https://api.athom.com';
-const REQUEST_TIMEOUT_MS = 12000;
 
 let cachedCloudId = cfg('HOMEY_CLOUD_ID') || null;
 let cachedBase = null;
 
 const getPat = () => cfg('HOMEY_PAT');
 
-async function fetchWithTimeout(url, opts = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...opts, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 async function resolveCloudId() {
   if (cachedCloudId) return cachedCloudId;
   const pat = getPat();
   if (!pat) throw new Error('HOMEY_PAT mangler');
 
-  const res = await fetchWithTimeout(`${ATHOM_API}/user/me`, {
+  const data = await fetchJson(`${ATHOM_API}/user/me`, {
     headers: { Authorization: `Bearer ${pat}` }
   });
-  if (!res.ok) throw new Error(`Athom user lookup failed (${res.status})`);
-  const data = await res.json();
   const homeys = data?.homeys || data?._homeys || [];
   const first = Array.isArray(homeys) ? homeys[0] : null;
   const id = first?.id || data?.homeyId || data?.activeHomey;
@@ -57,7 +45,7 @@ async function homeyFetch(pathPart, opts = {}) {
   const pat = getPat();
   if (!pat) throw new Error('HOMEY_PAT mangler');
   const base = await getBaseUrl();
-  const res = await fetchWithTimeout(`${base}${pathPart}`, {
+  return fetchJson(`${base}${pathPart}`, {
     ...opts,
     headers: {
       'Content-Type': 'application/json',
@@ -65,27 +53,31 @@ async function homeyFetch(pathPart, opts = {}) {
       ...(opts.headers || {})
     }
   });
-  if (!res.ok) {
-    // Avoid echoing raw response body — it may contain reflected auth tokens
-    throw new Error(`Homey API ${res.status} ${pathPart}`);
-  }
-  if (res.status === 204) return null;
-  return res.json();
 }
 
+const devicesReader = cachedReader(() => homeyFetch('/manager/devices/device'));
+const zonesReader = cachedReader(() => homeyFetch('/manager/zones/zone'), 60000);
+const flowsReader = cachedReader(() => homeyFetch('/manager/flow/flow'), 60000);
+
 export const homeyClient = {
-  listDevices: () => homeyFetch('/manager/devices/device'),
-  listZones:   () => homeyFetch('/manager/zones/zone'),
-  listFlows:   () => homeyFetch('/manager/flow/flow'),
+  listDevices: devicesReader,
+  refreshDevices: () => { devicesReader.invalidate(); return devicesReader(); },
+  listZones: zonesReader,
+  listFlows: flowsReader,
   listAlarms:  () => homeyFetch('/manager/alarms/alarm'),
   // Skriving går gjennom kommando-køen (rate-limit) for å skåne BLE-mesh
   // som Plejd. Lesing (listDevices osv.) går direkte.
   setCapability: (deviceId, capabilityId, value) =>
     enqueueCommand(
-      () => homeyFetch(
+      async () => {
+        validateCapability(await devicesReader(), deviceId, capabilityId, value);
+        const result = await homeyFetch(
         `/manager/devices/device/${encodeURIComponent(deviceId)}/capability/${encodeURIComponent(capabilityId)}`,
         { method: 'PUT', body: JSON.stringify({ value }) }
-      ),
+        );
+        devicesReader.invalidate();
+        return result;
+      },
       `setCapability ${deviceId}/${capabilityId}`
     ),
   // Alias slik at både setCapability og setCapabilityValue fungerer
