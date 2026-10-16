@@ -10,6 +10,8 @@ import { FLOORS, ALL_ROOMS, roomPoly, roomCenter, roomArea, planPctToWorld, BIM_
 import { capValue, hasCap } from '../../lib/deviceUtils.js';
 import { useHouse3dRooms } from '../../lib/useHouse3dRooms.js';
 import { DeviceControls } from '../FloorPlanPin.jsx';
+import { canWrite } from '../../lib/deviceCommands.js';
+import { DeviceCommandStatus, useDeviceCommand } from '../DeviceCommandStatus.jsx';
 import { SaveButton } from '../SaveButton.jsx';
 
 /**
@@ -710,6 +712,7 @@ function Ground({ mode }) {
 
 export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) {
   const roomsCfg = useHouse3dRooms();
+  const groupCommand = useDeviceCommand();
   const [mode, setMode] = useState('interior');
   const [floorFilter, setFloorFilter] = useState('all');
   const [overlay, setOverlay] = useState('all');
@@ -767,11 +770,17 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
     }
   };
 
-  const setAllLights = (devs, on) => {
+  const setAllLights = (devs, on) => groupCommand.run(async () => {
+    let confirmed = true;
     for (const d of devs) {
-      if (isLight(d) && hasCap(d, 'onoff') && capValue(d, 'onoff') !== on) onSetCapability?.(d.id, 'onoff', on);
+      if (!isLight(d) || !hasCap(d, 'onoff') || capValue(d, 'onoff') === on) continue;
+      if (!canWrite(d, 'onoff')) throw new Error(`${d.name} er utilgjengelig eller skrivebeskyttet`);
+      const result = await onSetCapability(d.id, 'onoff', on);
+      if (result?.ok === false) throw new Error(`${d.name}: ${result.error}. Resterende lys ble ikke styrt.`);
+      confirmed = confirmed && result?.confirmed === true;
     }
-  };
+    return { ok: true, confirmed };
+  });
 
   // Totalstatus for topplinja
   const totals = useMemo(() => {
@@ -784,6 +793,7 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
 
   return (
     <div>
+      <DeviceCommandStatus command={groupCommand} />
       <header className="flex items-center justify-between flex-wrap gap-3 mb-3">
         <div>
           <h2 className="panel-title">3D-modell</h2>
@@ -958,13 +968,13 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
               zones={zones}
               editing={editing}
               onSet={onSetCapability}
-              onAllLights={setAllLights}
+              onAllLights={setAllLights} groupPending={groupCommand.pending}
               onClose={() => selectRoom(null)}
               onToggleZone={(zoneId) => roomsCfg.toggleZone(selectedRoom.room.id, zoneId, selectedRoom.zoneIds)}
               onResetZones={() => roomsCfg.resetRoom(selectedRoom.room.id)}
             />
           ) : (
-            <Overview roomData={roomData} onSelect={selectRoom} onAllLights={setAllLights} />
+            <Overview roomData={roomData} onSelect={selectRoom} onAllLights={setAllLights} groupPending={groupCommand.pending} />
           )}
         </aside>
       </div>
@@ -974,7 +984,7 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
 
 // ─── Sidepanel ──────────────────────────────────────────────────────────
 
-function Overview({ roomData, onSelect, onAllLights }) {
+function Overview({ roomData, onSelect, onAllLights, groupPending }) {
   return (
     <div className="space-y-3">
       <p className="panel-title">Rom</p>
@@ -990,8 +1000,8 @@ function Overview({ roomData, onSelect, onAllLights }) {
               {total > 0 && (
                 <span className="flex items-center gap-1">
                   <span className="font-mono text-[10px] text-nx-amber mr-1">{on}/{total}</span>
-                  <MiniBtn onClick={() => onAllLights(devs, true)} title={`Alle lys på i ${f.label}`}><Lightbulb size={10} /> På</MiniBtn>
-                  <MiniBtn onClick={() => onAllLights(devs, false)} title={`Alle lys av i ${f.label}`}><Power size={10} /> Av</MiniBtn>
+                  <MiniBtn disabled={groupPending} onClick={() => onAllLights(devs, true)} title={`Alle lys på i ${f.label}`}><Lightbulb size={10} /> På</MiniBtn>
+                  <MiniBtn disabled={groupPending} onClick={() => onAllLights(devs, false)} title={`Alle lys av i ${f.label}`}><Power size={10} /> Av</MiniBtn>
                 </span>
               )}
             </div>
@@ -1024,7 +1034,7 @@ function Overview({ roomData, onSelect, onAllLights }) {
   );
 }
 
-function RoomPanel({ data, zones, editing, onSet, onAllLights, onClose, onToggleZone, onResetZones }) {
+function RoomPanel({ data, zones, editing, onSet, onAllLights, onClose, onToggleZone, onResetZones, groupPending }) {
   const { room, stats, devices, zoneIds, manual } = data;
   const floor = FLOORS.find(f => f.rooms.some(r => r.id === room.id));
   const [openId, setOpenId] = useState(null);
@@ -1075,8 +1085,8 @@ function RoomPanel({ data, zones, editing, onSet, onAllLights, onClose, onToggle
       {lights.length > 0 && (
         <Section title={`Lys (${stats.lightsOn}/${lights.length})`} actions={
           <>
-            <MiniBtn onClick={() => onAllLights(lights, true)}><Lightbulb size={10} /> Alle på</MiniBtn>
-            <MiniBtn onClick={() => onAllLights(lights, false)}><Power size={10} /> Alle av</MiniBtn>
+            <MiniBtn disabled={groupPending} onClick={() => onAllLights(lights, true)}><Lightbulb size={10} /> Alle på</MiniBtn>
+            <MiniBtn disabled={groupPending} onClick={() => onAllLights(lights, false)}><Power size={10} /> Alle av</MiniBtn>
           </>
         }>
           {lights.map(d => <DeviceRow key={d.id} device={d} open={openId === d.id} onToggle={() => setOpenId(openId === d.id ? null : d.id)} onSet={onSet} />)}
@@ -1125,6 +1135,7 @@ function MarkerPanel({ marker, onSet, onClose }) {
 }
 
 function DeviceRow({ device, open, onToggle, onSet }) {
+  const command = useDeviceCommand();
   const on = capValue(device, 'onoff');
   const t = capValue(device, 'measure_temperature');
   const target = capValue(device, 'target_temperature');
@@ -1138,14 +1149,16 @@ function DeviceRow({ device, open, onToggle, onSet }) {
         {!Number.isFinite(target) && Number.isFinite(t) && <span className="font-mono text-[10px] text-nx-mute">{t.toFixed(1)}°</span>}
         {lockable && (
           <button
-            onClick={() => onSet(device.id, 'locked', !capValue(device, 'locked'))}
+            onClick={() => command.run(() => onSet(device.id, 'locked', !capValue(device, 'locked')))}
+            disabled={command.pending || !canWrite(device, 'locked')}
             className={capValue(device, 'locked') ? 'text-nx-green' : 'text-nx-amber'}
             aria-label={capValue(device, 'locked') ? 'Lås opp' : 'Lås'}
           >{capValue(device, 'locked') ? <Lock size={13} /> : <Unlock size={13} />}</button>
         )}
         {hasCap(device, 'onoff') && (
           <button
-            onClick={() => onSet(device.id, 'onoff', !on)}
+            onClick={() => command.run(() => onSet(device.id, 'onoff', !on))}
+            disabled={command.pending || !canWrite(device, 'onoff')}
             role="switch"
             aria-checked={!!on}
             aria-label={`${device.name} av/på`}
@@ -1155,6 +1168,7 @@ function DeviceRow({ device, open, onToggle, onSet }) {
           </button>
         )}
       </div>
+      <DeviceCommandStatus command={command} />
       {open && (
         <div className="border-t border-nx-line/40 px-2 py-2">
           <DeviceControls device={device} onSet={onSet} />

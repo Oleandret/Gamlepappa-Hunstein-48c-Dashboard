@@ -1,4 +1,5 @@
 import { ExperienceView } from './components/views/ExperienceView.jsx';
+import { VoiceAssistant } from './components/VoiceAssistant.jsx';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { api } from './lib/api.js';
@@ -141,14 +142,25 @@ export default function App() {
   }, [visible]);
 
   const setCapability = useCallback(async (deviceId, capability, value) => {
-    if (data.quality?.devices !== 'live' && data.quality?.devices !== 'demo') { pushEvent({type:'alarm',text:'Styring krever ferske enhetsdata',source:'feil'}); return; }
+    if (data.quality?.devices !== 'live' && data.quality?.devices !== 'demo') {
+      const error = 'Styring krever ferske enhetsdata';
+      pushEvent({type:'alarm',text:error,source:'feil'}); return {ok:false,error};
+    }
     pushEvent({type:'info',text:`Sender ${capability} til enhet`,source:'venter'});
     try {
       const result = await api.setCapability(deviceId, capability, value);
-      const fresh = await api.devices();
-      setData(d=>({...d,devices:fresh.devices || d.devices}));
+      let warning = result.warning;
+      try {
+        const fresh = await api.devices();
+        setData(d=>({...d,devices:fresh.devices || d.devices,quality:{...d.quality,devices:fresh._quality}}));
+        if (fresh._quality !== 'live' && fresh._quality !== 'demo') warning = 'Kommando mottatt, men ny enhetsstatus er utilgjengelig';
+      } catch {
+        setData(d=>({...d,quality:{...d.quality,devices:'unavailable'}}));
+        warning = 'Kommando mottatt, men ny enhetsstatus er utilgjengelig';
+      }
       pushEvent({type:'info',text: result.confirmed ? 'Enhetstilstand bekreftet' : 'Kommando mottatt; tilstanden er ikke bekreftet ennå',source:result.confirmed?'bekreftet':'venter'});
-    } catch(e) { pushEvent({type:'alarm',text:`Styring feilet: ${e.message}`,source:'feil'}); }
+      return {...result,ok:true,warning};
+    } catch(e) { pushEvent({type:'alarm',text:`Styring feilet: ${e.message}`,source:'feil'}); return {ok:false,error:e.message}; }
 
   }, [data.quality?.devices]);
 
@@ -238,7 +250,7 @@ export default function App() {
         />
       </div>
 
-
+      <VoiceAssistant section={section} />
     </div>
   );
 }

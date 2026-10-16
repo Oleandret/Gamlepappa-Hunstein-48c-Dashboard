@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Lightbulb, Lock, Unlock, Thermometer, Activity, DoorOpen, Camera, Power, X, Music, Zap } from 'lucide-react';
 import { capValue, hasCap, classLabel, formatCapability } from '../lib/deviceUtils.js';
 import { PIN_CATEGORIES } from './views/FloorPlanView.jsx';
+import { canWrite, setDimmer } from '../lib/deviceCommands.js';
+import { CommitSlider } from './CommitSlider.jsx';
+import { DeviceCommandStatus, useDeviceCommand } from './DeviceCommandStatus.jsx';
 
 /**
  * Pin på en plantegning. To moduser:
@@ -188,6 +191,8 @@ function PinPopover({ pin, device, onSet, onClose }) {
 }
 
 export function DeviceControls({ device, onSet }) {
+  const command = useDeviceCommand();
+  const send = (capability, value) => command.run(() => onSet(device.id, capability, value));
   const onoff = capValue(device, 'onoff');
   const dim = capValue(device, 'dim');
   const locked = capValue(device, 'locked');
@@ -231,12 +236,14 @@ export function DeviceControls({ device, onSet }) {
         <Row label="Av/på">
           <div className="flex items-center gap-1 rounded-full border border-nx-line/60 p-0.5 text-[10px] font-mono">
             <button
-              onClick={() => onSet(device.id, 'onoff', false)}
+              onClick={() => send('onoff', false)}
+              disabled={command.pending || !canWrite(device, 'onoff')}
               aria-pressed={onoff === false}
               className={['px-2 py-0.5 rounded-full', onoff === false ? 'bg-nx-cyan/15 text-nx-cyan' : 'text-nx-mute'].join(' ')}
             >Av</button>
             <button
-              onClick={() => onSet(device.id, 'onoff', true)}
+              onClick={() => send('onoff', true)}
+              disabled={command.pending || !canWrite(device, 'onoff')}
               aria-pressed={onoff === true}
               className={['px-2 py-0.5 rounded-full', onoff === true ? 'bg-nx-cyan/15 text-nx-cyan' : 'text-nx-mute'].join(' ')}
             >På</button>
@@ -246,28 +253,17 @@ export function DeviceControls({ device, onSet }) {
 
       {hasCap(device, 'dim') && (
         <Row label="Dim">
-          <input
-            type="range"
-            min={0} max={100} step={1}
-            value={Math.round((dim ?? 0) * 100)}
-            onChange={(e) => {
-              const v = Number(e.target.value) / 100;
-              if (!onoff && v > 0) onSet(device.id, 'onoff', true);
-              onSet(device.id, 'dim', v);
-            }}
-            className="w-32 accent-nx-cyan"
-            aria-label="Dim-nivå"
-          />
-          <span className="font-mono text-[10px] text-nx-mute tabular-nums w-8 text-right">
-            {Math.round((dim ?? 0) * 100)}%
-          </span>
+          <CommitSlider key={`${device.id}:dim`} value={Math.round((dim ?? 0) * 100)} label="Dim-nivå"
+            disabled={command.pending || !canWrite(device, 'dim')}
+            onCommit={percent => command.run(() => setDimmer(device, percent, onSet))} />
         </Row>
       )}
 
       {hasCap(device, 'locked') && (
         <Row label={locked ? 'Låst' : 'Ulåst'}>
           <button
-            onClick={() => onSet(device.id, 'locked', !locked)}
+            onClick={() => send('locked', !locked)}
+            disabled={command.pending || !canWrite(device, 'locked')}
             className={[
               'inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-mono uppercase tracking-[0.16em]',
               locked ? 'bg-nx-amber/15 text-nx-amber' : 'bg-nx-green/15 text-nx-green'
@@ -281,19 +277,16 @@ export function DeviceControls({ device, onSet }) {
 
       {hasCap(device, 'target_temperature') && (
         <Row label="Mål">
-          <input
-            type="range"
-            min={5} max={30} step={0.5}
-            value={Number.isFinite(target) ? target : 21}
-            onChange={(e) => onSet(device.id, 'target_temperature', Number(e.target.value))}
-            className="w-32 accent-nx-cyan"
-            aria-label="Måltemperatur"
-          />
-          <span className="font-mono text-[10px] text-nx-cyan tabular-nums w-12 text-right">
-            {Number.isFinite(target) ? `${target.toFixed(1)}°` : '—'}
-          </span>
+          <CommitSlider key={`${device.id}:temperature`} value={Number.isFinite(target) ? target : 21}
+            min={device.capabilitiesObj?.target_temperature?.min ?? 5}
+            max={device.capabilitiesObj?.target_temperature?.max ?? 30}
+            step={device.capabilitiesObj?.target_temperature?.step ?? 0.5} suffix="°" label="Måltemperatur"
+            disabled={command.pending || !canWrite(device, 'target_temperature')}
+            onCommit={value => send('target_temperature', value)} />
         </Row>
       )}
+      {device.available === false && <p role="status" className="text-xs text-nx-amber">Enheten er utilgjengelig</p>}
+      <DeviceCommandStatus command={command} />
     </div>
   );
 }
