@@ -18,6 +18,7 @@ import { chatRoutes } from './routes/chat.js';
 import { runMigrations, isEnabled as dbEnabled } from './lib/db.js';
 import { startDevicePoller } from './workers/devicePoller.js';
 import { cfg, isDemoMode } from './config.js';
+import { voiceWidget } from './routes/voiceWidget.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,7 +33,7 @@ app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
 app.use(compression());
-app.use((_req,res,next) => { res.set({'X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin','X-Frame-Options':'DENY', 'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; frame-src https://artimis-ai-production.up.railway.app; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"}); next(); });
+app.use((_req,res,next) => { res.set({'X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin','X-Frame-Options':'DENY', 'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; frame-src 'self' https://artimis-ai-production.up.railway.app; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"}); next(); });
 
 // CORS — same-origin in prod (frontend served by this server), permissive in dev
 const allowedOrigin = process.env.CORS_ORIGIN
@@ -61,6 +62,9 @@ app.use('/api/weather', weatherRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/chat', chatRoutes);
+
+// ElevenLabs-widget i isolert (sandboxed) side – vises i iframe i dashboardet
+app.get('/voice/widget', voiceWidget);
 
 // Healthcheck — Railway uses this for restart policy
 app.get('/healthz', (_req, res) =>

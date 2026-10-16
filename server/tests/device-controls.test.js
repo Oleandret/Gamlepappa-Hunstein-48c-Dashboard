@@ -99,13 +99,32 @@ test('capability validation and queue rejection retain actionable HTTP status',a
   }
 });
 
-test('voice launcher retains both existing agents and opens only an isolated provider tab',async()=>{
+test('voice widget is embedded only in a sandboxed opaque-origin frame per existing agent',async()=>{
   const render=await componentHarness('VoiceAssistant.jsx','VoiceAssistant');
   assert.equal(render({section:'chat'}),null);assert.equal(render({section:'avatar'}),null);
-  for(const [section,agent] of [['oversikt','SCOI5nAeUm2P90tPlhxJ'],['3d','agent_4501kc02r47xec2s0r87f0awxdj6']]){
-    const link=render({section});assert.equal(link.type,'a');
-    assert.equal(link.props.href,`https://elevenlabs.io/app/talk-to?agent_id=${agent}`);
-    assert.equal(link.props.target,'_blank');assert.equal(link.props.rel,'noopener noreferrer');
-    assert.equal(link.props.referrerPolicy,'no-referrer');assert.match(link.props['aria-label'],/ny fane/);
+  const find=(node,pred)=>{if(!node||typeof node!=='object')return null;if(pred(node))return node;
+    for(const c of [].concat(node.children||[]).flat()){const r=find(c,pred);if(r)return r;}return null;};
+  for(const [section,key] of [['oversikt','oversikt'],['3d','standard']]){
+    const fresh=await componentHarness('VoiceAssistant.jsx','VoiceAssistant');
+    let tree=fresh({section});
+    assert.equal(find(tree,n=>n.type==='iframe'),null,'third-party frame must not load before the user opens it');
+    find(tree,n=>n.type==='button'&&n.props['aria-expanded']===false).props.onClick();
+    tree=fresh({section});const frame=find(tree,n=>n.type==='iframe');
+    assert.equal(frame.props.src,`/voice/widget?agent=${key}`);
+    assert.doesNotMatch(frame.props.sandbox,/allow-same-origin/);assert.match(frame.props.sandbox,/allow-scripts/);
+    assert.match(frame.props.allow,/microphone/);assert.equal(frame.props.referrerPolicy,'no-referrer');
   }
+});
+
+test('voice widget page is sandboxed by CSP, pinned with SRI and limited to known agents',async()=>{
+  const {voiceWidget,VOICE_AGENTS,WIDGET_SCRIPT}=await import('../routes/voiceWidget.js');
+  const run=agent=>{const res={headers:{'X-Frame-Options':'DENY'},body:'',removeHeader(h){delete this.headers[h];},set(h){Object.assign(this.headers,h);},send(b){this.body=b;}};
+    voiceWidget({query:{agent}},res);return res;};
+  const res=run('oversikt');const csp=res.headers['Content-Security-Policy'];
+  assert.equal(res.headers['X-Frame-Options'],undefined);
+  assert.match(csp,/(^|; )sandbox allow-scripts/);assert.doesNotMatch(csp,/allow-same-origin/);
+  assert.match(csp,/frame-ancestors 'self'/);assert.match(csp,/default-src 'none'/);
+  assert.match(res.body,new RegExp(`agent-id="${VOICE_AGENTS.oversikt}"`));
+  assert.ok(res.body.includes(`integrity="${WIDGET_SCRIPT.integrity}"`));assert.match(WIDGET_SCRIPT.src,/@\d+\.\d+\.\d+\//);
+  assert.match(run('"><script>alert(1)</script>').body,new RegExp(`agent-id="${VOICE_AGENTS.standard}"`));
 });
