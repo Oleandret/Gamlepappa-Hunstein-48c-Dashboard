@@ -7,7 +7,7 @@ function downloadHarness({status=200}={}) {
   const requests=[],events=[],blobs=[],errors=[],loading=[];
   const context=vm.createContext({
     sessionStorage:{getItem:()=> 'synthetic-session-for-test'},
-    window:{dispatchEvent:event=>events.push(event.type)},Event,
+    window:{dispatchEvent:event=>events.push(event.type)},Event,Headers,
     fetch:async (url,options)=>{requests.push({url,options});return {ok:status===200,status,json:async()=>({devices:{fixture:{name:'Test light'}}})};},
     setDownloading:value=>loading.push(value),setError:value=>errors.push(value),
     Blob:class {constructor(parts,options){blobs.push({parts,options});}},
@@ -25,7 +25,7 @@ test('full inventory download carries the session token and produces the returne
   const h=downloadHarness();await h.download();
   assert.equal(h.requests.length,1);
   assert.equal(h.requests[0].url,'/api/homey/inventory?full=true');
-  assert.equal(h.requests[0].options.headers.Authorization,'Bearer synthetic-session-for-test');
+  assert.equal(h.requests[0].options.headers.get('Authorization'),'Bearer synthetic-session-for-test');
   assert.equal(JSON.parse(h.blobs[0].parts[0]).devices.fixture.name,'Test light');
   assert.deepEqual(h.loading,[true,false]);assert.deepEqual(h.errors,[]);
 });
@@ -50,4 +50,26 @@ test('voice indicator renders unavailable without probing widget registration or
   assert.match(html,/aria-label="Taleassistent ikke konfigurert"/);
   assert.match(html,/Ikke konfigurert/);
   assert.doesNotMatch(html,/tilkobler|online|AI CONNECTION|animate-pulseGlow/i);
+});
+
+test('cookie API writes carry CSRF in memory while bearer requests retain their authorization', async () => {
+  const requests = [];
+  let bearer = null;
+  const context = vm.createContext({ Headers, Event, sessionStorage: { getItem: () => bearer }, window: { dispatchEvent() {} }, fetch: async (url, options) => { requests.push({url, options}); return {status: 200}; } });
+  const source = fs.readFileSync(new URL('../../client/src/lib/api.js', import.meta.url), 'utf8').replace('import.meta.env.VITE_API_BASE', "''").replace(/^export /gm, '');
+  vm.runInContext(source + '\nglobalThis.client = {apiFetch, setCsrfToken};', context);
+  context.client.setCsrfToken('fixture-csrf');
+  await context.client.apiFetch('/api/config/a', {method: 'PUT', headers: {'Content-Type': 'application/json'}});
+  assert.equal(requests[0].options.credentials, 'same-origin');
+  assert.equal(requests[0].options.headers.get('X-CSRF-Token'), 'fixture-csrf');
+  assert.equal(requests[0].options.headers.get('Content-Type'), 'application/json');
+  await context.client.apiFetch('/api/session');
+  assert.equal(requests[1].options.headers.has('X-CSRF-Token'), false);
+  bearer = 'fixture-bearer';
+  await context.client.apiFetch('/api/config/a', {method: 'PUT'});
+  assert.equal(requests[2].options.headers.get('Authorization'), 'Bearer fixture-bearer');
+  assert.equal(requests[2].options.headers.has('X-CSRF-Token'), false);
+  bearer = null; context.client.setCsrfToken('');
+  await context.client.apiFetch('/api/logout', {method: 'POST'});
+  assert.equal(requests[3].options.headers.has('X-CSRF-Token'), false);
 });
