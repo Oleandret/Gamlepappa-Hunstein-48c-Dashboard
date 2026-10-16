@@ -1,0 +1,1411 @@
+[
+ {
+  "id": "3swAijge53VfLjpuVWzdKi",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "floor1",
+  "kind": "swing",
+  "width": 0.9,
+  "height": 2.105,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": -1.5708,
+  "pivot": [
+   0.8882,
+   3.136,
+   -3.2722
+  ],
+  "openRot": 1.35,
+  "center": [
+   0.8882,
+   4.136,
+   -2.8222
+  ],
+  "label": "Dør Soverom 3 – Bad",
+  "rooms": [
+   "Soverom 3",
+   "Bad"
+  ],
+  "exterior": false,
+  "revitId": "1505974",
+  "keywords": [
+   "soverom 3",
+   "bad"
+  ]
+ },
+ {
+  "id": "1tetp7M7179QXCg6j_7QaY",
+  "ifcName": "HG 152 Værøy",
+  "floor": "basement",
+  "kind": "swing",
+  "width": 1.02,
+  "height": 2.31,
+  "moving": [
+   0,
+   1,
+   2
+  ],
+  "yaw": 3.14159,
+  "pivot": [
+   5.2063,
+   0.0,
+   5.0878
+  ],
+  "openRot": 1.35,
+  "center": [
+   4.6963,
+   1.0,
+   5.0878
+  ],
+  "label": "Inngangsdør hybel",
+  "rooms": [
+   "Entrè"
+  ],
+  "exterior": true,
+  "revitId": "1522602",
+  "keywords": [
+   "hybel",
+   "leilighet",
+   "utleie"
+  ]
+ },
+ {
+  "id": "2BiFOi5Un0bAz7kGGmJ8HK",
+  "ifcName": "Balkongdør BD",
+  "floor": "basement",
+  "kind": "swing",
+  "width": 0.92,
+  "height": 2.31,
+  "moving": [
+   1,
+   2
+  ],
+  "yaw": -1.5708,
+  "pivot": [
+   8.4483,
+   0.0,
+   2.0888
+  ],
+  "openRot": -1.35,
+  "center": [
+   8.4483,
+   1.0,
+   1.7588
+  ],
+  "label": "Terrassedør hybel",
+  "rooms": [
+   "Kjøkken/stue"
+  ],
+  "exterior": true,
+  "revitId": "1523256",
+  "keywords": [
+   "terrassedør hybel",
+   "balkongdør hybel",
+   "hybel terrasse"
+  ]
+ },
+ {
+  "id": "2BiFOi5Un0bAz7kGGmJFc0",
+  "ifcName": "Balkongdør BD",
+  "floor": "basement",
+  "kind": "swing",
+  "width": 0.92,
+  "height": 2.31,
+  "moving": [
+   1,
+   2
+  ],
+  "yaw": -1.45656,
+  "pivot": [
+   5.5799,
+   0.0,
+   -1.7252
+  ],
+  "openRot": -1.35,
+  "center": [
+   5.5423,
+   1.0,
+   -2.0531
+  ],
+  "label": "Ytterdør kjellerstue",
+  "rooms": [
+   "Kjellerstue"
+  ],
+  "exterior": true,
+  "revitId": "1524716",
+  "keywords": [
+   "kjellerstue"
+  ]
+ },
+ {
+  "id": "2BiFOi5Un0bAz7kGGmJFuy",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "basement",
+  "kind": "swing",
+  "width": 0.9,
+  "height": 2.105,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 1.5708,
+  "pivot": [
+   -5.2046,
+   0.0,
+   -0.8652
+  ],
+  "openRot": 1.35,
+  "center": [
+   -5.2046,
+   1.0,
+   -1.3152
+  ],
+  "label": "Dør Kino – Kontor",
+  "rooms": [
+   "Kino",
+   "Kontor"
+  ],
+  "exterior": false,
+  "revitId": "1524816",
+  "keywords": [
+   "kino",
+   "kontor"
+  ]
+ },
+ {
+  "id": "1DoOdNqrT15Pkf9DkpYM1i",
+  "ifcName": "Balkongdør ST",
+  "floor": "floor1",
+  "kind": "slide",
+  "width": 1.82,
+  "height": 2.31,
+  "moving": [
+   1,
+   2
+  ],
+  "yaw": -1.45656,
+  "pivot": [
+   6.0125,
+   3.136,
+   2.0629
+  ],
+  "openScale": 0.5,
+  "center": [
+   5.9219,
+   4.136,
+   1.2731
+  ],
+  "label": "Skyvedør stue (terrasse øst)",
+  "rooms": [
+   "Terrasse",
+   "Kjøkken/stue"
+  ],
+  "exterior": true,
+  "revitId": "1533087",
+  "keywords": [
+   "skyvedør stue",
+   "terrassedør stue",
+   "stue"
+  ]
+ },
+ {
+  "id": "0V8UzbaG18YxgNLUiE_rZ5",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "floor2",
+  "kind": "swing",
+  "width": 0.9,
+  "height": 2.105,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 3.14159,
+  "pivot": [
+   -2.9956,
+   5.916,
+   0.1506
+  ],
+  "openRot": 1.35,
+  "center": [
+   -3.4456,
+   6.916,
+   0.1506
+  ],
+  "label": "Dør Gang/trapp – Soverom 6",
+  "rooms": [
+   "Gang/trapp",
+   "Soverom 6"
+  ],
+  "exterior": false,
+  "revitId": "1717737",
+  "keywords": [
+   "gang/trapp",
+   "soverom 6"
+  ]
+ },
+ {
+  "id": "2klS67EwPDMx3LfmxhVL6r",
+  "ifcName": "Balkongdør ST",
+  "floor": "floor1",
+  "kind": "slide",
+  "width": 1.82,
+  "height": 2.31,
+  "moving": [
+   1,
+   2
+  ],
+  "yaw": 3.14159,
+  "pivot": [
+   -2.6346,
+   3.136,
+   5.1018
+  ],
+  "openScale": 0.5,
+  "center": [
+   -1.8396,
+   4.136,
+   5.1018
+  ],
+  "label": "Skyvedør kjøkken (sør)",
+  "rooms": [
+   "Terrasse",
+   "Kjøkken/stue"
+  ],
+  "exterior": true,
+  "revitId": "1783296",
+  "keywords": [
+   "skyvedør kjøkken",
+   "kjøkken"
+  ]
+ },
+ {
+  "id": "1uKceUzgP0gxxPe4NLDw6L",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "basement",
+  "kind": "swing",
+  "width": 0.9,
+  "height": 2.105,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 0.0,
+  "pivot": [
+   1.3704,
+   0.0,
+   -0.6592
+  ],
+  "openRot": -1.35,
+  "center": [
+   1.0271,
+   1.0,
+   -0.6592
+  ],
+  "label": "Dør Kjellerstue – Bod",
+  "rooms": [
+   "Kjellerstue",
+   "Bod"
+  ],
+  "exterior": false,
+  "revitId": "1832460",
+  "keywords": [
+   "kjellerstue",
+   "bod"
+  ]
+ },
+ {
+  "id": "0T3ynq7g5CH9etH2iMEeqt",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "basement",
+  "kind": "swing",
+  "width": 0.9,
+  "height": 2.105,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 0.0,
+  "pivot": [
+   -3.3737,
+   0.0,
+   -0.6592
+  ],
+  "openRot": 1.35,
+  "center": [
+   -2.9237,
+   1.0,
+   -0.6592
+  ],
+  "label": "Dør Kontor – Bad",
+  "rooms": [
+   "Kontor",
+   "Bad"
+  ],
+  "exterior": false,
+  "revitId": "1848276",
+  "keywords": [
+   "kontor",
+   "bad"
+  ]
+ },
+ {
+  "id": "17bbzisdL5uASTECsgQ5mc",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "basement",
+  "kind": "swing",
+  "width": 0.9,
+  "height": 2.105,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 1.5708,
+  "pivot": [
+   1.7143,
+   0.0,
+   2.5338
+  ],
+  "openRot": 1.35,
+  "center": [
+   1.7143,
+   1.0,
+   2.0838
+  ],
+  "label": "Dør Soverom 2 – Kjøkken/stue",
+  "rooms": [
+   "Soverom 2",
+   "Kjøkken/stue"
+  ],
+  "exterior": false,
+  "revitId": "1856103",
+  "keywords": [
+   "soverom 2",
+   "kjøkken/stue"
+  ]
+ },
+ {
+  "id": "2jrPvKw559YwO0$dhUZv3Q",
+  "ifcName": "Innerdør Slett Skyvedør Enkel (Diplomat)",
+  "floor": "basement",
+  "kind": "slide",
+  "width": 0.9,
+  "height": 2.1,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 3.14159,
+  "pivot": [
+   0.5284,
+   0.0,
+   1.0043
+  ],
+  "openScale": 0.5,
+  "center": [
+   0.9784,
+   1.0,
+   1.0043
+  ],
+  "label": "Dør Soverom 2 – Bod",
+  "rooms": [
+   "Soverom 2",
+   "Bod"
+  ],
+  "exterior": false,
+  "revitId": "1858460",
+  "keywords": [
+   "soverom 2",
+   "bod"
+  ]
+ },
+ {
+  "id": "0nqjFSykr0XQdWvnrcaNzp",
+  "ifcName": "HG 152 Værøy",
+  "floor": "floor1",
+  "kind": "swing",
+  "width": 1.02,
+  "height": 2.31,
+  "moving": [
+   0,
+   1,
+   2
+  ],
+  "yaw": 1.5708,
+  "pivot": [
+   -4.9056,
+   3.136,
+   0.0696
+  ],
+  "openRot": -1.35,
+  "center": [
+   -4.9056,
+   4.136,
+   0.4916
+  ],
+  "label": "Hoveddør",
+  "rooms": [
+   "Gang",
+   "Gang"
+  ],
+  "exterior": true,
+  "revitId": "1868139",
+  "keywords": [
+   "hoveddør",
+   "inngang",
+   "inngangsdør",
+   "ytterdør",
+   "entré",
+   "entre",
+   "front"
+  ]
+ },
+ {
+  "id": "1LuJ5hWtf93gS9OGCU5NV$",
+  "ifcName": "Innerdør Slett Skyvedør Enkel (Diplomat)",
+  "floor": "basement",
+  "kind": "slide",
+  "width": 0.9,
+  "height": 2.1,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 0.0,
+  "pivot": [
+   5.2663,
+   0.0,
+   2.6958
+  ],
+  "openScale": 0.5,
+  "center": [
+   4.8163,
+   1.0,
+   2.6958
+  ],
+  "label": "Dør Kjøkken/stue – Entrè",
+  "rooms": [
+   "Kjøkken/stue",
+   "Entrè"
+  ],
+  "exterior": false,
+  "revitId": "1891656",
+  "keywords": [
+   "kjøkken/stue",
+   "entrè"
+  ]
+ },
+ {
+  "id": "1LuJ5hWtf93gS9OGCU5NSM",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "basement",
+  "kind": "swing",
+  "width": 0.9,
+  "height": 2.105,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 0.0,
+  "pivot": [
+   2.4223,
+   0.0,
+   2.6898
+  ],
+  "openRot": 1.35,
+  "center": [
+   2.8723,
+   1.0,
+   2.6898
+  ],
+  "label": "Dør Kjøkken/stue – Bad",
+  "rooms": [
+   "Kjøkken/stue",
+   "Bad"
+  ],
+  "exterior": false,
+  "revitId": "1891745",
+  "keywords": [
+   "kjøkken/stue",
+   "bad"
+  ]
+ },
+ {
+  "id": "2nO9ZVW5X9EROO_5FEsOR9",
+  "ifcName": "Balkongdør ST",
+  "floor": "floor2",
+  "kind": "slide",
+  "width": 1.82,
+  "height": 2.31,
+  "moving": [
+   1,
+   2
+  ],
+  "yaw": -1.72788,
+  "pivot": [
+   1.671,
+   5.916,
+   1.992
+  ],
+  "openScale": 0.5,
+  "center": [
+   1.7954,
+   6.916,
+   1.2067
+  ],
+  "label": "Skyvedør terrasse 2. etg",
+  "rooms": [
+   "Terrasse øst 2.etg",
+   "Gang/trapp"
+  ],
+  "exterior": true,
+  "revitId": "1900785",
+  "keywords": [
+   "terrasse oppe",
+   "terrasse 2",
+   "sjøside"
+  ]
+ },
+ {
+  "id": "0YXuIx0c5DhxoTpasit804",
+  "ifcName": "Balkongdør BD",
+  "floor": "floor2",
+  "kind": "swing",
+  "width": 0.92,
+  "height": 2.31,
+  "moving": [
+   2,
+   3
+  ],
+  "yaw": 1.5708,
+  "pivot": [
+   -4.9216,
+   5.916,
+   1.8852
+  ],
+  "openRot": 1.35,
+  "center": [
+   -4.9216,
+   6.916,
+   1.5552
+  ],
+  "label": "Dør takterrasse vest",
+  "rooms": [
+   "Takterrasse vest (over garasje)",
+   "Gang/trapp"
+  ],
+  "exterior": true,
+  "revitId": "1909791",
+  "keywords": [
+   "takterrasse",
+   "vinterhage"
+  ]
+ },
+ {
+  "id": "28IhcQfGr6qxmbTptu_1Hj",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "basement",
+  "kind": "swing",
+  "width": 0.81,
+  "height": 2.115,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 1.5708,
+  "pivot": [
+   -4.9956,
+   0.0,
+   0.6368
+  ],
+  "openRot": -1.35,
+  "center": [
+   -4.9956,
+   1.0,
+   0.935
+  ],
+  "label": "Dør Svømmebasseng – Tek",
+  "rooms": [
+   "Svømmebasseng",
+   "Tek"
+  ],
+  "exterior": false,
+  "revitId": "1974465",
+  "keywords": [
+   "svømmebasseng",
+   "tek"
+  ]
+ },
+ {
+  "id": "28IhcQfGr6qxmbTptu_1NP",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "basement",
+  "kind": "swing",
+  "width": 0.81,
+  "height": 2.115,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 1.5708,
+  "pivot": [
+   -4.9956,
+   0.0,
+   3.0328
+  ],
+  "openRot": 1.35,
+  "center": [
+   -4.9956,
+   1.0,
+   2.6278
+  ],
+  "label": "Dør Svømmebasseng – Badstu",
+  "rooms": [
+   "Svømmebasseng",
+   "Badstu"
+  ],
+  "exterior": false,
+  "revitId": "1974645",
+  "keywords": [
+   "svømmebasseng",
+   "badstu"
+  ]
+ },
+ {
+  "id": "1dR9Rp8BnFafZN6X3w0mPh",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "floor1",
+  "kind": "swing",
+  "width": 0.9,
+  "height": 2.105,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 1.5708,
+  "pivot": [
+   -8.0106,
+   3.136,
+   -1.8642
+  ],
+  "openRot": -1.35,
+  "center": [
+   -8.0106,
+   4.136,
+   -1.521
+  ],
+  "label": "Dør Dobbelgarasje – Bod/sluse",
+  "rooms": [
+   "Dobbelgarasje",
+   "Bod/sluse"
+  ],
+  "exterior": false,
+  "revitId": "1978890",
+  "keywords": [
+   "dobbelgarasje",
+   "bod/sluse"
+  ]
+ },
+ {
+  "id": "3CeJgShTTDwgQU2VL6wuED",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "floor1",
+  "kind": "swing",
+  "width": 0.9,
+  "height": 2.105,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 1.5708,
+  "pivot": [
+   -3.4936,
+   3.136,
+   -0.3724
+  ],
+  "openRot": 1.35,
+  "center": [
+   -3.4936,
+   4.136,
+   -0.8224
+  ],
+  "label": "Dør Gang – Vaskerom",
+  "rooms": [
+   "Gang",
+   "Vaskerom"
+  ],
+  "exterior": false,
+  "revitId": "1980469",
+  "keywords": [
+   "gang",
+   "vaskerom"
+  ]
+ },
+ {
+  "id": "3X5JU6EML4XQH$O71g4CZ5",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "floor2",
+  "kind": "swing",
+  "width": 0.9,
+  "height": 2.105,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 0.0,
+  "pivot": [
+   1.6324,
+   5.916,
+   0.1386
+  ],
+  "openRot": -1.35,
+  "center": [
+   1.2891,
+   6.916,
+   0.1386
+  ],
+  "label": "Dør Soverom 4 – Gang/trapp",
+  "rooms": [
+   "Soverom 4",
+   "Gang/trapp"
+  ],
+  "exterior": false,
+  "revitId": "1993777",
+  "keywords": [
+   "soverom 4",
+   "gang/trapp"
+  ]
+ },
+ {
+  "id": "0Thnxxox56gfKzaDcDaJm6",
+  "ifcName": "H 151 Lovund",
+  "floor": "basement",
+  "kind": "swing",
+  "width": 0.92,
+  "height": 2.1,
+  "moving": [
+   0,
+   1,
+   4
+  ],
+  "yaw": -1.5708,
+  "pivot": [
+   -1.6302,
+   0.0,
+   5.9669
+  ],
+  "openRot": 1.35,
+  "center": [
+   -1.6302,
+   1.0,
+   6.4539
+  ],
+  "label": "Dør sportsbod",
+  "rooms": [
+   "Sportsbod"
+  ],
+  "exterior": true,
+  "revitId": "2007755",
+  "keywords": [
+   "sportsbod",
+   "utebod",
+   "bod ute"
+  ]
+ },
+ {
+  "id": "3BVF8qQrDBp8Iq8PZMvlf2",
+  "ifcName": "Innerdør Slett Skyvedør Enkel (Diplomat)",
+  "floor": "floor1",
+  "kind": "slide",
+  "width": 0.8,
+  "height": 2.1,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": -1.5708,
+  "pivot": [
+   0.7942,
+   3.136,
+   -0.7034
+  ],
+  "openScale": 0.5,
+  "center": [
+   0.7942,
+   4.136,
+   -1.1034
+  ],
+  "label": "Dør Soverom 3 – Walk in/bod",
+  "rooms": [
+   "Soverom 3",
+   "Walk in/bod"
+  ],
+  "exterior": false,
+  "revitId": "2021758",
+  "keywords": [
+   "soverom 3",
+   "walk in/bod"
+  ]
+ },
+ {
+  "id": "1Va2pI_k99aPWi3ls93nsY",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "floor2",
+  "kind": "swing",
+  "width": 0.9,
+  "height": 2.105,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 3.14159,
+  "pivot": [
+   -2.5626,
+   5.916,
+   2.1498
+  ],
+  "openRot": 1.35,
+  "center": [
+   -3.0126,
+   6.916,
+   2.1498
+  ],
+  "label": "Dør Bad – Gang/trapp",
+  "rooms": [
+   "Bad",
+   "Gang/trapp"
+  ],
+  "exterior": false,
+  "revitId": "2318475",
+  "keywords": [
+   "bad",
+   "gang/trapp"
+  ]
+ },
+ {
+  "id": "2EFGjykAT4eBma8lYq0ge_",
+  "ifcName": "Balkongdør ST",
+  "floor": "basement",
+  "kind": "slide",
+  "width": 3.2,
+  "height": 2.11,
+  "moving": [
+   2,
+   3,
+   4,
+   5
+  ],
+  "yaw": 0.0,
+  "pivot": [
+   -9.3176,
+   0.0,
+   0.4473
+  ],
+  "openScale": 0.5,
+  "center": [
+   -10.9606,
+   1.0,
+   0.4473
+  ],
+  "label": "Glassvegg kino–basseng (skyvedør 1)",
+  "rooms": [
+   "Kino",
+   "Svømmebasseng"
+  ],
+  "exterior": false,
+  "revitId": "2322170",
+  "keywords": [
+   "basseng"
+  ]
+ },
+ {
+  "id": "2EFGjykAT4eBma8lYq0hJG",
+  "ifcName": "Balkongdør ST",
+  "floor": "basement",
+  "kind": "slide",
+  "width": 3.2,
+  "height": 2.11,
+  "moving": [
+   2,
+   3,
+   4,
+   5
+  ],
+  "yaw": 0.0,
+  "pivot": [
+   -5.9176,
+   0.0,
+   0.4473
+  ],
+  "openScale": 0.5,
+  "center": [
+   -7.5606,
+   1.0,
+   0.4473
+  ],
+  "label": "Glassvegg kino–basseng (skyvedør 2)",
+  "rooms": [
+   "Kino",
+   "Svømmebasseng"
+  ],
+  "exterior": false,
+  "revitId": "2322452",
+  "keywords": [
+   "basseng"
+  ]
+ },
+ {
+  "id": "3_Vhh1clf63R9voNqw5rQ4",
+  "ifcName": "Garage_-_Horz_Pnl",
+  "floor": "floor1",
+  "kind": "garage",
+  "width": 5.0,
+  "height": 2.125,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": -1.5708,
+  "pivot": [
+   -13.6361,
+   5.261,
+   -3.4852
+  ],
+  "openTilt": 1.5707963267948966,
+  "center": [
+   -13.6361,
+   4.136,
+   -0.9852
+  ],
+  "label": "Garasjeport",
+  "rooms": [
+   "Dobbelgarasje"
+  ],
+  "exterior": true,
+  "revitId": "2380403",
+  "keywords": [
+   "garasjeport",
+   "garasjedør",
+   "garasje port",
+   "garage"
+  ]
+ },
+ {
+  "id": "1DrAot_811ggEyp52Pl3OV",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "floor1",
+  "kind": "swing",
+  "width": 0.9,
+  "height": 2.105,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 3.14159,
+  "pivot": [
+   -3.6496,
+   3.136,
+   -2.1842
+  ],
+  "openRot": 1.35,
+  "center": [
+   -4.0996,
+   4.136,
+   -2.1842
+  ],
+  "label": "Dør Gang – WC",
+  "rooms": [
+   "Gang",
+   "WC"
+  ],
+  "exterior": false,
+  "revitId": "2380643",
+  "keywords": [
+   "gang",
+   "wc"
+  ]
+ },
+ {
+  "id": "1DrAot_811ggEyp52Pl3OQ",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "floor1",
+  "kind": "swing",
+  "width": 0.9,
+  "height": 2.105,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 3.14159,
+  "pivot": [
+   -6.1676,
+   3.136,
+   -2.1842
+  ],
+  "openRot": -1.35,
+  "center": [
+   -5.8244,
+   4.136,
+   -2.1842
+  ],
+  "label": "Dør gang – trapp",
+  "rooms": [
+   "Gang"
+  ],
+  "exterior": true,
+  "revitId": "2380646",
+  "keywords": [
+   "trapp"
+  ]
+ },
+ {
+  "id": "1DrAot_811ggEyp52Pl3OR",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "floor1",
+  "kind": "swing",
+  "width": 0.9,
+  "height": 2.105,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 3.14159,
+  "pivot": [
+   -3.3256,
+   3.136,
+   -2.1842
+  ],
+  "openRot": -1.35,
+  "center": [
+   -2.9824,
+   4.136,
+   -2.1842
+  ],
+  "label": "Dør Vaskerom – Bad",
+  "rooms": [
+   "Vaskerom",
+   "Bad"
+  ],
+  "exterior": false,
+  "revitId": "2380647",
+  "keywords": [
+   "vaskerom",
+   "bad"
+  ]
+ },
+ {
+  "id": "1DrAot_811ggEyp52Pl32h",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "floor1",
+  "kind": "swing",
+  "width": 0.9,
+  "height": 2.105,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 0.0,
+  "pivot": [
+   1.3754,
+   3.136,
+   -0.0374
+  ],
+  "openRot": 1.35,
+  "center": [
+   1.8254,
+   4.136,
+   -0.0374
+  ],
+  "label": "Dør Soverom 3 – Kjøkken/stue",
+  "rooms": [
+   "Soverom 3",
+   "Kjøkken/stue"
+  ],
+  "exterior": false,
+  "revitId": "2381271",
+  "keywords": [
+   "soverom 3",
+   "kjøkken/stue"
+  ]
+ },
+ {
+  "id": "1DrAot_811ggEyp52Pl326",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "floor1",
+  "kind": "swing",
+  "width": 0.9,
+  "height": 2.105,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 1.5708,
+  "pivot": [
+   -3.1936,
+   3.136,
+   0.2312
+  ],
+  "openRot": -1.35,
+  "center": [
+   -3.1936,
+   4.136,
+   0.5744
+  ],
+  "label": "Dør Gang – Kjøkken/stue",
+  "rooms": [
+   "Gang",
+   "Kjøkken/stue"
+  ],
+  "exterior": false,
+  "revitId": "2381306",
+  "keywords": [
+   "gang",
+   "kjøkken/stue"
+  ]
+ },
+ {
+  "id": "1sWMI4iHT1gwFah5pQUZCY",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "floor1",
+  "kind": "swing",
+  "width": 0.9,
+  "height": 2.105,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": -1.5708,
+  "pivot": [
+   1.0122,
+   3.136,
+   0.238
+  ],
+  "openRot": 1.35,
+  "center": [
+   1.0122,
+   4.136,
+   0.688
+  ],
+  "label": "Dør Kjøkken/stue – Bod",
+  "rooms": [
+   "Kjøkken/stue",
+   "Bod"
+  ],
+  "exterior": false,
+  "revitId": "2382760",
+  "keywords": [
+   "kjøkken/stue",
+   "bod"
+  ]
+ },
+ {
+  "id": "1FKQcpSF1DKh9iNW2L$2q7",
+  "ifcName": "Innerdør Slett Skyvedør Enkel (Diplomat)",
+  "floor": "basement",
+  "kind": "slide",
+  "width": 0.9,
+  "height": 2.1,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": -1.5708,
+  "pivot": [
+   -0.9656,
+   0.0,
+   -1.1152
+  ],
+  "openScale": 0.5,
+  "center": [
+   -0.9656,
+   1.0,
+   -1.5652
+  ],
+  "label": "Dør Kjellerstue – Kontor",
+  "rooms": [
+   "Kjellerstue",
+   "Kontor"
+  ],
+  "exterior": false,
+  "revitId": "2387761",
+  "keywords": [
+   "kjellerstue",
+   "kontor"
+  ]
+ },
+ {
+  "id": "3it47d$UX4TvvCuJ0_34uF",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "floor2",
+  "kind": "swing",
+  "width": 0.9,
+  "height": 2.105,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 3.14159,
+  "pivot": [
+   1.2614,
+   5.916,
+   2.1498
+  ],
+  "openRot": 1.35,
+  "center": [
+   0.8114,
+   6.916,
+   2.1498
+  ],
+  "label": "Dør Soverom 5/ Tv-stue – Gang/trapp",
+  "rooms": [
+   "Soverom 5/ Tv-stue",
+   "Gang/trapp"
+  ],
+  "exterior": false,
+  "revitId": "2425151",
+  "keywords": [
+   "soverom 5/ tv-stue",
+   "gang/trapp"
+  ]
+ },
+ {
+  "id": "3QyoxqihLDShTF5w2aRCGj",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "basement",
+  "kind": "swing",
+  "width": 0.81,
+  "height": 2.115,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 0.0,
+  "pivot": [
+   -6.5089,
+   0.0,
+   4.9858
+  ],
+  "openRot": 1.35,
+  "center": [
+   -6.1039,
+   1.0,
+   4.9858
+  ],
+  "label": "Dør Svømmebasseng – Bad",
+  "rooms": [
+   "Svømmebasseng",
+   "Bad"
+  ],
+  "exterior": false,
+  "revitId": "2462203",
+  "keywords": [
+   "svømmebasseng",
+   "bad"
+  ]
+ },
+ {
+  "id": "3VXswughn4YfrWXMBmnXzO",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "basement",
+  "kind": "swing",
+  "width": 0.81,
+  "height": 2.115,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 0.0,
+  "pivot": [
+   -10.3453,
+   0.0,
+   4.9858
+  ],
+  "openRot": 1.35,
+  "center": [
+   -9.9403,
+   1.0,
+   4.9858
+  ],
+  "label": "Dør Svømmebasseng – Basseng bod",
+  "rooms": [
+   "Svømmebasseng",
+   "Basseng bod"
+  ],
+  "exterior": false,
+  "revitId": "2463563",
+  "keywords": [
+   "svømmebasseng",
+   "basseng bod"
+  ]
+ },
+ {
+  "id": "3VXswughn4YfrWXMBmnX$2",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "basement",
+  "kind": "swing",
+  "width": 0.81,
+  "height": 2.115,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": -1.5708,
+  "pivot": [
+   -12.9187,
+   0.0,
+   0.2608
+  ],
+  "openRot": -1.35,
+  "center": [
+   -12.9187,
+   1.0,
+   -0.0374
+  ],
+  "label": "Dør Kino – Tekniskrom",
+  "rooms": [
+   "Kino",
+   "Tekniskrom"
+  ],
+  "exterior": false,
+  "revitId": "2463697",
+  "keywords": [
+   "kino",
+   "tekniskrom"
+  ]
+ },
+ {
+  "id": "2ReW9gLgT6C99m28VmoICP",
+  "ifcName": "Innerdør Slett (Diplomat)",
+  "floor": "floor1",
+  "kind": "swing",
+  "width": 0.9,
+  "height": 2.105,
+  "moving": [
+   0,
+   1
+  ],
+  "yaw": 1.5708,
+  "pivot": [
+   -6.6896,
+   3.136,
+   -1.9494
+  ],
+  "openRot": -1.35,
+  "center": [
+   -6.6896,
+   4.136,
+   -1.6062
+  ],
+  "label": "Ytterdør gang nord",
+  "rooms": [
+   "Bod/sluse",
+   "Gang"
+  ],
+  "exterior": true,
+  "revitId": "2464053",
+  "keywords": [
+   "bakdør",
+   "gang nord"
+  ]
+ }
+]
