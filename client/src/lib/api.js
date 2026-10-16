@@ -1,6 +1,11 @@
+let csrfToken = '';
+export function setCsrfToken(value) { csrfToken = value || ''; }
 export async function apiFetch(url, options = {}) {
   const token = sessionStorage.getItem('dashboard.session');
-  const response = await fetch(url, { ...options, headers: { ...options.headers, ...(token ? {Authorization: `Bearer ${token}`} : {}) } });
+  const headers = new Headers(options.headers);
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  if (!token && csrfToken && !['GET','HEAD'].includes((options.method || 'GET').toUpperCase())) headers.set('X-CSRF-Token', csrfToken);
+  const response = await fetch(url, { ...options, credentials: 'same-origin', headers });
   if (response.status === 401) window.dispatchEvent(new Event('dashboard-auth-required'));
   return response;
 }

@@ -1,4 +1,5 @@
 import { accessControl, authConfigured } from './lib/auth.js';
+import { googleAuth } from './lib/googleAuth.js';
 import { experienceRoutes } from './routes/experience.js';
 import { stopDevicePoller } from './workers/devicePoller.js';
 import { shutdown } from './lib/db.js';
@@ -48,9 +49,11 @@ app.use((req, _res, next) => {
   next();
 });
 
-app.use('/api', accessControl);
+app.use('/auth', googleAuth.router);
+app.use('/api', (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); }, accessControl);
 app.use('/api/experience', experienceRoutes);
-app.get('/api/session', (req,res) => res.json({role:req.user.role}));
+app.get('/api/session', (req,res) => res.json(req.user));
+app.post('/api/logout', googleAuth.logout);
 // API routes
 app.use('/api/system', systemRoutes);
 app.use('/api/homey', homeyRoutes);
