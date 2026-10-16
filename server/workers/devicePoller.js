@@ -221,8 +221,8 @@ async function performPoll({ manual = false } = {}) {
               value: caps[cap],
               prev_value: null,
               kind: 'snapshot',
-              sourceTs: sourceTimestamp(d.capabilitiesObj?.[c.capability]?.lastUpdated),
-            ...ctx
+              sourceTs: sourceTimestamp(d.capabilitiesObj?.[cap]?.lastUpdated),
+              ...ctx
             });
           }
         }
