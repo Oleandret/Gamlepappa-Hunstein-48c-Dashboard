@@ -1,19 +1,22 @@
-import { useEffect, useMemo, useRef, useState, Suspense } from 'react';
+import { Component, useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Html, Edges } from '@react-three/drei';
+import { OrbitControls, Html, Edges, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import {
   Box, Layers, Lightbulb, Thermometer, ShieldAlert, Home as HomeIcon, Edit2,
   RotateCw, Power, ChevronRight, X, Move3d, Activity, DoorOpen, Lock, Unlock
 } from 'lucide-react';
-import { FLOORS, ALL_ROOMS, roomPoly, roomCenter, roomArea, planPctToWorld } from '../../lib/house3dModel.js';
+import { FLOORS, ALL_ROOMS, roomPoly, roomCenter, roomArea, planPctToWorld, BIM_MODEL_URL } from '../../lib/house3dModel.js';
 import { capValue, hasCap } from '../../lib/deviceUtils.js';
 import { useHouse3dRooms } from '../../lib/useHouse3dRooms.js';
 import { DeviceControls } from '../FloorPlanPin.jsx';
 import { SaveButton } from '../SaveButton.jsx';
 
 /**
- * Interaktiv 3D-modell av Hunstein 48c, bygget fra arkitekttegningene.
+ * Interaktiv 3D-modell av Hunstein 48c. Bygningskroppen er BIM-modellen
+ * («som bygget», eksportert fra IFC til GLB); rommene oppå brukes til klikk,
+ * overlegg og Homey-styring. Faller tilbake til de forenklede rom-volumene
+ * hvis GLB-en ikke kan lastes.
  *
  *  - Eksteriør: hele huset med kledning, vindusbånd og terrasser. Rom med
  *    lys på gløder ut gjennom vinduene.
@@ -422,14 +425,125 @@ function GarageDoor() {
   );
 }
 
+// ─── BIM-modell (GLB) ───────────────────────────────────────────────────
+
+const BIM_GROUP_FLOOR = { basement: 'basement', floor1: 'floor1', floor2: 'floor2' };
+const CLIP_HEIGHT = 1.35;   // dukkehus-snitt over gulv i interiør-modus
+
+/** Deler GLB-scenen i grupper (basement/floor1/floor2/roof/site) én gang. */
+function useBimGroups() {
+  const gltf = useGLTF(BIM_MODEL_URL, false, false);  // ingen Draco/Meshopt: CSP tillater ikke WASM
+  return useMemo(() => {
+    const groups = {};
+    gltf.scene.updateMatrixWorld(true);
+    gltf.scene.traverse((o) => {
+      if (!o.isMesh) return;
+      const [grp = 'site', type = ''] = (o.name || o.parent?.name || '').split('|');
+      (groups[grp] ||= []).push({ mesh: o, type });
+    });
+    return groups;
+  }, [gltf]);
+}
+
+function BimGroup({ items, offsetY = 0, clipY = null, interior, onPick, dim = 1 }) {
+  const group = useMemo(() => {
+    const g = new THREE.Group();
+    const plane = clipY == null ? null : new THREE.Plane(new THREE.Vector3(0, -1, 0), clipY);
+    for (const { mesh, type } of items) {
+      // I interiør skjules tak/dekker over snittet og terreng; gulvplater tegnes av rommene
+      if (interior && (type === 'IfcSlab' || type === 'IfcRoof' || type === 'IfcCovering')) continue;
+      const m = mesh.clone();
+      m.matrix.copy(mesh.matrixWorld);
+      m.matrix.decompose(m.position, m.quaternion, m.scale);
+      const src = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+      const mat = src.clone();
+      if (dim !== 1 && mat.color) mat.color.multiplyScalar(dim);
+      if (interior) {
+        mat.clippingPlanes = plane ? [plane] : null;
+        mat.clipShadows = true;
+        if (mat.color) mat.color.multiplyScalar(0.55);
+      }
+      mat.side = THREE.DoubleSide;
+      m.material = mat;
+      m.castShadow = !mat.transparent;
+      m.receiveShadow = true;
+      m.userData.ifcType = type;
+      g.add(m);
+    }
+    return g;
+  }, [items, clipY, interior, dim]);
+  useEffect(() => () => group.traverse((o) => o.isMesh && o.material.dispose()), [group]);
+  return (
+    <primitive
+      object={group}
+      position={[0, offsetY, 0]}
+      onClick={onPick ? (e) => { e.stopPropagation(); onPick(e.point); } : undefined}
+    />
+  );
+}
+
+/** Hele bygget/tomta (eksteriør) eller én etasje med snitt (interiør). */
+function BimModel({ mode, visibleFloors, floorY, onPick }) {
+  const groups = useBimGroups();
+  if (mode === 'exterior') {
+    return (
+      <group>
+        {['site', 'basement', 'floor1', 'floor2', 'roof'].map(k => groups[k] && (
+          <BimGroup key={k} items={groups[k]} onPick={k === 'site' ? undefined : onPick} dim={k === 'site' ? 0.42 : 0.9} />
+        ))}
+      </group>
+    );
+  }
+  return (
+    <group>
+      {visibleFloors.map((floor) => {
+        const items = groups[BIM_GROUP_FLOOR[floor.id]];
+        if (!items) return null;
+        const y = floorY(floor.id);
+        return <BimGroup key={floor.id} items={items} offsetY={y - floor.level} clipY={y + CLIP_HEIGHT} interior />;
+      })}
+    </group>
+  );
+}
+
+class BimBoundary extends Component {
+  constructor(props) { super(props); this.state = { failed: false }; }
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(err) { console.warn('BIM-modell kunne ikke lastes, bruker forenklet modell', err); this.props.onFail?.(); }
+  render() { return this.state.failed ? null : this.props.children; }
+}
+
+/** Lys som gløder ut gjennom vinduene i eksteriør-modus. */
+function ExteriorGlow({ roomData }) {
+  return (
+    <group raycast={() => null}>
+      {FLOORS.flatMap(floor => floor.rooms.map(room => {
+        const { stats } = roomData.byRoom[room.id];
+        if (room.outdoor || !stats.lightsOn) return null;
+        const [cx, cz] = roomCenter(room);
+        return (
+          <group key={room.id} position={[cx, floor.level + 1.3, cz]}>
+            <pointLight color={C.amber} intensity={2 + stats.glow * 6} distance={6} decay={2} />
+            <mesh raycast={() => null}>
+              <sphereGeometry args={[0.5, 16, 12]} />
+              <meshBasicMaterial color={C.amber} transparent opacity={0.18 + stats.glow * 0.25} depthWrite={false} blending={THREE.AdditiveBlending} />
+            </mesh>
+          </group>
+        );
+      }))}
+    </group>
+  );
+}
+
 // ─── Etasje ─────────────────────────────────────────────────────────────
 
-function Floor({ floor, index, mode, explode, roomData, overlay, selectedRoomId, hoveredRoomId, onSelect, onHover, isolated, dimmed }) {
+function Floor({ floor, index, mode, explode, roomData, overlay, selectedRoomId, hoveredRoomId, onSelect, onHover, isolated, dimmed, bim }) {
   const y = floor.level + (mode === 'interior' ? explode * index * 3.2 : 0);
   return (
     <group position={[0, y, 0]}>
       {floor.rooms.map(room => {
         const data = roomData.byRoom[room.id];
+        if (mode === 'exterior' && bim) return null;
         return mode === 'interior' ? (
           <InteriorRoom
             key={room.id}
@@ -455,11 +569,11 @@ function Floor({ floor, index, mode, explode, roomData, overlay, selectedRoomId,
         );
       })}
 
-      {mode === 'interior' && (floor.stairs || []).map((s, i) => (
+      {mode === 'interior' && !bim && (floor.stairs || []).map((s, i) => (
         <Stairs key={i} rect={s} height={floor.height} />
       ))}
 
-      {mode === 'exterior' && (floor.roofs || []).map((r, i) => (
+      {mode === 'exterior' && !bim && (floor.roofs || []).map((r, i) => (
         <mesh key={i} position={[(r[0] + r[2]) / 2, -0.05, (r[1] + r[3]) / 2]} raycast={() => null} receiveShadow>
           <boxGeometry args={[r[2] - r[0] + 0.3, 0.12, r[3] - r[1] + 0.3]} />
           <meshStandardMaterial color="#3a3f47" roughness={0.95} />
@@ -606,6 +720,9 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
   const [editing, setEditing] = useState(false);
   const [autoRotate, setAutoRotate] = useState(false);
   const [flyTo, setFlyTo] = useState(null);
+  const [bimOn, setBimOn] = useState(true);
+  const [bimFailed, setBimFailed] = useState(false);
+  const bim = bimOn && !bimFailed;
   const controlsRef = useRef();
 
   const roomData = useRoomData(devices, zones, roomsCfg.config, floorPlanPins);
@@ -628,6 +745,16 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
     const [x, z] = roomCenter(room);
     const y = floorY(room.floorId);
     setFlyTo({ pos: [x + 7, y + 9, z + 10], target: [x, y + 0.8, z], key: Date.now() });
+  };
+
+  // Klikk på BIM-geometri → finn rommet under punktet
+  const pickPoint = (p) => {
+    const lv = (id) => FLOORS.find(f => f.id === id).level;
+    const floorId = p.y < lv('floor1') - 0.2 ? 'basement' : p.y < lv('floor2') - 0.2 ? 'floor1' : 'floor2';
+    const floor = FLOORS.find(f => f.id === floorId);
+    const room = floor.rooms.find(r => pointInPoly([p.x, p.z], roomPoly(r)))
+      || FLOORS.flatMap(f => f.rooms).find(r => pointInPoly([p.x, p.z], roomPoly(r)));
+    if (room) selectRoom(room.id);
   };
 
   const selectFloor = (id) => {
@@ -662,7 +789,7 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
           <h2 className="panel-title">3D-modell</h2>
           <p className="mt-1 text-xl font-semibold">Hus · Hunstein 48c</p>
           <p className="mt-0.5 text-xs text-nx-mute font-mono">
-            Bygget fra arkitekttegninger · {ALL_ROOMS.length} rom · 3 etasjer ·{' '}
+            {bim ? 'BIM-modell (som bygget)' : 'Forenklet modell fra arkitekttegninger'} · {ALL_ROOMS.length} rom · 3 etasjer ·{' '}
             <span className="text-nx-amber">{totals.lightsOn}/{totals.lights} lys på</span>
             {totals.motion > 0 && <span className="text-nx-red"> · bevegelse i {totals.motion} rom</span>}
           </p>
@@ -670,6 +797,7 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
         <div className="flex flex-wrap gap-1.5">
           <ToggleBtn active={mode === 'exterior'} onClick={() => { setMode('exterior'); setFloorFilter('all'); setFlyTo({ ...PRESETS.iso, key: Date.now() }); }} Icon={HomeIcon}>Eksteriør</ToggleBtn>
           <ToggleBtn active={mode === 'interior'} onClick={() => setMode('interior')} Icon={Box}>Interiør</ToggleBtn>
+          {!bimFailed && <ToggleBtn active={bimOn} onClick={() => setBimOn(b => !b)} Icon={Layers}>BIM</ToggleBtn>}
         </div>
       </header>
 
@@ -696,6 +824,7 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
         >
           <Canvas
             shadows
+            gl={{ localClippingEnabled: true }}
             dpr={[1, 2]}
             camera={{ position: PRESETS.iso.pos, fov: 40, near: 0.1, far: 400 }}
             onPointerMissed={() => { setSelectedRoomId(null); setSelectedMarkerId(null); }}
@@ -717,7 +846,15 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
             <directionalLight position={[-20, 12, -10]} intensity={0.25} color="#7d5cff" />
 
             <Suspense fallback={null}>
-              <Ground mode={mode} />
+              {!(bim && mode === 'exterior') && <Ground mode={mode} />}
+              {bimOn && !bimFailed && (
+                <BimBoundary onFail={() => setBimFailed(true)}>
+                  <Suspense fallback={null}>
+                    <BimModel mode={mode} visibleFloors={visibleFloors} floorY={floorY} onPick={pickPoint} />
+                  </Suspense>
+                </BimBoundary>
+              )}
+              {bim && mode === 'exterior' && <ExteriorGlow roomData={roomData} />}
               {visibleFloors.map((floor) => {
                 const i = FLOORS.indexOf(floor);
                 return (
@@ -735,10 +872,11 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
                     onHover={setHoveredRoomId}
                     isolated={floorFilter === floor.id}
                     dimmed={floorFilter !== 'all' && floorFilter !== floor.id && mode === 'interior'}
+                    bim={bim}
                   />
                 );
               })}
-              {mode === 'exterior' && <GarageDoor />}
+              {mode === 'exterior' && !bim && <GarageDoor />}
               {mode === 'interior' && roomData.markers
                 .filter(m => visibleFloors.some(f => f.id === m.floorId))
                 .filter(m => overlay === 'all'

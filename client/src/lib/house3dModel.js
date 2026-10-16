@@ -8,8 +8,12 @@
  *   som er felles for alle etasjene — derfor ligger etasjene riktig
  *   over hverandre.
  *
- * Kotehøyder fra snitt A: U.etg +5.00, 1. etg +8.14, 2. etg ≈ +11.0,
+ * Kotehøyder fra snitt A: U.etg +5.00, 1. etg +8.14, 2. etg +10.92,
  * tak +13.76. Her er U.etg satt til y = 0.
+ *
+ * Bygningskroppen tegnes fra BIM-modellen (public/models/hunstein48c.glb,
+ * eksportert fra «som bygget»-IFC i samme koordinatsystem). Rommene her
+ * brukes til klikk, overlegg og kobling mot Homey-soner.
  *
  * Rom er rektangler [x0, z0, x1, z1] eller polygoner (poly: [[x,z],…]).
  * `match` brukes for å koble rommet automatisk mot Homey-soner ved navn.
@@ -63,6 +67,11 @@ export const FLOORS = [
       { id: 'f1-sov3',     name: 'Soverom 3',      rect: [0.93, -3.9, 5.5, -0.07],    match: /hovedsoverom|soverom 3/i, kind: 'bed' },
       { id: 'f1-kjokken',  name: 'Kjøkken/stue',   rect: [-4.9, 0.1, 6.2, 5.1],       match: /kj.kken|^stue$|spisestue/i, kind: 'living' },
       {
+        // Ballbane på dekket over bassenget (+8,14), med pergola mot huset
+        id: 'f1-ballbane', name: 'Ballbane', match: /ballbane|uteomr/i, kind: 'outdoor', outdoor: true,
+        poly: [[-18.96, 2.3], [-5.03, 2.3], [-5.03, 10.25], [-19.29, 10.25]]
+      },
+      {
         id: 'f1-terrasse', name: 'Terrasse', match: /terr?asse/i, kind: 'outdoor', outdoor: true,
         poly: [[5.9, -0.6], [8.55, -0.6], [8.55, 6.3], [-0.7, 6.3], [-0.7, 5.1], [6.2, 5.1]]
       }
@@ -73,11 +82,12 @@ export const FLOORS = [
     id: 'floor2',
     label: '2. etasje',
     short: '2',
-    level: 6.0,
+    level: 5.92,
     height: 2.5,
     planId: 'homeFloor2',
     rooms: [
-      { id: 'f2-vinterhage', name: 'Vinterhage',          rect: [-13.7, -2.35, -5.0, 2.27], match: /vinter|loft/i, kind: 'glass' },
+      // Innglassingen ble aldri utført – åpen takterrasse over garasjen
+      { id: 'f2-vinterhage', name: 'Takterrasse vest',    rect: [-13.7, -2.35, -5.0, 2.27], match: /vinter|loft|takterr/i, kind: 'outdoor', outdoor: true },
       { id: 'f2-sov6',       name: 'Soverom 6 / Vendela', rect: [-4.83, -2.2, -1.47, 0.08], match: /vendela|soverom 6/i, kind: 'bed' },
       { id: 'f2-sov4',       name: 'Soverom 4 / Andrea',  rect: [-1.36, -2.2, 1.6, 0.08],   match: /andrea|soverom 4/i, kind: 'bed' },
       { id: 'f2-gang',       name: 'Gang/trapp',          rect: [-4.83, 0.08, 1.6, 2.1],    match: /gang.*trapp|gang 2/i, kind: 'hall' },
@@ -96,6 +106,9 @@ export const FLOORS = [
 
 /** Takflate over 2. etasje (+13.76). */
 export const ROOF_LEVEL = 8.76;
+
+/** BIM-modell (GLB). Nodenavn: «<gruppe>|<IfcType>|<navn>|<GlobalId>|<mat>», gruppe = basement/floor1/floor2/roof/site. */
+export const BIM_MODEL_URL = '/models/hunstein48c.glb';
 
 /**
  * Transformasjon fra prosent-koordinater på 2D-plantegningene (de eksisterende
