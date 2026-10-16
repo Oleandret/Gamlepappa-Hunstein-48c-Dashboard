@@ -1,3 +1,5 @@
+import { recordAction } from '../lib/audit.js';
+import { capValue } from '../lib/validation.js';
 import { Router } from 'express';
 import { homeyClient } from '../lib/homeyClient.js';
 import { isDemoMode } from '../config.js';
@@ -12,19 +14,25 @@ import {
 
 export const homeyRoutes = Router();
 
-const safe = (handler, fallback) => async (req, res) => {
-  try {
-    if (isDemoMode()) return res.json(await fallback(req));
-    const data = await handler(req);
-    res.json(data);
-  } catch (err) {
-    console.warn('[homey] falling back to mock:', sanitizeMessage(err.message));
-    res.json({
-      ...(await fallback(req)),
-      _fallback: true,
-      _error: sanitizeMessage(err.message)
-    });
-  }
+const safe = (handler, fallback) => {
+  const snapshots = new Map();
+  return async (req, res) => {
+    const key = req.originalUrl;
+    if (isDemoMode()) return res.json({ ...(await fallback(req)), _quality: 'demo', _updatedAt: null });
+    try {
+      const data = await handler(req);
+      const updatedAt = new Date().toISOString();
+      snapshots.set(key, { data, updatedAt });
+      if (snapshots.size > 50) snapshots.delete(snapshots.keys().next().value);
+      res.json({ ...data, _quality: 'live', _updatedAt: updatedAt });
+    } catch (err) {
+      const previous = snapshots.get(key);
+      const recent = previous && Date.now() - Date.parse(previous.updatedAt) < 5 * 60_000;
+      res.status(recent ? 200 : 503).json({ ...(recent ? previous.data : {}),
+        _quality: recent ? 'stale' : 'unavailable', _updatedAt: previous?.updatedAt || null,
+        error: 'Homey-data er ikke tilgjengelige', _error: sanitizeMessage(err.message) });
+    }
+  };
 };
 
 function sanitizeMessage(s) {
@@ -87,7 +95,7 @@ homeyRoutes.get('/security', safe(
   async () => {
     const devices = await homeyClient.listDevices();
     const list = Object.values(devices).filter(d => ['sensor', 'lock', 'camera'].includes(d.class));
-    return { devices: list, armed: false, healthScore: computeHealthScore(list) };
+    return { devices: list, armed: null, healthScore: computeHealthScore(list) };
   },
   async () => {
     const list = Object.values(MOCK_DEVICES).filter(d => ['sensor', 'lock', 'camera'].includes(d.class));
@@ -98,7 +106,7 @@ homeyRoutes.get('/security', safe(
 function computeHealthScore(devices) {
   if (!devices.length) return 0;
   const offline = devices.filter(d => d.available === false).length;
-  const lowBattery = devices.filter(d => d.capabilities?.alarm_battery === true).length;
+  const lowBattery = devices.filter(d => (d.capabilitiesObj?.alarm_battery?.value ?? d.capabilities?.alarm_battery) === true).length;
   const score = 100 - (offline * 8) - (lowBattery * 4);
   return Math.max(0, Math.min(100, score));
 }
@@ -149,8 +157,12 @@ homeyRoutes.post('/devices/:id/capability/:cap', async (req, res) => {
       }
       return res.json({ ok: true, mocked: true });
     }
+    const auditId = await recordAction('device_command', {deviceId:id, capability:cap, value}, 'pending', req.user?.role || 'unknown');
     await homeyClient.setCapability(id, cap, value);
-    res.json({ ok: true });
+    const fresh = await homeyClient.refreshDevices().catch(() => null);
+    const confirmed = fresh ? capValue(fresh[id],cap) === value : false;
+    await recordAction('device_result', {commandId:auditId,deviceId:id,capability:cap,value}, confirmed?'confirmed':'unconfirmed', req.user?.role || 'unknown');
+    res.json({ ok: true, confirmed });
   } catch (err) {
     console.warn('[homey] setCapability failed:', sanitizeMessage(err.message));
     res.status(502).json({ error: 'homey unreachable' });
@@ -164,8 +176,10 @@ homeyRoutes.post('/flows/:id/run', async (req, res) => {
   }
   try {
     if (isDemoMode()) return res.json({ ok: true, mocked: true });
+    await recordAction('flow_request', {flowId:id}, 'pending', req.user?.role || 'unknown');
     await homeyClient.runFlow(id);
-    res.json({ ok: true });
+    await recordAction('flow_result', {flowId:id}, 'accepted', req.user?.role || 'unknown');
+    res.json({ ok:true, confirmed:false });
   } catch (err) {
     console.warn('[homey] runFlow failed:', sanitizeMessage(err.message));
     res.status(502).json({ error: 'homey unreachable' });

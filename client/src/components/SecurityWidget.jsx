@@ -2,7 +2,7 @@ import { Lock, ShieldCheck, DoorOpen, Activity, Camera } from 'lucide-react';
 import { useMemo } from 'react';
 
 export function SecurityWidget({ security }) {
-  const armed = security?.armed ?? false;
+  const armed = security?.armed ?? null;
   const score = clampScore(security?.healthScore);
 
   const counts = useMemo(() => {
@@ -31,7 +31,7 @@ export function SecurityWidget({ security }) {
             'h-1.5 w-1.5 rounded-full animate-pulseGlow',
             armed ? 'bg-nx-green' : 'bg-nx-amber'
           ].join(' ')} aria-hidden="true" />
-          {armed ? 'Systemet er aktivt' : 'Inaktivt'}
+          {armed === null ? 'Ukjent alarmstatus' : armed ? 'Systemet er aktivt' : 'Inaktivt'}
         </span>
       </div>
 
@@ -55,7 +55,7 @@ export function SecurityWidget({ security }) {
           <div className="text-center">
             <ShieldCheck size={20} className="text-nx-green mx-auto" aria-hidden="true"/>
             <div className="font-mono text-xl mt-0.5">
-              {score}<span className="text-nx-mute text-xs">/100</span>
+              {score ?? '—'}<span className="text-nx-mute text-xs">/100</span>
             </div>
           </div>
         </div>
@@ -78,7 +78,7 @@ export function SecurityWidget({ security }) {
 
 function clampScore(s) {
   const n = Number(s);
-  if (!Number.isFinite(n)) return 96;
+  if (s == null || !Number.isFinite(n)) return null;
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 

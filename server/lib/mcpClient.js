@@ -1,221 +1,100 @@
-/**
- * Minimal MCP-klient som snakker JSON-RPC over HTTP mot Homey-MCP-serveren.
- *
- * Config:
- *   HOMEY_MCP_URL — endpoint (eks. http://92.221.70.95:3000/mcp)
- *
- * Vi følger Model Context Protocol-spesifikasjonen:
- *   - initialize  → handshake med capabilities
- *   - tools/list  → liste verktøy
- *   - tools/call  → utfør verktøy
- *
- * Mange MCP-server-implementasjoner krever en sesjon. Vi initialiserer
- * én gang, husker session-id (Mcp-Session-Id-header), og bruker den på
- * påfølgende kall. Hvis sesjonen brytes, init på nytt.
- */
-
-const DEFAULT_URL = 'http://92.221.70.95:3000/mcp';
-const CLIENT_INFO = { name: 'gamlepappa-dashboard', version: '1.0.0' };
-const PROTOCOL_VERSION = '2025-06-18';
-
-let sessionId = null;
-let toolsCache = null;
-let toolsCacheAt = 0;
-const TOOLS_CACHE_TTL = 5 * 60 * 1000;
-let nextRpcId = 1;
-
-export function mcpUrl() {
-  return process.env.HOMEY_MCP_URL || DEFAULT_URL;
+import { enqueueCommand } from './commandQueue.js';
+const READ_TOOLS = new Set(['get_home_structure','search_tools','get_device','get_devices','get_zones','get_flows']);
+let sessionId, initialized, toolsCache, initializedPromise;
+let nextId = 1;
+export function mcpUrl() { return process.env.HOMEY_MCP_URL || ''; }
+export function mcpConfigured() { return Boolean(mcpUrl() && process.env.HOMEY_MCP_TOKEN); }
+export function getLastRawResponse() { return null; } // Raw responses/session IDs never leave the server.
+function endpoint() {
+  if (!process.env.HOMEY_MCP_TOKEN) throw new Error('MCP-autentisering er ikke konfigurert');
+  const url = new URL(mcpUrl());
+  if (url.protocol !== 'https:' || url.username || url.password) throw new Error('MCP krever HTTPS uten credentials i URL');
+  return url.href;
 }
-
-export function mcpConfigured() {
-  // MCP-URL har en default — alltid 'konfigurert'. Funksjonen er for
-  // konsekvent grensesnitt mot resten av appen.
-  return Boolean(mcpUrl());
+function headers() {
+  return { 'Content-Type':'application/json', Accept:'application/json, text/event-stream',
+    'MCP-Protocol-Version':'2025-06-18',
+    ...(sessionId ? {'Mcp-Session-Id':sessionId} : {}),
+    ...(process.env.HOMEY_MCP_TOKEN ? {Authorization:`Bearer ${process.env.HOMEY_MCP_TOKEN}`} : {}) };
 }
-
-// Siste rå-respons fra en RPC, eksponert til chat-endepunktet for debug
-let lastRawResponse = null;
-export function getLastRawResponse() { return lastRawResponse; }
-
-/**
- * Send en JSON-RPC request. Returnerer parsed result (eller kaster).
- * Håndterer både SSE-respons og vanlig JSON-respons. Fanger raw body
- * i lastRawResponse for diagnostikk.
- */
-async function rpc(method, params = {}, { withSession = true } = {}) {
-  const url = mcpUrl();
-  const id = nextRpcId++;
-  const body = { jsonrpc: '2.0', id, method, params };
-  const headers = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json, text/event-stream'
-  };
-  if (withSession && sessionId) headers['Mcp-Session-Id'] = sessionId;
-  const startedAt = Date.now();
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body)
-  });
-
-  // Server kan returnere session-id på initialize
-  const newSession = res.headers.get('Mcp-Session-Id');
-  if (newSession) sessionId = newSession;
-
-  const contentType = res.headers.get('content-type') || '';
-
-  // Les body som tekst FØRST slik at vi kan logge selv hvis JSON-parsing feiler
-  const rawText = await res.text().catch(() => '');
-  lastRawResponse = {
-    method,
-    requestId: id,
-    status: res.status,
-    contentType,
-    sessionId: newSession || sessionId,
-    bodyBytes: rawText.length,
-    rawBody: rawText.slice(0, 4000),
-    durationMs: Date.now() - startedAt
-  };
-
-  console.log(`[mcp] ${method} (id=${id}) → ${res.status} ${contentType} ${rawText.length}B in ${Date.now() - startedAt}ms`);
-
-  if (!res.ok) {
-    throw new Error(`MCP ${method} → ${res.status}: ${rawText.slice(0, 300)}`);
-  }
-
-  let payload;
-
-  // 202 Accepted med tom body = response kommer asynkront via en separat GET
-  // (modern MCP Streamable HTTP). Vi støtter ikke det per nå — gi tydelig feil.
-  if (res.status === 202 && !rawText) {
-    throw new Error(`MCP ${method}: serveren returnerte 202 Accepted uten body. Krever async SSE-stream på separat GET — ikke støttet ennå.`);
-  }
-
-  if (contentType.includes('text/event-stream') || rawText.trimStart().startsWith('event:') || rawText.trimStart().startsWith('data:')) {
-    // SSE — parse events korrekt:
-    //   * Events er separert med \n\n
-    //   * Innenfor et event har vi 'data:' / 'event:' / 'id:' / 'retry:' linjer
-    //   * Flere data:-linjer i samme event skal konkateneres med \n
-    const events = rawText.split(/\r?\n\r?\n/);
-    const allParsed = [];
-    let unparsable = 0;
-    for (const evt of events) {
-      const dataLines = [];
-      for (const rawLine of evt.split(/\r?\n/)) {
-        if (!rawLine.startsWith('data:')) continue;
-        const line = rawLine.slice(5);
-        dataLines.push(line.startsWith(' ') ? line.slice(1) : line);
-      }
-      if (dataLines.length === 0) continue;
-      const data = dataLines.join('\n').trim();
-      if (!data) continue;
-      try {
-        const msg = JSON.parse(data);
-        allParsed.push(msg);
-        if (msg.id === id || String(msg.id) === String(id)) payload = msg;
-      } catch {
-        unparsable++;
+export async function readRpcResponse(response, id) {
+  let buffer='', bytes=0;
+  const decoder = new TextDecoder();
+  const sse = (response.headers.get('content-type') || '').includes('text/event-stream');
+  const reader = response.body.getReader();
+  try {
+    while (true) {
+      const {value,done}=await reader.read();
+      if (done) break;
+      bytes+=value.byteLength;
+      if (bytes>2_000_000) throw new Error('MCP response too large');
+      buffer+=decoder.decode(value,{stream:true});
+      if (sse) {
+        buffer=buffer.replace(/\r\n/g,'\n');
+        let end;
+        while ((end=buffer.indexOf('\n\n'))>=0) {
+          const event=buffer.slice(0,end);buffer=buffer.slice(end+2);
+          const data=event.split('\n').filter(x=>x.startsWith('data:')).map(x=>x.slice(5).trimStart()).join('\n');
+          if (!data) continue;
+          const msg=JSON.parse(data);
+          if (msg.id === id) return unwrap(msg,id);
+        }
       }
     }
-    lastRawResponse.parsedEvents = allParsed.length;
-    lastRawResponse.unparsableEvents = unparsable;
-
-    if (!payload) {
-      const candidate = allParsed.find(m => m && (m.result !== undefined || m.error !== undefined));
-      if (candidate) payload = candidate;
-    }
-    if (!payload) {
-      throw new Error(`MCP ${method}: ingen JSON-RPC respons i SSE-stream (${allParsed.length} events parset, ${unparsable} feilet, ${rawText.length} bytes)`);
-    }
-  } else if (rawText) {
-    try {
-      payload = JSON.parse(rawText);
-    } catch (err) {
-      throw new Error(`MCP ${method}: kunne ikke parse JSON-respons: ${err.message}. Body: ${rawText.slice(0, 200)}`);
-    }
-  } else {
-    throw new Error(`MCP ${method}: tom respons fra serveren (status ${res.status})`);
-  }
-
-  lastRawResponse.parsedPayload = payload ? JSON.stringify(payload).slice(0, 2000) : null;
-
-  if (payload.error) {
-    throw new Error(`MCP ${method} error: ${payload.error.message || JSON.stringify(payload.error)}`);
-  }
-  return payload.result;
+    if (sse) throw new Error('MCP stream ended without matching response');
+    return unwrap(JSON.parse(buffer),id);
+  } finally { await reader.cancel().catch(()=>{}); }
 }
-
+function unwrap(msg,id) {
+  if (msg.jsonrpc!=='2.0' || msg.id!==id) throw new Error('MCP response ID mismatch');
+  if (msg.error) throw new Error(`MCP RPC error ${msg.error.code || ''}`);
+  return msg.result;
+}
+async function rpc(method,params={}) {
+  const id=nextId++;
+  const response=await fetch(endpoint(),{method:'POST',headers:headers(),body:JSON.stringify({jsonrpc:'2.0',id,method,params}),signal:AbortSignal.timeout(20000),redirect:'error'});
+  if (response.status===404) { resetSession(); throw new Error('MCP session expired; request not retried'); }
+  if (!response.ok) throw new Error(`MCP HTTP ${response.status}`);
+  if (method==='initialize') sessionId=response.headers.get('Mcp-Session-Id');
+  return readRpcResponse(response,id);
+}
 async function ensureInitialized() {
-  if (sessionId) return;
-  try {
-    await rpc('initialize', {
-      protocolVersion: PROTOCOL_VERSION,
-      capabilities: { tools: {} },
-      clientInfo: CLIENT_INFO
-    }, { withSession: false });
-    // Etter init må vi sende 'notifications/initialized' (no response)
-    try {
-      await fetch(mcpUrl(), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          ...(sessionId ? { 'Mcp-Session-Id': sessionId } : {})
-        },
-        body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })
-      });
-    } catch { /* notification is fire-and-forget */ }
-  } catch (err) {
-    sessionId = null;
-    throw err;
-  }
+  if (initialized) return;
+  if (!initializedPromise) initializedPromise=(async()=>{
+    await rpc('initialize',{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'dashboard',version:'2.0'}});
+    const response=await fetch(endpoint(),{method:'POST',headers:headers(),body:JSON.stringify({jsonrpc:'2.0',method:'notifications/initialized'}),signal:AbortSignal.timeout(10000),redirect:'error'});
+    if (!response.ok) throw new Error('MCP initialization notification failed');
+    await response.body?.cancel(); initialized=true;
+  })().finally(()=>{initializedPromise=null;});
+  return initializedPromise;
 }
-
-export async function listTools({ force = false } = {}) {
-  if (!force && toolsCache && Date.now() - toolsCacheAt < TOOLS_CACHE_TTL) {
-    return toolsCache;
-  }
+function allowed(name) {
+  let writes=[];try { writes=JSON.parse(process.env.HOMEY_MCP_ALLOWED_TOOLS_JSON || '[]'); } catch { /* deny */ }
+  return READ_TOOLS.has(name) || (Array.isArray(writes) && writes.includes(name));
+}
+export async function listTools({force=false}={}) {
+  if (!mcpConfigured()) return [];
+  if (!force && toolsCache && Date.now()-toolsCache.ts<300000) return toolsCache.tools;
   await ensureInitialized();
-  const result = await rpc('tools/list');
-  const tools = Array.isArray(result?.tools) ? result.tools : [];
-  toolsCache = tools;
-  toolsCacheAt = Date.now();
-  return tools;
-}
-
-export async function callTool(name, args = {}) {
-  await ensureInitialized();
-  try {
-    return await rpc('tools/call', { name, arguments: args });
-  } catch (err) {
-    // Hvis sesjonen har gått ut, prøv én gang til etter re-init
-    if (/session/i.test(err.message) || /not initialized/i.test(err.message)) {
-      sessionId = null;
-      await ensureInitialized();
-      return await rpc('tools/call', { name, arguments: args });
-    }
-    throw err;
+  const tools=[];let cursor;
+  for (let page=0;page<10;page++) {
+    const result=await rpc('tools/list',cursor?{cursor}:{});
+    tools.push(...(result?.tools || []).filter(t=>allowed(t.name)));
+    cursor=result?.nextCursor;if(!cursor) break;
   }
+  toolsCache={ts:Date.now(),tools};return tools;
 }
-
-export function resetSession() {
-  sessionId = null;
-  toolsCache = null;
-  toolsCacheAt = 0;
+export async function callTool(name,args={}) {
+  if (process.env.DEMO_MODE==='true') throw new Error('MCP handlinger er av i demo');
+  const tools=await listTools();
+  const tool=tools.find(t=>t.name===name);
+  if (!tool || !allowed(name)) throw new Error('MCP-verktøyet er ikke tillatt');
+  if (!args || typeof args!=='object' || Array.isArray(args)) throw new Error('Ugyldige verktøyargumenter');
+  for (const key of tool.inputSchema?.required || []) if (!(key in args)) throw new Error('Manglende verktøyargument');
+  // Shared rate-limited command lane. No automatic retry of side effects.
+  return enqueueCommand(()=>rpc('tools/call',{name,arguments:args}),`mcp:${name}`);
 }
-
-/**
- * Konverter MCP tools til OpenAI Chat Completions tool-format.
- */
+export function resetSession() { sessionId=null;initialized=false;toolsCache=null; }
 export function toOpenAITools(tools) {
-  return (tools || []).map(t => ({
-    type: 'function',
-    function: {
-      name: t.name,
-      description: t.description || '',
-      parameters: t.inputSchema || { type: 'object', properties: {} }
-    }
-  }));
+  return tools.map(t=>({type:'function',function:{name:t.name,description:t.description || '',parameters:t.inputSchema || {type:'object',properties:{}}}}));
 }

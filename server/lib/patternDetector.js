@@ -38,7 +38,7 @@ export async function detectCoOccurrence() {
       SELECT id, ts, device_id, device_name, zone, capability,
              COALESCE(value::text, 'null') AS val
       FROM device_events
-      WHERE kind = 'transition' AND ts > NOW() - ($1 || ' days')::interval
+      WHERE kind = 'transition' AND prev_value IS NOT NULL AND time_source = 'device' AND ts > NOW() - ($1 || ' days')::interval
     ),
     a_totals AS (
       SELECT device_id, device_name, zone, capability, val, COUNT(*)::int AS total
@@ -52,7 +52,7 @@ export async function detectCoOccurrence() {
         a.capability  AS a_cap,  a.val          AS a_val,
         b.device_id   AS b_id,   b.device_name AS b_name,   b.zone AS b_zone,
         b.capability  AS b_cap,  b.val          AS b_val,
-        COUNT(*)::int AS pair_count,
+        COUNT(DISTINCT a.id)::int AS pair_count,
         AVG(EXTRACT(EPOCH FROM (b.ts - a.ts)))::real    AS avg_delay,
         STDDEV(EXTRACT(EPOCH FROM (b.ts - a.ts)))::real AS stddev_delay
       FROM events a
@@ -62,7 +62,7 @@ export async function detectCoOccurrence() {
        AND b.device_id <> a.device_id
       GROUP BY a.device_id, a.device_name, a.zone, a.capability, a.val,
                b.device_id, b.device_name, b.zone, b.capability, b.val
-      HAVING COUNT(*) >= $2
+      HAVING COUNT(DISTINCT a.id) >= $2
     )
     SELECT p.*, t.total AS a_total,
            (p.pair_count::real / t.total) AS confidence
@@ -70,6 +70,8 @@ export async function detectCoOccurrence() {
     JOIN a_totals t ON t.device_id = p.a_id
                    AND t.capability = p.a_cap
                    AND t.val = p.a_val
+                   AND t.device_name IS NOT DISTINCT FROM p.a_name
+                   AND t.zone IS NOT DISTINCT FROM p.a_zone
     WHERE (p.pair_count::real / t.total) >= $4
     ORDER BY (p.pair_count::real / t.total) * p.pair_count DESC
     LIMIT 50
@@ -100,9 +102,9 @@ export async function detectTimeBased() {
       SELECT device_id, device_name, zone, capability,
              COALESCE(value::text, 'null') AS val,
              is_weekend,
-             EXTRACT(HOUR FROM ts)::real + EXTRACT(MINUTE FROM ts)::real / 60.0 AS hour_dec
+             EXTRACT(HOUR FROM ts AT TIME ZONE 'Europe/Oslo')::real + EXTRACT(MINUTE FROM ts AT TIME ZONE 'Europe/Oslo')::real / 60.0 AS hour_dec
       FROM device_events
-      WHERE kind = 'transition' AND ts > NOW() - ($1 || ' days')::interval
+      WHERE kind = 'transition' AND prev_value IS NOT NULL AND ts > NOW() - ($1 || ' days')::interval
     )
     SELECT device_id, device_name, zone, capability, val, is_weekend,
            COUNT(*)::int AS occurrences,

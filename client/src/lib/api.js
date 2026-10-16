@@ -1,13 +1,19 @@
+export async function apiFetch(url, options = {}) {
+  const token = sessionStorage.getItem('dashboard.session');
+  const response = await fetch(url, { ...options, headers: { ...options.headers, ...(token ? {Authorization: `Bearer ${token}`} : {}) } });
+  if (response.status === 401) window.dispatchEvent(new Event('dashboard-auth-required'));
+  return response;
+}
 const BASE = import.meta.env.VITE_API_BASE || '';
 
 async function jget(path, signal) {
-  const r = await fetch(`${BASE}/api${path}`, { signal });
+  const r = await apiFetch(`${BASE}/api${path}`, { signal });
   if (!r.ok) throw new Error(`${path} → ${r.status}`);
   return r.json();
 }
 
 async function jpost(path, body) {
-  const r = await fetch(`${BASE}/api${path}`, {
+  const r = await apiFetch(`${BASE}/api${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined
@@ -55,7 +61,7 @@ export const api = {
       return jget(`/events/suggestions${q}`, signal);
     },
     generateSuggestions: () => jpost('/events/suggestions/generate'),
-    updateSuggestionStatus: (id, status) => fetch(`${BASE}/api/events/suggestions/${id}`, {
+    updateSuggestionStatus: (id, status) => apiFetch(`${BASE}/api/events/suggestions/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status })
@@ -68,7 +74,7 @@ export const api = {
     autoFlows:        (signal) => jget('/events/auto-flows', signal),
     autoFlowRuns:     (id, signal) => jget(`/events/auto-flows/${id}/runs`, signal),
     compileSuggestion: (id) => jpost(`/events/suggestions/${id}/compile`),
-    updateAutoFlow:   (id, patch) => fetch(`${BASE}/api/events/auto-flows/${id}`, {
+    updateAutoFlow:   (id, patch) => apiFetch(`${BASE}/api/events/auto-flows/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patch)
@@ -76,7 +82,7 @@ export const api = {
       if (!r.ok) throw new Error(`PATCH auto-flow → ${r.status}`);
       return r.json();
     }),
-    deleteAutoFlow:   (id) => fetch(`${BASE}/api/events/auto-flows/${id}`, {
+    deleteAutoFlow:   (id) => apiFetch(`${BASE}/api/events/auto-flows/${id}`, {
       method: 'DELETE'
     }).then(r => {
       if (!r.ok) throw new Error(`DELETE auto-flow → ${r.status}`);
@@ -89,10 +95,10 @@ export const api = {
     status: (signal) => jget('/chat/status', signal),
     tools:  (signal) => jget('/chat/tools', signal),
     reset:  () => jpost('/chat/reset'),
-    send:   (messages) => fetch(`${BASE}/api/chat/message`, {
+    send:   (messages) => apiFetch(`${BASE}/api/chat/message`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages })
+      body: JSON.stringify({ messages: messages.filter(m => ['user','assistant'].includes(m.role) && typeof m.content === 'string' && m.content).slice(-40).map(m => ({role:m.role,content:m.content})) })
     }).then(async r => {
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
@@ -106,7 +112,7 @@ export const api = {
   config: {
     getAll: (signal) => jget('/config', signal),
     get: (ns, signal) => jget(`/config/${encodeURIComponent(ns)}`, signal),
-    put: (ns, value) => fetch(`${BASE}/api/config/${encodeURIComponent(ns)}`, {
+    put: (ns, value) => apiFetch(`${BASE}/api/config/${encodeURIComponent(ns)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ value })
@@ -114,7 +120,7 @@ export const api = {
       if (!r.ok) throw new Error(`PUT /config/${ns} → ${r.status}`);
       return r.json();
     }),
-    del: (ns) => fetch(`${BASE}/api/config/${encodeURIComponent(ns)}`, {
+    del: (ns) => apiFetch(`${BASE}/api/config/${encodeURIComponent(ns)}`, {
       method: 'DELETE'
     }).then(r => {
       if (!r.ok) throw new Error(`DELETE /config/${ns} → ${r.status}`);

@@ -1,3 +1,5 @@
+import { validateFlow } from '../lib/validation.js';
+import { homeyClient } from '../lib/homeyClient.js';
 import { Router } from 'express';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -36,7 +38,7 @@ async function inspectStorage() {
 
   // Forsøk å opprette mappa (idempotent). Hvis dette feiler er FS read-only.
   try {
-    await fs.mkdir(dir, { recursive: true });
+    await fs.stat(dir);
     result.dirExists = true;
   } catch (err) {
     result.error = `Kunne ikke opprette ${dir}: ${err.message}`;
@@ -46,9 +48,7 @@ async function inspectStorage() {
 
   // Test skriv ved å lage og slette en probe-fil
   try {
-    const probe = path.join(dir, '.write-test');
-    await fs.writeFile(probe, '', { flag: 'w' });
-    await fs.unlink(probe);
+    await fs.access(dir, 2);
     result.writable = true;
   } catch (err) {
     result.error = err.message;
@@ -282,6 +282,11 @@ eventsRoutes.patch('/auto-flows/:id', async (req, res, next) => {
     const patch = req.body || {};
     const fields = [];
     const values = [];
+    if (patch.enabled === true) {
+      const {rows} = await query('SELECT trigger,actions FROM auto_flows WHERE id=$1', [id]);
+      if (!rows[0]) return res.status(404).json({error:'Flow finnes ikke'});
+      validateFlow(rows[0], await homeyClient.listDevices(), await homeyClient.listFlows());
+    }
     if (typeof patch.enabled === 'boolean') {
       values.push(patch.enabled);
       fields.push(`enabled = $${values.length}`);

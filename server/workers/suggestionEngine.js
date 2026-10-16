@@ -73,7 +73,7 @@ async function loadTopPatterns(limit = 40) {
 }
 
 function buildUserPrompt(patterns, flows) {
-  const flowList = flows
+  const flowList = (Array.isArray(flows) ? flows : Object.values(flows || {}))
     .filter(f => f.enabled !== false)
     .slice(0, 80)
     .map(f => `- ${f.name}${f.folder ? ` (${f.folder})` : ''}`)
@@ -132,7 +132,8 @@ export async function runSuggestionEngine() {
   let saved = 0;
   for (const s of items) {
     if (!s?.title || !s?.description) continue;
-    const patternIds = Array.isArray(s.patternIds) ? s.patternIds.filter(Number.isInteger) : [];
+    const patternIds = Array.isArray(s.patternIds) ? s.patternIds.filter(id => Number.isInteger(id) && patterns.some(p => Number(p.id) === id)) : [];
+    if (!patternIds.length) continue;
     await query(
       `INSERT INTO suggestions (title, description, trigger_text, action_text, why, confidence, pattern_ids, model)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,

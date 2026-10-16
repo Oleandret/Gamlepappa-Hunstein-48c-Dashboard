@@ -1,3 +1,5 @@
+import { validateMessages } from '../lib/validation.js';
+import { fetchJson } from '../lib/http.js';
 import { Router } from 'express';
 import { openaiEnabled } from '../lib/openaiClient.js';
 import { listTools, callTool, toOpenAITools, mcpUrl, resetSession, getLastRawResponse } from '../lib/mcpClient.js';
@@ -6,7 +8,7 @@ import { getNamespace } from '../lib/configStore.js';
 export const chatRoutes = Router();
 
 const FALLBACK_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini';
-const MAX_TOOL_ITERATIONS = Number(process.env.CHAT_MAX_ITERATIONS) || 15;
+const MAX_TOOL_ITERATIONS = Math.min(8, Math.max(1, Number(process.env.CHAT_MAX_ITERATIONS) || 5));
 
 /**
  * Hent chat-modellen fra config (slot 'chat'). Faller tilbake til env og
@@ -23,6 +25,7 @@ async function getChatModel() {
 }
 
 const SYSTEM_PROMPT = `Du er en smart-hus-assistent for Gamlepappa Hunstein 48c.
+Når ingen verktøy er tilgjengelige, si tydelig at du ikke kan styre huset. Aldri påstå at en handling er utført uten et vellykket verktøyresultat.
 Du har tilgang til Homey-verktøy via MCP som lar deg lese og styre alle enhetene i huset og på hytta.
 
 KRITISK — XML-STRUKTUREN:
@@ -53,7 +56,7 @@ ARBEIDSFLYT:
      ekte <light>-tags, sjekk om huset bruker socket-baserte lys (smart-plugger
      med onoff+dim-capabilities).
 3. For HVER lys-enhet du fant: kall riktig tool med deviceId, capability="dim",
-   value=1.0 (eller onoff=true).
+   value lik brukerens ønskede prosent delt på 100. Ikke anta 100%.
 4. Hvis det finnes et control_zone_lights-tool og en sone med <light>-barn,
    kan du bruke zoneId — men kun hvis det FINNES en <zone> med det navnet.
 
@@ -82,7 +85,7 @@ async function callOpenAI({ messages, tools, model }) {
     temperature: 0.3,
     max_tokens: 1500
   };
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  return fetchJson('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -90,11 +93,6 @@ async function callOpenAI({ messages, tools, model }) {
     },
     body: JSON.stringify(body)
   });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`OpenAI ${res.status}: ${text.slice(0, 300)}`);
-  }
-  return res.json();
 }
 
 function mcpContentToString(result) {
@@ -122,7 +120,7 @@ chatRoutes.get('/status', async (_req, res) => {
   const model = await getChatModel();
   res.json({
     llm: openaiEnabled(),
-    mcpUrl: mcpUrl(),
+    mcpConfigured: Boolean(mcpUrl() && process.env.HOMEY_MCP_TOKEN),
     model,
     fallbackModel: FALLBACK_MODEL
   });
@@ -152,8 +150,9 @@ chatRoutes.post('/reset', async (_req, res) => {
  */
 chatRoutes.post('/message', async (req, res, next) => {
   try {
+    if (process.env.DEMO_MODE === 'true') return res.status(400).json({error:'AI-styring er av i demo'});
     if (!openaiEnabled()) return res.status(400).json({ error: 'OPENAI_API_KEY ikke satt' });
-    const inboundMessages = Array.isArray(req.body?.messages) ? req.body.messages : [];
+    const inboundMessages = validateMessages(req.body?.messages);
     if (inboundMessages.length === 0) return res.status(400).json({ error: 'mangler messages' });
 
     // Hent tools fra MCP. Hvis MCP er nede, prøv likevel uten tools.
@@ -180,6 +179,7 @@ chatRoutes.post('/message', async (req, res, next) => {
       const choice = openaiResponse.choices?.[0];
       if (!choice) throw new Error('OpenAI returnerte ingen choices');
       const assistantMsg = choice.message;
+      if ((assistantMsg.tool_calls?.length || 0) > 5) throw new Error('For mange verktøykall i ett svar');
 
       // Legg til assistant-meldingen i historikken
       const persistAssistant = {
@@ -203,12 +203,12 @@ chatRoutes.post('/message', async (req, res, next) => {
       }
 
       // Kjør hver tool-call
-      for (const tc of assistantMsg.tool_calls) {
+      for (const tc of assistantMsg.tool_calls.slice(0, 5)) {
         const fn = tc.function || {};
         const name = fn.name;
         let args = {};
         try { args = fn.arguments ? JSON.parse(fn.arguments) : {}; }
-        catch { args = {}; }
+        catch { throw Object.assign(new Error('Ugyldige JSON-argumenter fra modellen'), {status:502}); }
 
         let resultText, isError = false;
         let debugInfo = null;

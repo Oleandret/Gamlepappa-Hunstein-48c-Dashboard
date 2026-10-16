@@ -16,6 +16,7 @@ const ALLOWED_NS = new Set([
   'house3dRooms',       // kobling rom i 3D-modellen ↔ Homey-soner
   'flowsSidebarFlows',  // brukervalgte flows i høyre-sidebar (kommer senere)
   'frontSpecials',      // hvilke spesial-kort (Tesla/Tibber/Støvsuger) som vises på Oversikt
+  'scenes',
   'aiModels'            // hvilken OpenAI-modell som brukes for chat og suggestion-engine
 ]);
 
@@ -43,6 +44,8 @@ configRoutes.put('/:ns', async (req, res, next) => {
   try {
     if (!valid(req.params.ns)) return res.status(400).json({ error: 'unknown namespace' });
     if (!('value' in (req.body || {}))) return res.status(400).json({ error: 'missing body.value' });
+    if (req.body.value === null || typeof req.body.value !== 'object' || JSON.stringify(req.body.value).length > 64000) return res.status(400).json({error:'Ugyldig konfigurasjon'});
+    if (req.params.ns === 'scenes') return res.status(400).json({error:'Bruk stemningseditoren'});
     const saved = await setNamespace(req.params.ns, req.body.value);
     res.json({ value: saved });
   } catch (err) { next(err); }

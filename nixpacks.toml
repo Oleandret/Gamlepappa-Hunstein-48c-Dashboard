@@ -1,18 +1,9 @@
-# Railway/Nixpacks configuration
-# IMPORTANT: --include=dev forces Vite + build tools to install even when
-# Railway sets NODE_ENV=production (otherwise devDependencies get skipped).
+# Legacy fallback. Railway uses Dockerfile for this branch.
 [phases.setup]
-nixPkgs = ["nodejs_20", "npm-9_x"]
-
+nixPkgs = ["nodejs_22"]
 [phases.install]
-cmds = [
-  "npm ci --include=dev || npm install --include=dev",
-  "npm install --include=dev --prefix server",
-  "npm install --include=dev --prefix client"
-]
-
+cmds = ["npm ci --ignore-scripts --prefix server", "npm ci --ignore-scripts --prefix client"]
 [phases.build]
-cmds = ["npm run build --prefix client"]
-
+cmds = ["npm run build"]
 [start]
-cmd = "npm start --prefix server"
+cmd = "npm start"

@@ -25,14 +25,10 @@ export function getPool() {
   if (pool) return pool;
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    // Railway proxies eksternt-formet URL ofte over TLS uten gyldig CA-rot.
-    // For interne (private) URL'er trengs ikke SSL. Bruk PGSSLMODE=require
-    // hvis du peker mot ekstern URL.
-    ssl: process.env.PGSSLMODE === 'require'
-      ? { rejectUnauthorized: false }
-      : (process.env.DATABASE_URL || '').includes('railway.app') && !process.env.DATABASE_URL.includes('railway.internal')
-        ? { rejectUnauthorized: false }
-        : false,
+    // Certificate verification is mandatory for public DB endpoints.
+    ssl: (process.env.DATABASE_URL || '').includes('.railway.internal')
+      ? false : { rejectUnauthorized: true, ...(process.env.PG_TLS_CA ? {ca: process.env.PG_TLS_CA} : {}) },
+    statement_timeout: 15000,
     max: 10,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 8000
@@ -178,6 +174,26 @@ export async function runMigrations() {
     `);
     await p.query(`CREATE INDEX IF NOT EXISTS idx_auto_flow_runs_flow_ts ON auto_flow_runs (flow_id, run_at DESC)`);
 
+    await p.query(`CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    const migrationClient = await p.connect();
+    try {
+      await migrationClient.query('BEGIN');
+      await migrationClient.query("SELECT pg_advisory_xact_lock(480021)");
+      const applied = await migrationClient.query("SELECT version FROM schema_migrations WHERE version='002-dashboard-reliability'");
+      if (!applied.rows.length) {
+        await migrationClient.query(`ALTER TABLE device_events ADD COLUMN IF NOT EXISTS observed_at TIMESTAMPTZ;
+          ALTER TABLE device_events ADD COLUMN IF NOT EXISTS time_source TEXT NOT NULL DEFAULT 'legacy_unknown';
+          ALTER TABLE auto_flows ALTER COLUMN enabled SET DEFAULT FALSE;
+          CREATE TABLE IF NOT EXISTS dashboard_actions (
+            id BIGSERIAL PRIMARY KEY, ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            kind TEXT NOT NULL, detail JSONB NOT NULL, status TEXT NOT NULL, actor TEXT NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS dashboard_actions_ts ON dashboard_actions(ts DESC);
+          INSERT INTO schema_migrations(version) VALUES ('002-dashboard-reliability');`);
+      }
+      await migrationClient.query('COMMIT');
+    } catch(err) { await migrationClient.query('ROLLBACK'); throw err; }
+    finally { migrationClient.release(); }
     migrationsRan = true;
     console.log('[db] migrations ok — timescale:', hasTimescale ? 'yes' : 'no');
     return true;

@@ -1,4 +1,4 @@
-import { isEnabled, query } from './db.js';
+import { isEnabled, query, getPool } from './db.js';
 import { homeyClient } from './homeyClient.js';
 import { isDemoMode } from '../config.js';
 
@@ -14,6 +14,7 @@ import { isDemoMode } from '../config.js';
  * Demo-mode: actions skrives kun til logg, ikke faktisk sendt til Homey.
  */
 
+const runningFlows = new Set();
 let enabledFlowsCache = [];
 let cacheLoadedAt = 0;
 const CACHE_TTL_MS = 60_000;  // last enabled-flows fra DB max én gang per minutt
@@ -41,7 +42,8 @@ export function invalidateFlowCache() {
  * Sjekk om en spesifikk device-change matcher en triggers betingelse.
  * Endring = { deviceId, capability, prev, next }.
  */
-function triggerMatches(trigger, change) {
+export function triggerMatches(trigger, change) {
+  if (change.prev === undefined) return false;
   if (!trigger || trigger.type !== 'device_change') return false;
   if (trigger.deviceId !== change.deviceId) return false;
   if (trigger.capability !== change.capability) return false;
@@ -97,7 +99,7 @@ async function executeFlow(flow, triggerEvent) {
   for (const action of flow.actions || []) {
     const r = await runAction(action);
     results.push(r);
-    if (!r.ok) allOk = false;
+    if (!r.ok) { allOk = false; break; }
   }
 
   const durationMs = Date.now() - startedAt;
@@ -136,6 +138,7 @@ export async function onDeviceChanges(changes) {
   let fired = 0;
 
   for (const flow of flows) {
+    if (runningFlows.has(flow.id)) continue;
     // Throttling
     if (flow.last_run_at) {
       const ageSec = (now - new Date(flow.last_run_at).getTime()) / 1000;
@@ -145,13 +148,28 @@ export async function onDeviceChanges(changes) {
     for (const change of changes) {
       if (triggerMatches(flow.trigger, change)) {
         try {
-          await executeFlow(flow, change);
-          fired++;
+          runningFlows.add(flow.id);
+          const client = await getPool().connect();
+          try {
+            await client.query('BEGIN');
+            const lock = await client.query('SELECT pg_try_advisory_lock($1::bigint) AS locked', [flow.id]);
+            if (!lock.rows[0]?.locked) { await client.query('ROLLBACK'); continue; }
+            const claim = await client.query(`UPDATE auto_flows SET last_run_at = NOW()
+              WHERE id = $1 AND enabled = true AND (last_run_at IS NULL OR
+                last_run_at <= NOW() - make_interval(secs => min_interval_seconds)) RETURNING id`, [flow.id]);
+            if (!claim.rows.length) { await client.query('ROLLBACK'); continue; }
+            // Reserve durably before touching devices; a failed action still consumes cooldown.
+            await client.query('COMMIT');
+            flow.last_run_at = new Date();
+            await executeFlow(flow, change);
+            fired++;
+          } catch (err) { await client.query('ROLLBACK').catch(() => {}); throw err; }
+          finally { await client.query('SELECT pg_advisory_unlock($1::bigint)', [flow.id]).catch(() => {}); client.release(); }
           // Etter en run må vi vente til neste flow-iterasjon for throttling
           break;
         } catch (err) {
           console.error(`[auto-flow ${flow.id}] execute error:`, err.message);
-        }
+        } finally { runningFlows.delete(flow.id); }
       }
     }
   }
