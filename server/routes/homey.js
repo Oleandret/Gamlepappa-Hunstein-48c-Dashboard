@@ -133,6 +133,22 @@ function isValidCapabilityValue(v) {
   return false;
 }
 
+function commandError(res, err) {
+  if (err.status === 400) return res.status(400).json({ error: err.message, code: 'INVALID_CAPABILITY' });
+  if (err.status === 429) return res.status(429).json({ error: 'Kommandokøen er full. Vent før du prøver igjen.', code: 'QUEUE_FULL' });
+  return res.status(502).json({ error: 'Resultatet fra Homey er ukjent. Kontroller enheten før du prøver igjen.', code: 'RESULT_UNKNOWN' });
+}
+
+async function recordResult(kind, detail, status, actor) {
+  try { await recordAction(kind, detail, status, actor); }
+  catch {
+    // Homey has already accepted the command. Never turn a logging failure into
+    // a failed command response that invites repeating a physical action.
+    console.warn('[homey] accepted command could not be recorded');
+    return 'Kommando mottatt, men resultatet kunne ikke lagres i aktivitetsloggen';
+  }
+}
+
 homeyRoutes.post('/devices/:id/capability/:cap', async (req, res) => {
   const { id, cap } = req.params;
   const { value } = req.body || {};
@@ -161,11 +177,11 @@ homeyRoutes.post('/devices/:id/capability/:cap', async (req, res) => {
     await homeyClient.setCapability(id, cap, value);
     const fresh = await homeyClient.refreshDevices().catch(() => null);
     const confirmed = fresh ? capValue(fresh[id],cap) === value : false;
-    await recordAction('device_result', {commandId:auditId,deviceId:id,capability:cap,value}, confirmed?'confirmed':'unconfirmed', req.user?.role || 'unknown');
-    res.json({ ok: true, confirmed });
+    const warning = await recordResult('device_result', {commandId:auditId,deviceId:id,capability:cap,value}, confirmed?'confirmed':'unconfirmed', req.user?.role || 'unknown');
+    res.json({ ok: true, confirmed, commandId: auditId, ...(warning ? {warning} : {}) });
   } catch (err) {
     console.warn('[homey] setCapability failed:', sanitizeMessage(err.message));
-    res.status(502).json({ error: 'homey unreachable' });
+    commandError(res, err);
   }
 });
 
@@ -178,10 +194,10 @@ homeyRoutes.post('/flows/:id/run', async (req, res) => {
     if (isDemoMode()) return res.json({ ok: true, mocked: true });
     await recordAction('flow_request', {flowId:id}, 'pending', req.user?.role || 'unknown');
     await homeyClient.runFlow(id);
-    await recordAction('flow_result', {flowId:id}, 'accepted', req.user?.role || 'unknown');
-    res.json({ ok:true, confirmed:false });
+    const warning = await recordResult('flow_result', {flowId:id}, 'accepted', req.user?.role || 'unknown');
+    res.json({ ok:true, confirmed:false, ...(warning ? {warning} : {}) });
   } catch (err) {
     console.warn('[homey] runFlow failed:', sanitizeMessage(err.message));
-    res.status(502).json({ error: 'homey unreachable' });
+    commandError(res, err);
   }
 });

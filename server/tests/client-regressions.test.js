@@ -35,7 +35,7 @@ test('expired inventory session triggers login and does not download an error re
   assert.match(h.errors[0],/401/);assert.deepEqual(h.loading,[true,false]);
 });
 
-test('voice indicator renders unavailable without probing widget registration or claiming online',async()=>{
+test('voice indicator describes separate-tab access without claiming an active connection',async()=>{
   const { createRequire }=await import('node:module');
   const requireClient=createRequire(new URL('../../client/package.json',import.meta.url));
   const {transformWithOxc}=await import(requireClient.resolve('vite'));
@@ -47,8 +47,8 @@ test('voice indicator renders unavailable without probing widget registration or
   const context=vm.createContext({React,setTimeout:forbidden,window:{customElements:{get:forbidden}},document:{addEventListener:forbidden}});
   vm.runInContext(code+'\nglobalThis.Component=AIConnection;',context);
   const html=renderToStaticMarkup(React.createElement(context.Component));
-  assert.match(html,/aria-label="Taleassistent ikke konfigurert"/);
-  assert.match(html,/Ikke konfigurert/);
+  assert.match(html,/aria-label="Taleassistent åpnes i ny fane"/);
+  assert.match(html,/Ny fane/);
   assert.doesNotMatch(html,/tilkobler|online|AI CONNECTION|animate-pulseGlow/i);
 });
 
