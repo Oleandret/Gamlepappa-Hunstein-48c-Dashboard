@@ -13,6 +13,8 @@ import { DeviceControls } from '../FloorPlanPin.jsx';
 import { canWrite } from '../../lib/deviceCommands.js';
 import { DeviceCommandStatus, useDeviceCommand } from '../DeviceCommandStatus.jsx';
 import { SaveButton } from '../SaveButton.jsx';
+import { DeviceMarker3D, RoomLighting, RoomLightVolume, DoorAnimator, isLightDevice, deviceReadout } from './House3DDevices.jsx';
+import { useDoorMeta, useHouse3dDoors, resolveDoorLinks, isDoorSensor, doorSensorOpen } from '../../lib/house3dDoors.js';
 
 /**
  * Interaktiv 3D-modell av Hunstein 48c. Bygningskroppen er BIM-modellen
@@ -440,18 +442,24 @@ function useBimGroups() {
     gltf.scene.updateMatrixWorld(true);
     gltf.scene.traverse((o) => {
       if (!o.isMesh) return;
-      const [grp = 'site', type = ''] = (o.name || o.parent?.name || '').split('|');
-      (groups[grp] ||= []).push({ mesh: o, type });
+      const [grp = 'site', type = '', , gid = '', mi = ''] = (o.name || o.parent?.name || '').split('|');
+      (groups[grp] ||= []).push({ mesh: o, type, gid, mi: Number(mi) });
     });
     return groups;
   }, [gltf]);
 }
 
-function BimGroup({ items, offsetY = 0, clipY = null, interior, onPick, dim = 1 }) {
+function doorIdOf(obj) {
+  for (let o = obj; o; o = o.parent) if (o.userData?.doorId) return o.userData.doorId;
+  return null;
+}
+
+function BimGroup({ items, offsetY = 0, clipY = null, interior, onPick, onDoor, dim = 1, doorIndex, registry }) {
   const group = useMemo(() => {
     const g = new THREE.Group();
     const plane = clipY == null ? null : new THREE.Plane(new THREE.Vector3(0, -1, 0), clipY);
-    for (const { mesh, type } of items) {
+    const moving = new Map();
+    for (const { mesh, type, gid, mi } of items) {
       // I interiør skjules tak/dekker over snittet og terreng; gulvplater tegnes av rommene
       if (interior && (type === 'IfcSlab' || type === 'IfcRoof' || type === 'IfcCovering')) continue;
       const m = mesh.clone();
@@ -470,28 +478,72 @@ function BimGroup({ items, offsetY = 0, clipY = null, interior, onPick, dim = 1 
       m.castShadow = !mat.transparent;
       m.receiveShadow = true;
       m.userData.ifcType = type;
+      if (type === 'IfcDoor' && gid) {
+        m.userData.doorId = gid;
+        const meta = doorIndex?.get(gid);
+        if (meta && meta.moving.includes(mi)) {
+          if (!moving.has(gid)) moving.set(gid, []);
+          moving.get(gid).push(m);
+        }
+      }
       g.add(m);
     }
+    // Dørblad/port legges i en pivot i hengselen så de kan åpnes
+    g.updateMatrixWorld(true);
+    const pivots = [];
+    for (const [gid, meshes] of moving) {
+      const meta = doorIndex.get(gid);
+      const pivot = new THREE.Group();
+      pivot.rotation.order = 'YXZ';
+      pivot.position.set(...meta.pivot);
+      pivot.rotation.y = meta.yaw;
+      pivot.userData.doorId = gid;
+      g.add(pivot);
+      pivot.updateMatrixWorld(true);
+      for (const mm of meshes) pivot.attach(mm);
+      pivots.push({ id: gid, pivot, meta, mats: meshes.map(mm => mm.material), v: 0 });
+    }
+    g.userData.doorPivots = pivots;
     return g;
-  }, [items, clipY, interior, dim]);
+  }, [items, clipY, interior, dim, doorIndex]);
+
+  useEffect(() => {
+    if (!registry) return undefined;
+    const added = [];
+    for (const e of group.userData.doorPivots || []) {
+      const list = registry.current.get(e.id) || [];
+      list.push(e);
+      registry.current.set(e.id, list);
+      added.push(e);
+    }
+    return () => {
+      for (const e of added) {
+        const list = (registry.current.get(e.id) || []).filter(x => x !== e);
+        if (list.length) registry.current.set(e.id, list); else registry.current.delete(e.id);
+      }
+    };
+  }, [group, registry]);
   useEffect(() => () => group.traverse((o) => o.isMesh && o.material.dispose()), [group]);
-  return (
-    <primitive
-      object={group}
-      position={[0, offsetY, 0]}
-      onClick={onPick ? (e) => { e.stopPropagation(); onPick(e.point); } : undefined}
-    />
-  );
+
+  const handle = (onPick || onDoor) ? (e) => {
+    const doorId = doorIdOf(e.object);
+    if (doorId && onDoor) { e.stopPropagation(); onDoor(doorId); return; }
+    if (onPick) { e.stopPropagation(); onPick(e.point); }
+  } : undefined;
+  return <primitive object={group} position={[0, offsetY, 0]} onClick={handle} />;
 }
 
 /** Hele bygget/tomta (eksteriør) eller én etasje med snitt (interiør). */
-function BimModel({ mode, visibleFloors, floorY, onPick }) {
+function BimModel({ mode, visibleFloors, floorY, onPick, onDoor, doorIndex, registry }) {
   const groups = useBimGroups();
   if (mode === 'exterior') {
     return (
       <group>
         {['site', 'basement', 'floor1', 'floor2', 'roof'].map(k => groups[k] && (
-          <BimGroup key={k} items={groups[k]} onPick={k === 'site' ? undefined : onPick} dim={k === 'site' ? 0.42 : 0.9} />
+          <BimGroup
+            key={k} items={groups[k]} onPick={k === 'site' ? undefined : onPick} onDoor={onDoor}
+            dim={k === 'site' ? 0.42 : 0.9} doorIndex={doorIndex} registry={registry}
+          />
         ))}
       </group>
     );
@@ -502,7 +554,12 @@ function BimModel({ mode, visibleFloors, floorY, onPick }) {
         const items = groups[BIM_GROUP_FLOOR[floor.id]];
         if (!items) return null;
         const y = floorY(floor.id);
-        return <BimGroup key={floor.id} items={items} offsetY={y - floor.level} clipY={y + CLIP_HEIGHT} interior />;
+        return (
+          <BimGroup
+            key={floor.id} items={items} offsetY={y - floor.level} clipY={y + CLIP_HEIGHT} interior
+            onDoor={onDoor} doorIndex={doorIndex} registry={registry}
+          />
+        );
       })}
     </group>
   );
@@ -618,43 +675,6 @@ function Stairs({ rect, height }) {
 
 // ─── Enhets-pins i 3D ───────────────────────────────────────────────────
 
-function DeviceMarker({ marker, y, selected, onSelect }) {
-  const ref = useRef();
-  const color = markerColor(marker.device);
-  const alarm = capValue(marker.device, 'alarm_motion') === true;
-  useFrame(({ clock }) => {
-    if (!ref.current) return;
-    const s = (selected ? 1.5 : 1) * (alarm ? 1 + 0.25 * Math.sin(clock.elapsedTime * 6) : 1);
-    ref.current.scale.setScalar(s);
-    ref.current.position.y = y + 1.35 + Math.sin(clock.elapsedTime * 1.6 + marker.x) * 0.05;
-  });
-  return (
-    <group>
-      <mesh position={[marker.x, y + 0.7, marker.z]} raycast={() => null}>
-        <cylinderGeometry args={[0.012, 0.012, 1.3, 6]} />
-        <meshBasicMaterial color={color} transparent opacity={0.5} />
-      </mesh>
-      <mesh
-        ref={ref}
-        position={[marker.x, y + 1.35, marker.z]}
-        onClick={(e) => { e.stopPropagation(); onSelect(marker); }}
-        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
-        onPointerOut={() => { document.body.style.cursor = ''; }}
-      >
-        <sphereGeometry args={[0.17, 20, 14]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.9} />
-      </mesh>
-      {selected && (
-        <Html position={[marker.x, y + 1.75, marker.z]} center distanceFactor={20} style={{ pointerEvents: 'none' }}>
-          <div className="whitespace-nowrap rounded border border-nx-cyan/60 bg-nx-bg/90 px-1.5 py-0.5 font-mono text-[10px] text-nx-cyan">
-            {marker.label || marker.device.name}
-          </div>
-        </Html>
-      )}
-    </group>
-  );
-}
-
 // ─── Kamera ─────────────────────────────────────────────────────────────
 
 const PRESETS = {
@@ -729,11 +749,88 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
   const controlsRef = useRef();
 
   const roomData = useRoomData(devices, zones, roomsCfg.config, floorPlanPins);
+  const doorMeta = useDoorMeta();
+  const doorsCfg = useHouse3dDoors();
+  const doorIndex = useMemo(() => new Map(doorMeta.map(d => [d.id, d])), [doorMeta]);
+  const doorRegistry = useRef(new Map());
+  const [selectedDoorId, setSelectedDoorId] = useState(null);
+  const doorLinks = useMemo(
+    () => resolveDoorLinks(doorMeta, devices, doorsCfg.config, roomData.markers),
+    [doorMeta, devices, doorsCfg.config, roomData.markers]
+  );
+  const doorOpen = useMemo(() => {
+    const out = {};
+    for (const [doorId, devId] of Object.entries(doorLinks.links)) out[doorId] = devId ? doorSensorOpen(devices?.[devId]) : null;
+    return out;
+  }, [doorLinks, devices]);
+  const doorByDevice = useMemo(() => {
+    const out = {};
+    for (const [doorId, devId] of Object.entries(doorLinks.links)) if (devId) out[devId] = doorIndex.get(doorId);
+    return out;
+  }, [doorLinks, doorIndex]);
+  const openDoors = doorMeta.filter(d => doorOpen[d.id] === true);
+
+  // Enhetsmarkører: pins fra plantegningene, dørsensorer flyttes til døra de er koblet til
+  const markers3d = useMemo(() => {
+    const list = roomData.markers.map(m => {
+      const door = doorByDevice[m.device.id];
+      return door ? { ...m, x: door.center[0], z: door.center[2], floorId: door.floor } : m;
+    });
+    const pinned = new Set(list.map(m => m.device.id));
+    for (const [devId, door] of Object.entries(doorByDevice)) {
+      if (!door || pinned.has(devId) || !devices?.[devId]) continue;
+      list.push({ id: `door-${door.id}`, floorId: door.floor, x: door.center[0], z: door.center[2], device: devices[devId], label: door.label, roomId: null });
+    }
+    return list;
+  }, [roomData.markers, doorByDevice, devices]);
+
+  // Lyskilder: pin-posisjon i taket, ellers rommets sentrum
+  const lightSources = useMemo(() => {
+    const out = [];
+    const pinPos = new Map(roomData.markers.map(m => [m.device.id, m]));
+    for (const floor of FLOORS) {
+      for (const room of floor.rooms) {
+        const data = roomData.byRoom[room.id];
+        const lights = data.devices.filter(isLightDevice);
+        lights.forEach((d, i) => {
+          const r = deviceReadout(d);
+          const pin = pinPos.get(d.id);
+          const [cx, cz] = roomCenter(room);
+          const spread = lights.length > 1 && !pin ? 0.8 : 0;
+          out.push({
+            key: `${room.id}-${d.id}`, floorId: floor.id, ceiling: floor.height,
+            x: pin ? pin.x : cx + spread * Math.cos((i / lights.length) * Math.PI * 2),
+            z: pin ? pin.z : cz + spread * Math.sin((i / lights.length) * Math.PI * 2),
+            level: r.level || 0
+          });
+        });
+      }
+    }
+    return out;
+  }, [roomData]);
+
+  // Pins som ligger i et annet rom enn Homey-sonen tilsier
+  const placementIssues = useMemo(() => {
+    const zoneRooms = {};
+    for (const { room, zoneIds } of Object.values(roomData.byRoom)) {
+      for (const z of zoneDescendants(zoneIds, zones)) (zoneRooms[z] ||= new Set()).add(room.id);
+    }
+    return roomData.markers.filter(m => {
+      const zr = m.device.zone ? zoneRooms[m.device.zone] : null;
+      if (!m.roomId) return true;
+      return zr && zr.size > 0 && !zr.has(m.roomId);
+    }).map(m => ({
+      marker: m,
+      pinRoom: ALL_ROOMS.find(r => r.id === m.roomId)?.name || 'utenfor rom',
+      zoneRoom: [...(zoneRooms[m.device.zone] || [])].map(id => ALL_ROOMS.find(r => r.id === id)?.name).filter(Boolean).join(', ')
+    }));
+  }, [roomData, zones]);
 
   const floorIndex = floorFilter === 'all' ? FLOORS.length - 1 : FLOORS.findIndex(f => f.id === floorFilter);
   const visibleFloors = FLOORS.filter((_, i) => i <= floorIndex);
   const selectedRoom = selectedRoomId ? roomData.byRoom[selectedRoomId] : null;
-  const selectedMarker = roomData.markers.find(m => m.id === selectedMarkerId) || null;
+  const selectedMarker = markers3d.find(m => m.id === selectedMarkerId) || null;
+  const selectedDoor = selectedDoorId ? doorIndex.get(selectedDoorId) : null;
 
   const floorY = (floorId) => {
     const i = FLOORS.findIndex(f => f.id === floorId);
@@ -743,11 +840,35 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
   const selectRoom = (roomId) => {
     setSelectedRoomId(roomId);
     setSelectedMarkerId(null);
+    setSelectedDoorId(null);
     if (!roomId) return;
     const room = ALL_ROOMS.find(r => r.id === roomId);
     const [x, z] = roomCenter(room);
     const y = floorY(room.floorId);
     setFlyTo({ pos: [x + 7, y + 9, z + 10], target: [x, y + 0.8, z], key: Date.now() });
+  };
+
+  const selectDoor = (doorId) => {
+    setSelectedDoorId(doorId);
+    setSelectedRoomId(null);
+    setSelectedMarkerId(null);
+    const door = doorIndex.get(doorId);
+    if (!door) return;
+    let nx = -Math.sin(door.yaw), nz = -Math.cos(door.yaw);
+    if (nx * (door.center[0] - CENTER[0]) + nz * (door.center[2] - CENTER[2]) < 0) { nx = -nx; nz = -nz; }
+    if (door.kind === 'garage') {
+      // Garasjeporten vises utenfra (porten vipper opp i taket)
+      setMode('exterior');
+      setFloorFilter('all');
+      setFlyTo({ pos: [door.center[0] + nx * 10, 5.5, door.center[2] + nz * 10 + 2], target: [door.center[0], 3.6, door.center[2]], key: Date.now() });
+      return;
+    }
+    // Andre dører: vis etasjen alene i snitt, sett skrått ovenfra – ingen vegger i veien
+    const i = FLOORS.findIndex(f => f.id === door.floor);
+    setMode('interior');
+    setFloorFilter(door.floor);
+    const y = FLOORS[i].level + explode * i * 3.2;
+    setFlyTo({ pos: [door.center[0] + nx * 5.5, y + 9, door.center[2] + nz * 5.5 + 2.5], target: [door.center[0], y + 0.6, door.center[2]], key: Date.now() });
   };
 
   // Klikk på BIM-geometri → finn rommet under punktet
@@ -802,6 +923,7 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
             {bim ? 'BIM-modell (som bygget)' : 'Forenklet modell fra arkitekttegninger'} · {ALL_ROOMS.length} rom · 3 etasjer ·{' '}
             <span className="text-nx-amber">{totals.lightsOn}/{totals.lights} lys på</span>
             {totals.motion > 0 && <span className="text-nx-red"> · bevegelse i {totals.motion} rom</span>}
+            {openDoors.length > 0 && <span className="text-nx-amber"> · {openDoors.length} {openDoors.length === 1 ? 'dør' : 'dører'} åpen</span>}
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -822,8 +944,8 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
           <ToggleBtn key={o.id} active={overlay === o.id} onClick={() => setOverlay(o.id)} Icon={o.Icon} subtle>{o.label}</ToggleBtn>
         ))}
         <div className="ml-auto flex items-center gap-1.5">
-          <SaveButton sync={roomsCfg.sync} size="sm" />
-          <ToggleBtn active={editing} onClick={() => setEditing(e => !e)} Icon={Edit2}>{editing ? 'Ferdig' : 'Koble rom'}</ToggleBtn>
+          <SaveButton sync={selectedDoor ? doorsCfg.sync : roomsCfg.sync} size="sm" />
+          <ToggleBtn active={editing} onClick={() => setEditing(e => !e)} Icon={Edit2}>{editing ? 'Ferdig' : 'Koble rom/dører'}</ToggleBtn>
         </div>
       </div>
 
@@ -837,7 +959,7 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
             gl={{ localClippingEnabled: true }}
             dpr={[1, 2]}
             camera={{ position: PRESETS.iso.pos, fov: 40, near: 0.1, far: 400 }}
-            onPointerMissed={() => { setSelectedRoomId(null); setSelectedMarkerId(null); }}
+            onPointerMissed={() => { setSelectedRoomId(null); setSelectedMarkerId(null); setSelectedDoorId(null); }}
           >
             <color attach="background" args={[C.bg]} />
             <fog attach="fog" args={[C.bg, 45, 120]} />
@@ -860,11 +982,31 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
               {bimOn && !bimFailed && (
                 <BimBoundary onFail={() => setBimFailed(true)}>
                   <Suspense fallback={null}>
-                    <BimModel mode={mode} visibleFloors={visibleFloors} floorY={floorY} onPick={pickPoint} />
+                    <BimModel
+                      mode={mode} visibleFloors={visibleFloors} floorY={floorY} onPick={pickPoint}
+                      onDoor={selectDoor} doorIndex={doorIndex} registry={doorRegistry}
+                    />
                   </Suspense>
                 </BimBoundary>
               )}
+              {bim && <DoorAnimator registry={doorRegistry} openState={doorOpen} />}
               {bim && mode === 'exterior' && <ExteriorGlow roomData={roomData} />}
+              {overlay !== 'temp' && overlay !== 'security' && (
+                <RoomLighting
+                  lights={lightSources
+                    .filter(l => mode === 'exterior' || visibleFloors.some(f => f.id === l.floorId))
+                    .map(l => ({ ...l, y: floorY(l.floorId) + (mode === 'interior' ? Math.min(l.ceiling - 0.1, CLIP_HEIGHT + 0.6) : l.ceiling - 0.1) }))}
+                />
+              )}
+              {mode === 'interior' && overlay !== 'temp' && overlay !== 'security' && visibleFloors.flatMap(floor =>
+                floor.rooms.filter(r => !r.outdoor).map(room => {
+                  const st = roomData.byRoom[room.id].stats;
+                  return st.lightsOn > 0 ? (
+                    <group key={`vol-${room.id}`} position={[0, floorY(floor.id), 0]}>
+                      <RoomLightVolume poly={roomPoly(room)} height={CLIP_HEIGHT - 0.15} level={st.glow} />
+                    </group>
+                  ) : null;
+                }))}
               {visibleFloors.map((floor) => {
                 const i = FLOORS.indexOf(floor);
                 return (
@@ -887,21 +1029,28 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
                 );
               })}
               {mode === 'exterior' && !bim && <GarageDoor />}
-              {mode === 'interior' && roomData.markers
+              {mode === 'interior' && markers3d
                 .filter(m => visibleFloors.some(f => f.id === m.floorId))
                 .filter(m => overlay === 'all'
                   || (overlay === 'light' && isLight(m.device))
                   || (overlay === 'temp' && (hasCap(m.device, 'measure_temperature') || hasCap(m.device, 'target_temperature')))
-                  || (overlay === 'security' && (hasCap(m.device, 'alarm_motion') || hasCap(m.device, 'alarm_contact') || hasCap(m.device, 'locked') || m.device.class === 'camera')))
-                .map(m => (
-                  <DeviceMarker
-                    key={m.id}
-                    marker={m}
-                    y={floorY(m.floorId)}
-                    selected={selectedMarkerId === m.id}
-                    onSelect={(mk) => { setSelectedMarkerId(mk.id); setSelectedRoomId(mk.roomId); }}
-                  />
-                ))}
+                  || (overlay === 'security' && (hasCap(m.device, 'alarm_motion') || isDoorSensor(m.device) || hasCap(m.device, 'locked') || m.device.class === 'camera')))
+                .map(m => {
+                  const floor = FLOORS.find(f => f.id === m.floorId);
+                  const door = doorByDevice[m.device.id];
+                  return (
+                    <DeviceMarker3D
+                      key={m.id}
+                      marker={m}
+                      baseY={floorY(m.floorId)}
+                      ceiling={floor.height}
+                      selected={selectedMarkerId === m.id}
+                      doorOpen={door ? doorOpen[door.id] : undefined}
+                      showValue={overlay !== 'all' || floorFilter !== 'all'}
+                      onSelect={(mk) => { setSelectedMarkerId(mk.id); setSelectedRoomId(mk.roomId); setSelectedDoorId(null); }}
+                    />
+                  );
+                })}
             </Suspense>
 
             <OrbitControls
@@ -960,7 +1109,20 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
         </div>
 
         <aside className="xl:w-[360px] shrink-0 panel p-3 overflow-y-auto" style={{ maxHeight: 900 }}>
-          {selectedMarker && !editing ? (
+          {selectedDoor ? (
+            <DoorPanel
+              door={selectedDoor}
+              link={doorLinks.links[selectedDoor.id] ?? null}
+              source={doorLinks.source[selectedDoor.id]}
+              open={doorOpen[selectedDoor.id]}
+              devices={devices}
+              editing={editing}
+              onLink={(devId) => doorsCfg.link(selectedDoor.id, devId)}
+              onReset={() => doorsCfg.reset(selectedDoor.id)}
+              onSet={onSetCapability}
+              onClose={() => setSelectedDoorId(null)}
+            />
+          ) : selectedMarker && !editing ? (
             <MarkerPanel marker={selectedMarker} onSet={onSetCapability} onClose={() => setSelectedMarkerId(null)} />
           ) : selectedRoom ? (
             <RoomPanel
@@ -974,7 +1136,12 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
               onResetZones={() => roomsCfg.resetRoom(selectedRoom.room.id)}
             />
           ) : (
-            <Overview roomData={roomData} onSelect={selectRoom} onAllLights={setAllLights} groupPending={groupCommand.pending} />
+            <Overview
+              roomData={roomData} onSelect={selectRoom} onAllLights={setAllLights} groupPending={groupCommand.pending}
+              doors={doorMeta} doorLinks={doorLinks} doorOpen={doorOpen} devices={devices} onSelectDoor={selectDoor}
+              placementIssues={placementIssues}
+              onSelectMarker={(m) => { setSelectedMarkerId(m.id); setSelectedRoomId(m.roomId); setSelectedDoorId(null); }}
+            />
           )}
         </aside>
       </div>
@@ -984,9 +1151,58 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
 
 // ─── Sidepanel ──────────────────────────────────────────────────────────
 
-function Overview({ roomData, onSelect, onAllLights, groupPending }) {
+function Overview({ roomData, onSelect, onAllLights, groupPending, doors = [], doorLinks, doorOpen = {}, devices, onSelectDoor, placementIssues = [], onSelectMarker }) {
+  const linked = doors.filter(d => doorLinks?.links[d.id]);
+  const shown = [...linked].sort((a, b) => (doorOpen[b.id] === true) - (doorOpen[a.id] === true) || a.label.localeCompare(b.label, 'nb'));
   return (
     <div className="space-y-3">
+      <div className="rounded-lg border border-nx-line/60 bg-nx-panel/40">
+        <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-nx-line/50">
+          <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-nx-cyan">Dører og port</span>
+          <span className="font-mono text-[10px] text-nx-mute">{linked.length}/{doors.length} koblet</span>
+        </div>
+        <ul className="divide-y divide-nx-line/40">
+          {shown.map(d => {
+            const o = doorOpen[d.id];
+            return (
+              <li key={d.id}>
+                <button onClick={() => onSelectDoor(d.id)} className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs hover:bg-nx-cyan/5">
+                  <DoorOpen size={11} className={o === true ? 'text-nx-amber' : o === false ? 'text-nx-green' : 'text-nx-mute'} aria-hidden="true" />
+                  <span className="flex-1 truncate">{d.label}</span>
+                  <span className={`font-mono text-[10px] ${o === true ? 'text-nx-amber' : o === false ? 'text-nx-green' : 'text-nx-mute'}`}>
+                    {o === true ? 'Åpen' : o === false ? 'Lukket' : '—'}
+                  </span>
+                  <ChevronRight size={12} className="text-nx-mute" aria-hidden="true" />
+                </button>
+              </li>
+            );
+          })}
+          {shown.length === 0 && (
+            <li className="px-2.5 py-2 text-[11px] text-nx-mute">
+              Ingen dørsensorer koblet ennå. Klikk en dør i modellen og velg «Koble rom/dører».
+            </li>
+          )}
+        </ul>
+      </div>
+      {placementIssues.length > 0 && (
+        <div className="rounded-lg border border-nx-amber/40 bg-nx-panel/40">
+          <div className="px-2.5 py-1.5 border-b border-nx-line/50 font-mono text-[11px] uppercase tracking-[0.18em] text-nx-amber">
+            Plassering å sjekke ({placementIssues.length})
+          </div>
+          <ul className="divide-y divide-nx-line/40">
+            {placementIssues.map(({ marker, pinRoom, zoneRoom }) => (
+              <li key={marker.id}>
+                <button onClick={() => onSelectMarker(marker)} className="w-full px-2.5 py-1.5 text-left text-xs hover:bg-nx-cyan/5">
+                  <span className="block truncate">{marker.label || marker.device.name}</span>
+                  <span className="block font-mono text-[10px] text-nx-mute">
+                    pin i {pinRoom}{zoneRoom ? ` · Homey-sone: ${zoneRoom}` : ''}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <p className="panel-title">Rom</p>
       {[...FLOORS].reverse().map(f => {
         const rooms = f.rooms.map(r => roomData.byRoom[r.id]);
@@ -1109,6 +1325,64 @@ function RoomPanel({ data, zones, editing, onSet, onAllLights, onClose, onToggle
         <p className="text-xs text-nx-mute leading-relaxed">
           Ingen enheter koblet til dette rommet ennå. Trykk «Koble rom» og velg hvilke Homey-soner som hører til,
           eller plasser pins på 2D-plantegningen.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function DoorPanel({ door, link, source, open, devices, editing, onLink, onReset, onSet, onClose }) {
+  const dev = link ? devices?.[link] : null;
+  const sensors = Object.values(devices || {}).filter(isDoorSensor)
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'nb'));
+  const kind = door.kind === 'garage' ? 'Leddport' : door.kind === 'slide' ? 'Skyvedør' : 'Slagdør';
+  const floorLabel = FLOORS.find(f => f.id === door.floor)?.label;
+  return (
+    <div className="space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="panel-title">{floorLabel} · {kind}</p>
+          <h3 className="mt-1 text-lg font-semibold">{door.label}</h3>
+          <p className="font-mono text-[10px] text-nx-mute">
+            {(door.width * 1000).toFixed(0)} × {(door.height * 1000).toFixed(0)} mm · {door.ifcName}
+          </p>
+        </div>
+        <button onClick={onClose} aria-label="Lukk" className="text-nx-mute hover:text-nx-cyan"><X size={16} /></button>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Stat label="Status" value={open === true ? 'Åpen' : open === false ? 'Lukket' : 'Ukjent'} tone={open === true ? 'amber' : open === false ? 'green' : 'mute'} />
+        <Stat label="Sensor" value={dev ? dev.name : '—'} tone={dev ? 'cyan' : 'mute'} />
+      </div>
+      {source && <p className="font-mono text-[10px] text-nx-mute">Kobling: {source}</p>}
+      {dev && !editing && <DeviceControls device={dev} onSet={onSet} />}
+      {editing ? (
+        <div className="rounded-lg border border-nx-cyan/30 p-2">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-nx-cyan">Velg sensor for døra</p>
+            <button onClick={onReset} className="font-mono text-[10px] text-nx-mute hover:text-nx-cyan">Auto</button>
+          </div>
+          <div className="max-h-64 overflow-y-auto space-y-0.5">
+            <label className="flex items-center gap-2 text-xs px-1 py-0.5 rounded hover:bg-nx-panel/60 cursor-pointer">
+              <input type="radio" name="door-sensor" checked={!link && source?.startsWith('manuell')} onChange={() => onLink(null)} className="accent-nx-cyan" />
+              <span className="text-nx-mute">Ingen sensor</span>
+            </label>
+            {sensors.map(sd => {
+              const o = doorSensorOpen(sd);
+              return (
+                <label key={sd.id} className="flex items-center gap-2 text-xs px-1 py-0.5 rounded hover:bg-nx-panel/60 cursor-pointer">
+                  <input type="radio" name="door-sensor" checked={link === sd.id} onChange={() => onLink(sd.id)} className="accent-nx-cyan" />
+                  <span className="flex-1 truncate">{sd.name}</span>
+                  <span className={`font-mono text-[10px] ${o === true ? 'text-nx-amber' : 'text-nx-mute'}`}>{o === true ? 'åpen' : o === false ? 'lukket' : ''}</span>
+                </label>
+              );
+            })}
+            {sensors.length === 0 && <p className="text-[11px] text-nx-mute">Fant ingen dør-/kontaktsensorer i Homey.</p>}
+          </div>
+          <p className="mt-1.5 text-[10px] text-nx-mute">Tips: åpne døra og se hvilken sensor som viser «åpen». Husk å lagre.</p>
+        </div>
+      ) : (
+        <p className="text-[11px] text-nx-mute leading-relaxed">
+          Døra åpnes i modellen når sensoren melder åpen. Trykk «Koble rom/dører» for å velge sensor manuelt.
         </p>
       )}
     </div>

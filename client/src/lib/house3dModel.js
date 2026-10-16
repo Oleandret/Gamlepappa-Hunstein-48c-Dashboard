@@ -109,16 +109,19 @@ export const ROOF_LEVEL = 8.76;
 
 /** BIM-modell (GLB). Nodenavn: «<gruppe>|<IfcType>|<navn>|<GlobalId>|<mat>», gruppe = basement/floor1/floor2/roof/site. */
 export const BIM_MODEL_URL = '/models/hunstein48c.glb';
+/** Dørmetadata (hengsel, åpningsbevegelse, navn) – generert fra samme IFC. */
+export const DOOR_META_URL = '/models/hunstein48c.doors.json';
 
 /**
  * Transformasjon fra prosent-koordinater på 2D-plantegningene (de eksisterende
- * pinnene) til meter i 3D-modellen. Funnet ved å registrere bildene i
- * client/public mot PDF-tegningene: X = ax·x% + bx, Z = az·y% + bz.
+ * pinnene) til meter i 3D-modellen: X = ax·x% + bx, Z = az·y% + bz.
+ * Registrert med SIFT + RANSAC mellom bildene i client/public og STAV-PDF-en
+ * (tegn. 756-001/002/003), gjennomsnittlig restavvik 8–9 mm.
  */
 export const PLAN_IMAGE_TRANSFORM = {
-  homeBasement: { ax: 0.31095, bx: -18.7043, az: 0.19202, bz: -8.7204 },
-  homeFloor1:   { ax: 0.31472, bx: -18.9320, az: 0.15757, bz: -6.8226 },
-  homeFloor2:   { ax: 0.25592, bx: -15.868, az: 0.14480, bz: -9.19 }
+  homeBasement: { ax: 0.31318, bx: -18.7957, az: 0.19340, bz: -8.7364 },
+  homeFloor1:   { ax: 0.31315, bx: -18.8084, az: 0.15679, bz: -6.7833 },
+  homeFloor2:   { ax: 0.25870, bx: -15.8786, az: 0.14637, bz: -9.3003 }
 };
 
 export function planPctToWorld(planId, xPct, yPct) {
