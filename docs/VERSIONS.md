@@ -18,3 +18,7 @@ V3: cumulative focused checks passed.
 
 V4: cumulative focused checks passed.
 
+## V5 — Intervallpriser og delvis kostnadsdekning
+
+V5: cumulative focused checks passed.
+

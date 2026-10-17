@@ -52,3 +52,12 @@ export function appendSample(samples, row) {
   if(samples.some(s=>s.id===point.id&&s.at===point.at)) return samples;
   return [...samples,point].slice(-1440);
 }
+export function intervalCost(intervals, prices) {
+  // Exact matching avoids spreading daily kWh over hourly prices or inventing missing prices.
+  let cost=0, covered=0;
+  for(const i of intervals) {
+    const p=prices.find(p=>p.start===i.start&&p.end===i.end&&p.currency==='NOK'&&p.unit==='NOK/kWh');
+    if(i.quality==='measured'&&finite(i.kwh)&&p&&finite(p.value)) {cost+=i.kwh*p.value; covered++;}
+  }
+  return {cost:covered ? cost:null,covered,complete:intervals.length>0&&covered===intervals.length};
+}
