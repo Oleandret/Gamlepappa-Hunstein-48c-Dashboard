@@ -30,3 +30,7 @@ V6: cumulative focused checks passed.
 
 V7: cumulative focused checks passed.
 
+## V8 — Skrivebeskyttet Homey-adapter
+
+V8: cumulative focused checks passed.
+
