@@ -67,7 +67,7 @@ export function createMyUplinkOAuth({config=()=>myuplinkConfig(), session=req=>g
   async function record() { const cfg=configured(); if(!cfg)return null;const r=await store.load();if(!r)return null;if(!validReadScope(r.scope,cfg.offline) || typeof r.accessToken!=='string' || !Number.isFinite(r.expiresAt) || typeof r.owner!=='string')throw safeError(503);return r; }
   async function tokenRequest(cfg, fields, previous) {
     let response;
-    try { response=await fetchImpl('https://api.myuplink.com/connect/token',{method:'POST',redirect:'error',signal:AbortSignal.timeout(10000),headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({...fields,client_id:cfg.clientId,client_secret:cfg.clientSecret})}); } catch {retryAt=now()+60000;throw safeError(503);}
+    try { response=await fetchImpl('https://api.myuplink.com/oauth/token',{method:'POST',redirect:'error',signal:AbortSignal.timeout(10000),headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({...fields,client_id:cfg.clientId,client_secret:cfg.clientSecret})}); } catch {retryAt=now()+60000;throw safeError(503);}
     let body;try{body=await response.json();}catch{retryAt=now()+60000;throw safeError(503);}
     if(!response.ok) {
       if(response.status===400 && body?.error==='invalid_grant' && previous) throw Object.assign(safeError(503),{invalidGrant:true});
@@ -97,7 +97,7 @@ export function createMyUplinkOAuth({config=()=>myuplinkConfig(), session=req=>g
     if(attempts.size>=100)throw safeError(429);
     const binding=hash(s.csrfToken);for(const [k,v]of attempts)if(v.binding===binding)attempts.delete(k);
     const state=random(), verifier=random(), browserBinding=random();res.cookie(COOKIE,browserBinding,{...cookieOptions,maxAge:600000});attempts.set(hash(state),{binding,browserBinding:hash(browserBinding),owner:s.sub,verifier,expires:now()+600000,epoch,config:hash(storeConfig)});
-    const url=new URL('https://api.myuplink.com/connect/authorize');url.search=new URLSearchParams({client_id:cfg.clientId,redirect_uri:cfg.redirectUri,response_type:'code',scope:cfg.offline?'READSYSTEM offline_access':'READSYSTEM',state,code_challenge:hash(verifier),code_challenge_method:'S256'});
+    const url=new URL('https://api.myuplink.com/oauth/authorize');url.search=new URLSearchParams({client_id:cfg.clientId,redirect_uri:cfg.redirectUri,response_type:'code',scope:cfg.offline?'READSYSTEM offline_access':'READSYSTEM',state,code_challenge:hash(verifier),code_challenge_method:'S256'});
     return {url:url.href};
   }
   callback.use((_req,res,next)=>{res.set({'Cache-Control':'no-store','Referrer-Policy':'no-referrer'});next();});

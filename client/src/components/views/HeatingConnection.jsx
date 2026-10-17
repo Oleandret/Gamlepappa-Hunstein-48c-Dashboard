@@ -8,7 +8,7 @@ export function HeatingConnection({connection, onChange}) {
     try {
       const r=await apiFetch(`/api/heating/${action}`,{method,headers:{'Content-Type':'application/json'},...(method==='POST'?{body:JSON.stringify(body||{})}:{})});
       if(!r.ok)throw new Error();const result=await r.json();
-      if(action==='connect') {const url=new URL(result.url);if(url.origin!=='https://api.myuplink.com'||url.pathname!=='/connect/authorize')throw new Error();window.location.assign(url.href);}
+      if(action==='connect') {const url=new URL(result.url);if(url.origin!=='https://api.myuplink.com'||url.pathname!=='/oauth/authorize')throw new Error();window.location.assign(url.href);}
       else if(action==='systems') {setDevices(result.devices||[]);setSelected('');}
       else {setDevices([]);setSelected('');setMessage(action==='disconnect'?'Lokal lesetilgang fjernet. Tilbakekall også appens tilgang i myUplink ved behov.':'Varmepumpen er valgt.');onChange();}
     }catch{setMessage('Kunne ikke fullføre. Kontroller tilkoblingsstatus og prøv igjen.');}finally{setBusy(false);}

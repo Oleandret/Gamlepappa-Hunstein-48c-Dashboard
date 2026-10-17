@@ -40,7 +40,7 @@ Denne løsningen krever **én serverprosess/replika**, som eksisterende Google-s
 
 ## Offisielle kilder og verifikasjon
 
-Provider metadata kontrollert 17. oktober 2026: https://api.myuplink.com/.well-known/openid-configuration annonserer authorization_code, refresh_token og PKCE S256. Brukte adresser er fastlåst til `https://api.myuplink.com/connect/authorize` og `/connect/token`; ingen runtime-discovery kan omdirigere hemmeligheter.
+Provider metadata kontrollert 17. oktober 2026: https://api.myuplink.com/.well-known/openid-configuration annonserer authorization_code, refresh_token og PKCE S256. Discovery annonserer /connect-adresser, men disse stemmer ikke med de offentlige rutene i Swagger. Etter bekreftet 404 ved innlogging brukes de dokumenterte rutene `https://api.myuplink.com/oauth/authorize` og `/oauth/token`. Autorisasjonsruten svarte HTTP 302 ved kontroll 17. oktober 2026. Adressene er fastlåst; ingen runtime-discovery kan omdirigere hemmeligheter. Kilde: https://api.myuplink.com/swagger/index.html
 
 https://api.myuplink.com/swagger/index.html beskriver READSYSTEM, ParameterData, paginert SystemWithDevices/SystemDevice og AlarmsPaged. Ingen WRITE-scope eller kontrollendepunkt brukes. READSYSTEM er påkrevd; offline_access er eneste mulige ekstrascope bak eget godkjenningsflagg. Ukjente scopes avvises. Tokenrespons uten scope ved første grant avvises; ved refresh uten scope beholdes tidligere verifisert scope. Om provider avviker fra dette må kontrakten undersøkes, ikke utvides stille.
 

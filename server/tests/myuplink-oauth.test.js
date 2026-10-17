@@ -28,8 +28,8 @@ test('start requires Google owner session and CSRF, refuses bearer even alongsid
  const h=harness();for(const extra of [{identity:null},{identity:{...user,role:'viewer'}},{headers:{}},{headers:{authorization:'Bearer fixture','x-csrf-token':user.csrfToken}}])await assert.rejects(()=>h.auth.start(h.req(extra),{}));assert.equal(h.network.length,0);
 });
 test('PKCE S256, fixed URLs, one-time state and cookie binding',async()=>{
- const h=harness(),url=await h.start();assert.equal(url.origin+url.pathname,'https://api.myuplink.com/connect/authorize');assert.equal(url.searchParams.get('code_challenge_method'),'S256');assert.equal(url.searchParams.get('scope'),'READSYSTEM offline_access');assert.equal(await h.callback(url),'/?myuplink=connected');
- const body=h.network[0].init.body;assert.equal(createHash('sha256').update(body.get('code_verifier')).digest('base64url'),url.searchParams.get('code_challenge'));assert.equal(body.get('redirect_uri'),cfg.redirectUri);assert.equal(h.network[0].url,'https://api.myuplink.com/connect/token');assert.equal(h.network[0].init.redirect,'error');assert.equal(h.record.owner,user.sub);
+ const h=harness(),url=await h.start();assert.equal(url.origin+url.pathname,'https://api.myuplink.com/oauth/authorize');assert.equal(url.searchParams.get('code_challenge_method'),'S256');assert.equal(url.searchParams.get('scope'),'READSYSTEM offline_access');assert.equal(await h.callback(url),'/?myuplink=connected');
+ const body=h.network[0].init.body;assert.equal(createHash('sha256').update(body.get('code_verifier')).digest('base64url'),url.searchParams.get('code_challenge'));assert.equal(body.get('redirect_uri'),cfg.redirectUri);assert.equal(h.network[0].url,'https://api.myuplink.com/oauth/token');assert.equal(h.network[0].init.redirect,'error');assert.equal(h.record.owner,user.sub);
  assert.equal(await h.callback(url),'/?myuplink=failed');assert.equal(h.network.length,1);
 });
 test('wrong session, absent browser cookie, expired state, denial and altered state never exchange',async()=>{
