@@ -26,3 +26,7 @@ V5: cumulative focused checks passed.
 
 V6: cumulative focused checks passed.
 
+## V7 — Avgrenset simulering uten styring
+
+V7: cumulative focused checks passed.
+

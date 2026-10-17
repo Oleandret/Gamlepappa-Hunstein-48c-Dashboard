@@ -70,3 +70,21 @@ export function recommendations(rows, summary) {
   if(top) result.push({title:`Undersøk ${top.name}`,body:`Høyeste observerte effekt er ${Math.round(top.power.value)} W. Dette er ikke et bekreftet avvik; historisk normalnivå mangler. Ingen besparelse er beregnet.`});
   return result;
 }
+export function validatePlan(plan, rows) {
+  const device=rows.find(d=>d.id===plan.deviceId);
+  const errors=[];
+  if(!device?.canPlan) errors.push('Bare identifiserte lys med av/på kan planlegges. Ukjente og kritiske enheter er sperret.');
+  if(device?.power.quality!=='measured') errors.push('Fersk målt effekt kreves.');
+  if(!plan.nonCritical) errors.push('Bekreft at lyset ikke er kritisk, nødlys eller nødvendig for trygg ferdsel.');
+  if(!plan.reason?.trim()) errors.push('Beskriv hvorfor tiltaket er ønskelig.');
+  if(!plan.comfort?.trim()) errors.push('Oppgi egne komfort- og sikkerhetsgrenser.');
+  if(!finite(plan.minutes)||plan.minutes<1||plan.minutes>120) errors.push('Velg en simulering på 1–120 minutter.');
+  return errors;
+}
+export function simulate(plan, rows) {
+  const errors=validatePlan(plan,rows);
+  if(errors.length) return {ok:false,errors};
+  const d=rows.find(d=>d.id===plan.deviceId);
+  return {ok:true,deviceId:d.id,watts:d.power.value,estimatedKwh:Math.max(0,d.power.value)/1000*plan.minutes/60,
+    note:'Estimert energiforskjell hvis observert effekt varer hele perioden og lyset ellers ville vært på. Ikke dokumentert besparelse.',physicalExecution:false};
+}
