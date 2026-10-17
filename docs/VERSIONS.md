@@ -34,3 +34,7 @@ V7: cumulative focused checks passed.
 
 V8: cumulative focused checks passed.
 
+## V9 — Responsivt grensesnitt og lokal kontroll
+
+V9: cumulative focused checks passed.
+
