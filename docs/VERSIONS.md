@@ -6,3 +6,7 @@ Each version is cumulative and local only. No external writes. Focused checks ar
 
 V1: cumulative focused checks passed.
 
+## V2 — Caching, single-flight og backoff
+
+V2: cumulative focused checks passed.
+
