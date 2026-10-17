@@ -10,3 +10,7 @@ V1: cumulative focused checks passed.
 
 V2: cumulative focused checks passed.
 
+## V3 — Hovedmåler, undermålere og rom
+
+V3: cumulative focused checks passed.
+

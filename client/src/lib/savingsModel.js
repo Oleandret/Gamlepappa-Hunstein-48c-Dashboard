@@ -18,3 +18,18 @@ export function inventory(devices = {}, zones = {}, quality, now = Date.now()) {
     canPlan:d.class === 'light' && typeof d.capabilitiesObj?.onoff?.value === 'boolean'
   }));
 }
+export function overview(rows, mainId, subIds = []) {
+  const main = rows.find(r => r.id === mainId);
+  const trusted = r => r?.power.quality === 'measured';
+  const selected = rows.filter(r => r.id !== mainId && subIds.includes(r.id));
+  const valid = selected.filter(trusted);
+  const subtotal = valid.length ? valid.reduce((sum,r)=>sum+r.power.value,0) : null;
+  const total = trusted(main) ? main.power.value : null;
+  return { total, subtotal, residual:total !== null && subtotal !== null ? total-subtotal : null,
+    inconsistent:total !== null && subtotal !== null && subtotal > total,
+    measured:rows.filter(trusted).length, stale:rows.filter(r=>r.power.quality==='stale').length,
+    missing:rows.filter(r=>r.power.quality==='missing').length, selected:valid.length,
+    rooms:[...new Set(selected.map(r=>r.room))].map(room=>({room, watts:selected.filter(r=>r.room===room&&trusted(r)).reduce((s,r)=>s+r.power.value,0), count:selected.filter(r=>r.room===room&&trusted(r)).length}))
+  };
+}
+// Samples are cumulative meter readings, never instantaneous watts treated as kWh.
