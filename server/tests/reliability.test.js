@@ -119,7 +119,7 @@ test('Homey outage returns unavailable, then stale only after a real success',as
  try{
  homeyClient.listDevices=async()=>{throw new Error('fixture outage');};let r=await call();assert.equal(r.status,503);assert.equal(r.body._quality,'unavailable');assert.equal(r.body.devices,undefined);
  homeyClient.listDevices=async()=>devices;r=await call();assert.equal(r.body._quality,'live');
- homeyClient.listDevices=async()=>{throw new Error('fixture outage');};r=await call();assert.equal(r.body._quality,'stale');assert.deepEqual(r.body.devices,devices);
+ homeyClient.listDevices=async()=>{throw new Error('fixture outage');};r=await call();assert.equal(r.body._quality,'stale');assert.equal(JSON.stringify(r.body.devices),JSON.stringify(devices));
  }finally{ /* injected client only */ }
 });
 test('failed disk write leaves last acknowledged config intact',async()=>{
@@ -147,3 +147,12 @@ function sceneHarness({expired=false,changed=false}={}) {
 test('expired undo cannot perform any physical write',async()=>{const r=await sceneHarness({expired:true}).undo();assert.equal(r.code,409);assert.equal(r.writes,0);});
 test('changed light refuses undo without writing',async()=>{const r=await sceneHarness({changed:true}).undo();assert.equal(r.code,409);assert.equal(r.writes,0);});
 test('unchanged confirmed scene restores previous value and verifies result',async()=>{const r=await sceneHarness().undo();assert.equal(r.code,200);assert.equal(r.result.ok,true);assert.equal(r.writes,1);assert.ok(r.statuses.includes('undone'));});
+
+test('Homey device responses omit pairing secrets without changing cached originals',async()=>{
+ const privateDevices={fixture:{id:'fixture',name:'Lamp',capabilities:['onoff'],capabilitiesObj:{onoff:{value:true}},data:{token:'fixture-secret'},settings:{apikey:'fixture-key'},settingsObj:true}};
+ const routes=new Map();sandbox('routes/homey.js',{createInventoryReader,Router:()=>({get:(n,h)=>routes.set(n,h),post(){}}),homeyClient:{listDevices:async()=>privateDevices},isDemoMode:()=>false},'homeyRoutes');
+ let body;await routes.get('/devices')({originalUrl:'/devices'},{json(v){body=v;}});
+ assert.equal(body.devices.fixture.name,'Lamp');assert.equal(body.devices.fixture.capabilitiesObj.onoff.value,true);
+ assert.equal(body.devices.fixture.settings,undefined);assert.equal(body.devices.fixture.data,undefined);assert.equal(body.devices.fixture.settingsObj,undefined);
+ assert.equal(privateDevices.fixture.settings.apikey,'fixture-key');assert.equal(privateDevices.fixture.data.token,'fixture-secret');
+});

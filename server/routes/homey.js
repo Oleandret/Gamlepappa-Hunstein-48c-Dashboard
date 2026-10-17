@@ -53,9 +53,18 @@ homeyRoutes.get('/zones', safe(
 ));
 
 homeyRoutes.get('/devices', safe(
-  async () => ({ devices: await homeyClient.listDevices() }),
+  async () => ({ devices: publicDevices(await homeyClient.listDevices()) }),
   async () => ({ devices: MOCK_DEVICES })
 ));
+
+// Driver pairing/configuration fields can contain credentials and are never UI data.
+function publicDevices(devices) {
+  return Object.fromEntries(Object.entries(devices).map(([id, device]) => {
+    if (!device || typeof device !== 'object') return [id, device];
+    const {data, settings, settingsObj, ...visible} = device;
+    return [id, visible];
+  }));
+}
 
 // Explicit local snapshot import, never a Tesla request or a Homey command.
 homeyRoutes.post('/tesla/:id/refresh', async (req,res) => {
@@ -85,14 +94,14 @@ homeyRoutes.get('/activity', safe(
 const inventoryRead=createInventoryReader(homeyClient);
 homeyRoutes.get('/inventory',async(req,res)=>{
  if(isDemoMode()){const data=buildInventory({devices:MOCK_DEVICES,zones:MOCK_ZONES,flows:MOCK_FLOWS});return res.json({...data,_quality:'demo',_updatedAt:null});}
- try{const result=await inventoryRead(req.query.full==='true');res.status(result.status).json(result.body);}catch{res.status(503).json({error:'Kartlegging kunne ikke bygges',_quality:'unavailable'});}
+ try{const result=await inventoryRead(req.query.full==='true');if(result.body.raw?.devices)result.body.raw.devices=publicDevices(result.body.raw.devices);res.status(result.status).json(result.body);}catch{res.status(503).json({error:'Kartlegging kunne ikke bygges',_quality:'unavailable'});}
 });
 
 homeyRoutes.get('/security', safe(
   async () => {
     const devices = await homeyClient.listDevices();
     const list = Object.values(devices).filter(d => ['sensor', 'lock', 'camera'].includes(d.class));
-    return { devices: list, armed: null, healthScore: computeHealthScore(list) };
+    return { devices: Object.values(publicDevices(Object.fromEntries(list.map(d=>[d.id,d])))), armed: null, healthScore: computeHealthScore(list) };
   },
   async () => {
     const list = Object.values(MOCK_DEVICES).filter(d => ['sensor', 'lock', 'camera'].includes(d.class));
