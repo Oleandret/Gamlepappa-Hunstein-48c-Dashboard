@@ -88,8 +88,13 @@ export const homeyClient = {
       () => homeyFetch(`/manager/flow/flow/${encodeURIComponent(flowId)}/trigger`, { method: 'POST' }),
       `runFlow ${flowId}`
     ),
-  getEnergyReport: (scope = 'today') =>
-    homeyFetch(`/manager/energy/report/${encodeURIComponent(scope)}`)
+  getEnergyLive: () => homeyFetch('/manager/energy/live'),
+  getEnergyDay: (date) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Ugyldig dato');
+    return homeyFetch(`/manager/energy/report/day?date=${encodeURIComponent(date)}`);
+  },
+  // Legacy widgets expect a different schema; do not fabricate an adapter or call /report/today (404).
+  getEnergyReport: async () => { throw new Error('Energirapportens format er ikke verifisert. Se Strømsparing for kildestatus.'); }
 };
 
 export function isConfigured() {

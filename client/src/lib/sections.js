@@ -12,6 +12,7 @@ export const SECTIONS = [
   { id: 'lyd',               label: 'Lyd',             Icon: Music },
   { id: 'automasjon',        label: 'Automasjon',      Icon: Workflow },
   { id: 'flow-favoritter',   label: 'Flow-favoritter', Icon: Star },
+  { id: 'stromsparing', label: 'Strømsparing', Icon: Zap },
   { id: 'energi',            label: 'Energi',          Icon: Zap },
   { id: 'sikkerhet',         label: 'Sikkerhet',       Icon: ShieldCheck },
   { id: 'avatar',            label: 'Avatar',          Icon: Bot },

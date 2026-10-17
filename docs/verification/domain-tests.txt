@@ -1,0 +1,23 @@
+✔ v1 null, strings, NaN and Infinity are missing, not zero (1.695625ms)
+✔ v1 unavailable, stale, future and absent timestamps are excluded (0.110833ms)
+✔ v2 concurrent reads coalesce and retain original timestamp during cache (0.347208ms)
+✔ v2 429 backoff honors retry, returns stale and recovers (0.171958ms)
+✔ v2 initial 404/403/429 never substitute demo or leak exception (0.217625ms)
+✔ v3 main and sub are never added; duplicate ids counted once (0.264875ms)
+✔ v3 missing/stale cannot silently become zero total or subtotal (0.099833ms)
+✔ v4 history uses cumulative kWh, handles reset and separate meters (0.521792ms)
+✔ v4 duplicate samples and stale meter values are not recorded (0.166583ms)
+✔ v4 Oslo dates span UTC midnight and daylight saving boundaries (12.975167ms)
+✔ v5 negative prices work; missing/partial/wrong currency/units cannot make complete cost (0.374916ms)
+✔ v6 overlap warning and true zero main (0.122959ms)
+✔ v7 high instantaneous power is not presented as proven anomaly or saving (0.062417ms)
+✔ v8 simulation converts W to kWh and sends nothing (0.092542ms)
+✔ v8 unknown, socket, heat, absent bounds and stale data fail closed (0.130209ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 28.718291

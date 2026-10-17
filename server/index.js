@@ -9,6 +9,7 @@ import compression from 'compression';
 import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { savingsRoutes } from './routes/savings.js';
 import { homeyRoutes } from './routes/homey.js';
 import { weatherRoutes } from './routes/weather.js';
 import { systemRoutes } from './routes/system.js';
@@ -57,6 +58,7 @@ app.post('/api/logout', googleAuth.logout);
 // API routes
 app.use('/api/system', systemRoutes);
 app.use('/api/homey', homeyRoutes);
+app.use('/api/savings', savingsRoutes);
 app.use('/api/weather', weatherRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/events', eventsRoutes);
