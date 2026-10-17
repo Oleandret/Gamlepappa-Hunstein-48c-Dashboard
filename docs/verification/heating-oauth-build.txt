@@ -1,0 +1,30 @@
+
+> gamlepappa-hunstein-48c-dashboard@1.0.0 build
+> npm run build --prefix client
+
+
+> gamlepappa-smarthus-client@1.0.0 build
+> vite build
+
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 3145 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                             1.63 kB │ gzip:   0.83 kB
+dist/assets/HeatingView-C-cgqE2q.css        2.51 kB │ gzip:   0.97 kB
+dist/assets/SavingsView-DqEVRhSE.css        4.99 kB │ gzip:   1.60 kB
+dist/assets/index-D-RJqsKe.css             51.27 kB │ gzip:   9.25 kB
+dist/assets/rolldown-runtime-BWaJ3C7D.js    0.91 kB │ gzip:   0.51 kB
+dist/assets/EnergyWidget-DkSJIsn2.js        2.53 kB │ gzip:   1.10 kB
+dist/assets/EnergyView-PXSAB4-a.js          4.34 kB │ gzip:   1.63 kB
+dist/assets/HeatingView-Ba7OafB_.js         9.96 kB │ gzip:   3.84 kB
+dist/assets/SavingsView-Do906hCn.js        18.35 kB │ gzip:   6.33 kB
+dist/assets/icons-DBd2OAqh.js              29.24 kB │ gzip:   9.80 kB
+dist/assets/framer-motion-BH5ow19j.js     116.48 kB │ gzip:  38.52 kB
+dist/assets/react-vendor-D0ElQ-H9.js      140.46 kB │ gzip:  44.59 kB
+dist/assets/index-D2IMbeIH.js             261.60 kB │ gzip:  64.06 kB
+dist/assets/recharts-Dw8wm9kz.js          371.60 kB │ gzip:  98.93 kB
+dist/assets/House3DView-DobRu1Bq.js       969.93 kB │ gzip: 261.63 kB
+
+✓ built in 1.14s

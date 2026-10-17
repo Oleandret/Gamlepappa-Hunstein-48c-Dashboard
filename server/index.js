@@ -9,6 +9,7 @@ import compression from 'compression';
 import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { myuplinkOAuth } from './lib/myuplinkOAuth.js';
 import { heatingRoutes } from './routes/heating.js';
 import { savingsRoutes } from './routes/savings.js';
 import { homeyRoutes } from './routes/homey.js';
@@ -52,6 +53,7 @@ app.use((req, _res, next) => {
 });
 
 app.use('/auth', googleAuth.router);
+app.use('/auth/myuplink', myuplinkOAuth.callback);
 app.use('/api', (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); }, accessControl);
 app.use('/api/experience', experienceRoutes);
 app.get('/api/session', (req,res) => res.json(req.user));

@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "checks": [
+    "disabled setup has no connect action",
+    "owner chooses verified fixture device",
+    "local disconnect",
+    "ready connect action",
+    "bearer cannot administer",
+    "only two isolated mock POST requests",
+    "zero browser errors"
+  ]
+}

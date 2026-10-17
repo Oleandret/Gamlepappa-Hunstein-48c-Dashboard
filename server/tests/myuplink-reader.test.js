@@ -184,3 +184,10 @@ test('nested values and truthy non-boolean enable flags fail closed', async () =
   const off = harness({ enabled: 'true' });
   assert.equal((await off.read()).status, 'not_connected'); assert.equal(off.calls.token, 0);
 });
+
+test('offline_access is accepted only with explicit offline approval; write scopes always rejected',async()=>{
+  const token={accessToken:'fixture',scope:'READSYSTEM offline_access'};
+  assert.equal((await harness({token}).read()).status,'not_connected');
+  assert.equal((await harness({token,allowOffline:true}).read()).status,'ok');
+  assert.equal((await harness({token:{...token,scope:'READSYSTEM offline_access WRITESYSTEM'},allowOffline:true}).read()).status,'not_connected');
+});

@@ -1,11 +1,12 @@
 // Read-only myUplink adapter. Server-side only: it never sees a client token and
 // never takes a caller-supplied URL or method. Two fixed GET endpoints, nothing else.
+import { validReadScope } from './myuplinkOAuth.js';
 import { fetchJson } from './http.js';
 import { energyReader } from './energyReader.js';
 
 const POINTS_URL = id => `https://api.myuplink.com/v2/devices/${encodeURIComponent(id)}/points`;
 const NOTIFICATIONS_URL = id => `https://api.myuplink.com/v2/systems/${encodeURIComponent(id)}/notifications/active`;
-const REQUIRED_SCOPE = 'READSYSTEM';
+
 // Allowlist from the verified public-v2 ParameterData contract. The raw response may
 // carry more; only these cross the boundary, and `timestamp` stays exactly as sent.
 const POINT_FIELDS = ['category', 'parameterId', 'parameterName', 'parameterUnit', 'timestamp', 'value', 'strVal', 'smartHomeCategories', 'writable'];
@@ -39,7 +40,7 @@ function unavailableAlarms(reason) {
   return { available: false, count: null, reason };
 }
 
-export function createMyUplinkReader({ enabled = false, deviceId = '', systemId = '', getAccessToken, fetchImpl = fetch, now = Date.now } = {}) {
+export function createMyUplinkReader({ enabled = false, allowOffline = false, deviceId = '', systemId = '', getAccessToken, fetchImpl = fetch, now = Date.now } = {}) {
   const device = trimmed(deviceId);
   const system = trimmed(systemId);
   let lastReason = null;
@@ -49,9 +50,8 @@ export function createMyUplinkReader({ enabled = false, deviceId = '', systemId 
     const granted = await getAccessToken();
     const token = trimmed(granted?.accessToken);
     if (!token) throw authError('myUplink mangler et gyldig tilgangstoken');
-    const scopes = trimmed(granted?.scope).split(/\s+/).filter(Boolean);
-    if (scopes.length !== 1 || scopes[0] !== REQUIRED_SCOPE) {
-      throw authError(`myUplink-tokenet må ha nøyaktig scope ${REQUIRED_SCOPE}`);
+    if (!validReadScope(granted?.scope, allowOffline)) {
+      throw authError('myUplink-tokenet må ha godkjent lesescope');
     }
     return { Authorization: `Bearer ${token}`, Accept: 'application/json' };
   }

@@ -71,7 +71,7 @@ export default function App() {
     activity: null, security: null, weather: null
   });
   const [loaded, setLoaded] = useState(false);
-  const [section, setSection] = useState('oversikt');
+  const [section, setSection] = useState(() => new URLSearchParams(window.location.search).has('myuplink') ? 'varmestyring' : 'oversikt');
   const visible = usePageVisibility();
   const favorites = useFavorites();
   const sidebar = useSidebarPinned();
