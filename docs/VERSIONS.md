@@ -1,0 +1,8 @@
+# Local implementation checkpoints
+
+Each version is cumulative and local only. No external writes. Focused checks are repeated at each checkpoint; the complete test and browser evidence belong to V10.
+
+## V1 — Datakvalitet og kildekontrakt
+
+V1: cumulative focused checks passed.
+
