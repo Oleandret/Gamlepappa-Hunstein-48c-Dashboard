@@ -6,7 +6,7 @@ import { SECTIONS } from '../lib/sections.js';
  * Auto-collapsing sidebar — icon-only by default, expands on hover.
  * Click the pin icon to keep it open permanently (saved in localStorage).
  */
-export function Sidebar({ section, onSection, deviceCount = 0, flowCount = 0, pinned, onTogglePin }) {
+export function Sidebar({ section, onSection, deviceCount = 0, deviceQuality, flowCount = 0, pinned, onTogglePin }) {
   const [hovered, setHovered] = useState(false);
   const expanded = pinned || hovered;
 
@@ -76,7 +76,7 @@ export function Sidebar({ section, onSection, deviceCount = 0, flowCount = 0, pi
         <div className="mt-2 space-y-2 text-xs">
           <Stat label="Enheter" value={deviceCount || '—'} />
           <Stat label="Flows" value={flowCount || '—'} />
-          <Stat label="Online" value={deviceCount ? 'OK' : '—'} tone="green" />
+          <Stat label="Homey" value={deviceQuality === 'live' ? 'OK' : deviceCount ? 'Eldre data' : 'Utilgjengelig'} tone={deviceQuality === 'live' ? 'green' : undefined} />
         </div>
       </div>
     </aside>

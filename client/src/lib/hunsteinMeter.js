@@ -1,5 +1,5 @@
 // Owner confirmed whole-house Pulse; stable ID read from Homey 2026-10-17.
-export const HUNSTEIN_MAIN_ID='52c4a219-ebee-4be0-a052-38e800aaa239';
+export const HUNSTEIN_MAIN_ID='52c4a219-ebee-4be0-aa52-38e800aaa239';
 export const sourceTime=value=>typeof value==='number'&&Number.isFinite(value)&&value>1e12?value:Date.parse(typeof value==='string'?value:'');
 export function hunsteinMeter(devices,now=Date.now()){
  const d=devices?.[HUNSTEIN_MAIN_ID];if(!d)return null;

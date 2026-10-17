@@ -99,9 +99,9 @@ export default function App() {
         const sig = controller.signal;
         const [system, zones, devices, flows, energy, activity, security, weather] = await Promise.all([
           api.systemInfo(sig).catch(() => null),
-          api.zones(sig).catch(() => ({ zones: {} })),
+          api.zones(sig).catch(() => ({ _quality: 'unavailable' })),
           api.devices(sig).catch(() => ({ _quality:'unavailable' })),
-          api.flows(sig).catch(() => ({ flows: {} })),
+          api.flows(sig).catch(() => ({ _quality: 'unavailable' })),
           api.energy(sig).catch(() => ({ report: null, _quality:'unavailable' })),
           api.activity(sig).catch(() => ({ activity: [] })),
           api.security(sig).catch(() => ({ devices: [], armed: false })),
@@ -116,10 +116,10 @@ export default function App() {
         }
         if (devices?.devices) prevDevicesRef.current = devices.devices;
         setData(previous => ({
-          zones: zones?.zones,
+          zones: zones?.zones || previous.zones,
           devices: devices?.devices || previous.devices,
           quality: {devices:devices?._quality,energy:energy?._quality},
-          flows: flows?.flows,
+          flows: flows?.flows || previous.flows,
           energy: energy?.report,
           activity: activity?.activity,
           security,
@@ -204,6 +204,7 @@ export default function App() {
           section={section}
           onSection={setSection}
           deviceCount={counts.devices}
+          deviceQuality={data.quality?.devices}
           flowCount={counts.flows}
           pinned={sidebar.pinned}
           onTogglePin={sidebar.toggle}
@@ -241,7 +242,7 @@ export default function App() {
 
           <footer className="mt-10 mb-4 flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-nx-mute font-mono">
             <span>GAMLEPAPPA SMARTHUS · {system?.house || 'Hunstein 48c'}</span>
-            <span>v{system?.version || '1.0'} · {counts.devices} enh · {counts.zones} rom · {system?.demo ? 'demo' : 'live'}</span>
+            <span>v{system?.version || '1.0'} · {counts.devices} enh · {counts.zones} rom · {system?.demo ? 'demo' : data.quality?.devices || 'ukjent'}</span>
           </footer>
         </main>
         <FlowsSidebar
