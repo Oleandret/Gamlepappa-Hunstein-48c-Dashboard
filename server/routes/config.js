@@ -7,6 +7,7 @@ export const configRoutes = Router();
 // keys og fylle opp lagringa.
 const ALLOWED_NS = new Set([
   'flowOrganization',
+  'floorPlanDrafts',
   'pinConfig',          // HouseView pins på framsiden
   'frontImageConfig',   // bilde-størrelse
   'frontSensors',       // sensor-widget-rad

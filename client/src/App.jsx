@@ -1,3 +1,5 @@
+import {PlanHouseView} from './components/views/PlanHouseView.jsx';
+import {HistoryView} from './components/views/HistoryView.jsx';
 import {NetworkView} from './components/views/NetworkView.jsx';
 import { ExperienceView } from './components/views/ExperienceView.jsx';
 import { VoiceAssistant } from './components/VoiceAssistant.jsx';
@@ -263,6 +265,7 @@ export default function App() {
 }
 
 function SectionView({ onOpen3D, focusZoneId, section, system, data, counts, setCapability, runFlow, favorites, pinConfig, imageConfig, frontSensors, flowFavorites, links, floorPlanPins, planFlows, frontSpecials }) {
+  if (section === 'historikk') return <HistoryView/>;
   if (section === 'nettverk') return <NetworkView />;
   if (section === 'huspuls') return <ExperienceView devices={data.devices || {}} />;
   const userName = system?.user || 'Ole';
@@ -340,7 +343,7 @@ function SectionView({ onOpen3D, focusZoneId, section, system, data, counts, set
 
     case 'plantegning-hus':
       return wrapper(
-        <FloorPlanView
+        <PlanHouseView
           devices={data.devices || {}}
           zones={data.zones || {}}
           location="home"

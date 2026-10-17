@@ -26,7 +26,7 @@ export function ZonesView({ onOpen3D, devices, zones, onSet, favorites }) {
 
   return (
     <div>
-      <h2 className="panel-title">Rom · {tree.totalZones} aktive · {tree.totalDevices} enheter</h2>
+      <h2 className="panel-title">Rom · {tree.totalZones} registrerte · {tree.totalDevices} enheter</h2>
       <div className="mt-3 space-y-4">
         {tree.floors.map(floor => (
           <FloorSection key={floor.id} floor={floor} onOpen={setOpenZoneId} />
@@ -190,7 +190,7 @@ function buildZoneTree(zones, devices) {
     }
     for (const child of root.children) {
       const rooms = [];
-      if (child.directDevices > 0) rooms.push(withTotal(child, child.directDevices));
+      if (child.directDevices > 0 || child.children.length === 0) rooms.push(withTotal(child, child.directDevices));
       rooms.push(...flattenChildren(child));
       const totalDev = rooms.reduce((s, r) => s + r.totalDevices, 0);
       if (rooms.length > 0) {
@@ -211,7 +211,7 @@ function withTotal(node, total) {
 function flattenChildren(node) {
   const out = [];
   for (const c of node.children) {
-    if (c.directDevices > 0) out.push(withTotal(c, c.directDevices));
+    if (c.directDevices > 0 || c.children.length === 0) out.push(withTotal(c, c.directDevices));
     out.push(...flattenChildren(c));
   }
   return out;

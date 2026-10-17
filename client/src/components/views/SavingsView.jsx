@@ -1,3 +1,5 @@
+import {HistoryCharts} from '../HistoryCharts.jsx';
+import {PriceHistory} from '../PriceHistory.jsx';
 import {HUNSTEIN_MAIN_ID} from '../../lib/hunsteinMeter.js';
 import {HunsteinEnergy} from '../HunsteinEnergy.jsx';
 import { useEffect, useMemo, useState } from 'react';
@@ -42,6 +44,7 @@ export function SavingsView(){
   return <div className="savings">
     <header className="saving-hero"><div><p className="saving-eyebrow">GAMLEPAPPA / ENERGIINNSIKT</p><h1>Strømsparing</h1><p>Forstå forbruket. Prøv tiltak. Behold kontrollen.</p></div><span className="saving-badge">Kun innsikt og simulering</span></header>
     <div className="saving-notice" role="status">{quality==='demo'?'DEMO — alle kildedata er testdata. Ingen bekreftet husmåling.':error||'Lesetilgang · oppdateres tidligst hvert minutt · Europe/Oslo'}<br/>Ingen fysisk automasjon kan aktiveres fra denne fanen.</div>
+    {siteId==='hunstein'&&<><HistoryCharts/><PriceHistory/></>}
     {siteId==='hunstein'&&<section className="saving-card"><HunsteinEnergy devices={data?.devices?.value} quality={quality}/></section>}
     <section className="saving-metrics" aria-label="Forbruksoversikt">
       <Metric title="Valgt anlegg akkurat nå" value={summary.total===null?'—':number(summary.total/1000,2)} unit="kW" note={summary.total===null?'Velg en fersk, bekreftet hovedmåler':'Målt hovedmåler · ikke summert med undermålere'}/>

@@ -15,6 +15,7 @@ export const SECTIONS = [
   { id: 'varmestyring', label: 'Varmestyring', Icon: Thermometer },
   { id: 'stromsparing', label: 'Strømsparing', Icon: Zap },
   { id: 'energi',            label: 'Energi',          Icon: Zap },
+  { id: 'historikk', label: 'Historikk', Icon: Activity },
   { id: 'nettverk', label: 'Nettverk', Icon: Network },
   { id: 'sikkerhet',         label: 'Sikkerhet',       Icon: ShieldCheck },
   { id: 'avatar',            label: 'Avatar',          Icon: Bot },
