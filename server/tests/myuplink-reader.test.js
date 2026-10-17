@@ -57,6 +57,7 @@ test('only the fixed points URL is requested, with GET and the injected bearer',
   assert.equal(url, 'https://api.myuplink.com/v2/devices/dev-1/points');
   assert.equal(init.method, 'GET');
   assert.equal(init.headers.Authorization, 'Bearer token-abc');
+  assert.equal(init.headers['Accept-Language'], 'en-US');
   // read() takes no arguments, so no caller can inject a URL, a method or a client token.
   assert.equal(h.read.length, 0);
   const weird = harness({ deviceId: 'a/b c?x=1', systemId: 'sys/9' , notifications: [] });
@@ -159,6 +160,7 @@ test('alarms are unavailable rather than empty when the system is unconfigured o
     const result = await ok.read();
     assert.deepEqual([result.alarms.available, result.alarms.count], [true, count]);
     assert.equal(ok.calls.notifications[0].init.headers.Authorization, 'Bearer token-abc');
+    assert.equal(ok.calls.notifications[0].init.headers['Accept-Language'], 'en-US');
   }
 });
 

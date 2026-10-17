@@ -53,7 +53,7 @@ export function createMyUplinkReader({ enabled = false, allowOffline = false, de
     if (!validReadScope(granted?.scope, allowOffline)) {
       throw authError('myUplink-tokenet må ha godkjent lesescope');
     }
-    return { Authorization: `Bearer ${token}`, Accept: 'application/json' };
+    return { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Accept-Language': 'en-US' };
   }
 
   let alarmHeaders, alarmReason;
