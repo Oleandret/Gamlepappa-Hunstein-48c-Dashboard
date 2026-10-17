@@ -1,3 +1,5 @@
+import {useServerSyncedState} from '../../lib/useServerSyncedState.js';
+import {sortFavoriteFlows} from '../../lib/flowSorting.js';
 import { useMemo, useState } from 'react';
 import { Star, Play, Search, Workflow, X } from 'lucide-react';
 
@@ -10,7 +12,9 @@ import { Star, Play, Search, Workflow, X } from 'lucide-react';
  *
  * Søk filtrerer begge.
  */
-export function FlowFavoritesView({ flows, onRun, flowFavorites }) {
+export function FlowFavoritesView({ zones={}, flows, onRun, flowFavorites }) {
+  const [settings,setSettings]=useServerSyncedState('flowOrganization',{sort:'manual',meta:{}});
+  const org=settings||{sort:'manual',meta:{}};
   const [query, setQuery] = useState('');
   const flowList = useMemo(() => Object.values(flows || {}), [flows]);
 
@@ -21,13 +25,8 @@ export function FlowFavoritesView({ flows, onRun, flowFavorites }) {
         || (f.folder || '').toLowerCase().includes(q);
   };
 
-  const favoriteFlows = useMemo(
-    () => flowList
-      .filter(f => flowFavorites.isFavorite(f.id))
-      .filter(filter)
-      .sort((a, b) => (a.name || '').localeCompare(b.name || '')),
-    [flowList, flowFavorites, q]
-  );
+  const favoriteFlows=sortFavoriteFlows(flowList,flowFavorites.ids,org,zones).filter(filter);
+  const groups=Object.groupBy(favoriteFlows,f=>org.sort==='category'?(org.meta?.[f.id]?.category||'Ugruppert'):org.sort==='room'?(zones[org.meta?.[f.id]?.room]?.name||'Rom ikke valgt'):'Favoritter');
 
   const otherFlows = useMemo(
     () => flowList
@@ -45,7 +44,7 @@ export function FlowFavoritesView({ flows, onRun, flowFavorites }) {
             <p className="panel-title">Flow-favoritter</p>
             <h1 className="text-xl font-semibold mt-1">{favoriteFlows.length} stjernede flows</h1>
             <p className="text-xs text-nx-mute mt-0.5">
-              Klikk stjernen for å legge til/fjerne fra favoritter — lagres lokalt i nettleseren.
+              Favoritter og gruppering lagres privat på serveren. Manuell rekkefølge beholdes når du bytter sortering.
             </p>
           </div>
           <div className="relative">
@@ -70,13 +69,14 @@ export function FlowFavoritesView({ flows, onRun, flowFavorites }) {
         </div>
       </div>
 
+      <section className="col-span-12 panel p-4"><label>Sorter favoritter <select className="bg-nx-bg p-2" value={org.sort||'manual'} onChange={e=>setSettings(p=>({...p,sort:e.target.value}))}><option value="manual">Manuell / lagt til</option><option value="name">Navn</option><option value="category">Kategori</option><option value="room">Rom</option><option value="usage" disabled>Mest brukt – mangler bekreftet kjørehistorikk</option></select></label><p className="text-xs text-nx-mute mt-2">Homey bekrefter mottatt startforespørsel, men ikke fullført kjøring her. Klikk og mislykkede forsøk telles ikke som bruk. Historiske kjøretall er ukjent.</p><details className="mt-3"><summary>Rediger tilhørighet</summary>{favoriteFlows.map(f=><div key={f.id} className="flex flex-wrap gap-3 items-center mt-3"><span>{f.name}</span><label>Kategori <input className="bg-nx-bg border border-nx-line p-2" maxLength={60} value={org.meta?.[f.id]?.category||''} onChange={e=>setSettings(p=>({...p,meta:{...p?.meta,[f.id]:{...p?.meta?.[f.id],category:e.target.value}}}))}/></label><label>Rom <select className="bg-nx-bg p-2" value={org.meta?.[f.id]?.room||''} onChange={e=>setSettings(p=>({...p,meta:{...p?.meta,[f.id]:{...p?.meta?.[f.id],room:e.target.value}}}))}><option value="">Ukjent / ikke valgt</option>{Object.values(zones).sort((a,b)=>a.name.localeCompare(b.name)).map(z=><option key={z.id} value={z.id}>{z.name}</option>)}</select></label></div>)}</details></section>
       {favoriteFlows.length > 0 && (
         <div className="col-span-12 panel p-4">
           <p className="panel-title mb-3 flex items-center gap-2">
             <Star size={14} className="text-nx-amber" fill="currentColor" />
             Stjernede ({favoriteFlows.length})
           </p>
-          <FlowGrid flows={favoriteFlows} onRun={onRun} flowFavorites={flowFavorites} />
+          {Object.entries(groups).map(([label,list])=><section key={label} className="mt-3"><h3 className="text-sm mb-2">{label}</h3><FlowGrid flows={list} onRun={onRun} flowFavorites={flowFavorites} /></section>)}
         </div>
       )}
 

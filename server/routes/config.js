@@ -6,6 +6,7 @@ export const configRoutes = Router();
 // Tillat-listede namespace-nøkler. Forhindrer at klienten kan lagre vilkårlige
 // keys og fylle opp lagringa.
 const ALLOWED_NS = new Set([
+  'flowOrganization',
   'pinConfig',          // HouseView pins på framsiden
   'frontImageConfig',   // bilde-størrelse
   'frontSensors',       // sensor-widget-rad
