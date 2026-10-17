@@ -2,7 +2,7 @@
   "passed": true,
   "screenshots": 5,
   "checks": [
-    "main/submeter selection",
+    "explicit site assignment and main/submeter selection",
     "W to kWh simulation",
     "explicit preview activation",
     "pause and stop",

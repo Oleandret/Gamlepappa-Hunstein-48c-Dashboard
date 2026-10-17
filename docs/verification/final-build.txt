@@ -8,21 +8,21 @@
 
 vite v8.3.4 building client environment for production...
 transforming...
-✓ 3139 modules transformed.
+✓ 3141 modules transformed.
 rendering chunks...
 computing gzip size...
-dist/index.html                             1.31 kB │ gzip:   0.62 kB
+dist/index.html                             1.63 kB │ gzip:   0.83 kB
 dist/assets/SavingsView-DqEVRhSE.css        4.99 kB │ gzip:   1.60 kB
-dist/assets/index-Cv-h9225.css             51.88 kB │ gzip:   9.33 kB
+dist/assets/index-D-RJqsKe.css             51.27 kB │ gzip:   9.25 kB
 dist/assets/rolldown-runtime-BWaJ3C7D.js    0.91 kB │ gzip:   0.51 kB
 dist/assets/EnergyWidget-DkSJIsn2.js        2.53 kB │ gzip:   1.10 kB
-dist/assets/EnergyView-CRnEzgc4.js          4.34 kB │ gzip:   1.59 kB
-dist/assets/SavingsView-CTtO4BiG.js        16.76 kB │ gzip:   5.89 kB
+dist/assets/EnergyView-CfUn7CJc.js          4.34 kB │ gzip:   1.63 kB
+dist/assets/SavingsView-sgDC-saF.js        18.35 kB │ gzip:   6.33 kB
 dist/assets/icons-DBd2OAqh.js              29.24 kB │ gzip:   9.80 kB
 dist/assets/framer-motion-BH5ow19j.js     116.48 kB │ gzip:  38.52 kB
 dist/assets/react-vendor-D0ElQ-H9.js      140.46 kB │ gzip:  44.59 kB
-dist/assets/index-X_V_Q_r5.js             261.74 kB │ gzip:  64.05 kB
+dist/assets/index-Do4MaQBA.js             261.18 kB │ gzip:  63.94 kB
 dist/assets/recharts-Dw8wm9kz.js          371.60 kB │ gzip:  98.93 kB
-dist/assets/House3DView-nV7NdEgT.js       953.58 kB │ gzip: 257.21 kB
+dist/assets/House3DView-C7hAjQTq.js       969.93 kB │ gzip: 261.63 kB
 
-✓ built in 932ms
+✓ built in 1.17s

@@ -59,6 +59,8 @@ const devicesReader = cachedReader(() => homeyFetch('/manager/devices/device'));
 const zonesReader = cachedReader(() => homeyFetch('/manager/zones/zone'), 60000);
 const flowsReader = cachedReader(() => homeyFetch('/manager/flow/flow'), 60000);
 
+const legacyEnergyReaders = new Map();
+
 export const homeyClient = {
   listDevices: devicesReader,
   refreshDevices: () => { devicesReader.invalidate(); return devicesReader(); },
@@ -93,8 +95,11 @@ export const homeyClient = {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Ugyldig dato');
     return homeyFetch(`/manager/energy/report/day?date=${encodeURIComponent(date)}`);
   },
-  // Legacy widgets expect a different schema; do not fabricate an adapter or call /report/today (404).
-  getEnergyReport: async () => { throw new Error('Energirapportens format er ikke verifisert. Se Strømsparing for kildestatus.'); }
+  // Preserve the legacy contract while caching failures, including the observed 404.
+  getEnergyReport: (scope = 'today') => {
+    if (!legacyEnergyReaders.has(scope)) legacyEnergyReaders.set(scope, cachedReader(() => homeyFetch(`/manager/energy/report/${encodeURIComponent(scope)}`), 300000));
+    return legacyEnergyReaders.get(scope)();
+  }
 };
 
 export function isConfigured() {

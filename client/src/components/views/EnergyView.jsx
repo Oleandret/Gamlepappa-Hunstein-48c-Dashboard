@@ -26,11 +26,10 @@ export function EnergyView({ devices, zones, energy }) {
       .sort((a, b) => (b.watts || 0) - (a.watts || 0));
   }, [devices, zones]);
 
-  const totalLive = energyDevices.reduce((s, d) => s + (d.watts || 0), 0);
   const byZone = useMemo(() => {
     const m = new Map();
     for (const d of energyDevices) {
-      m.set(d.zone, (m.get(d.zone) || 0) + (d.watts || 0));
+      m.set(d.zone, (m.get(d.zone) || 0) + 1);
     }
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
   }, [energyDevices]);
@@ -44,14 +43,14 @@ export function EnergyView({ devices, zones, energy }) {
           </Suspense>
         </div>
         <div className="panel p-4">
-          <p className="panel-title">Sanntid</p>
+          <p className="panel-title">Enhetsoversikt</p>
           <div className="mt-2 flex items-baseline gap-2">
             <Zap size={20} className="text-nx-cyan" aria-hidden="true" />
-            <span className="font-mono text-3xl">{Math.round(totalLive).toLocaleString('no-NO')}</span>
-            <span className="text-nx-mute text-sm">W totalt</span>
+            <span className="font-mono text-3xl">{energyDevices.length}</span>
+            <span className="text-nx-mute text-sm">målere</span>
           </div>
           <p className="mt-1 text-xs text-nx-mute">
-            Summen er fra {energyDevices.length} enheter med strøm-måling.
+            Ingen totalsum: listen kan inneholde hovedmålere, undermålere og ulike anlegg. Bruk Strømsparing for brukerbekreftet anlegg og måleroppsett.
           </p>
           {energy?.today && (
             <div className="mt-4">
@@ -67,19 +66,19 @@ export function EnergyView({ devices, zones, energy }) {
       </header>
 
       <section>
-        <h3 className="panel-title">Per rom (sanntid)</h3>
+        <h3 className="panel-title">Målere per rom</h3>
         <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-          {byZone.map(([zone, watts]) => (
+          {byZone.map(([zone, count]) => (
             <div key={zone} className="panel p-3 flex items-center justify-between">
               <span className="text-sm truncate">{zone}</span>
-              <span className="font-mono text-sm text-nx-cyan">{Math.round(watts).toLocaleString('no-NO')} W</span>
+              <span className="font-mono text-sm text-nx-cyan">{count} målere</span>
             </div>
           ))}
         </div>
       </section>
 
       <section>
-        <h3 className="panel-title">Per enhet ({energyDevices.length})</h3>
+        <h3 className="panel-title">Sist rapportert per enhet ({energyDevices.length})</h3>
         <div className="mt-2 panel p-2">
           <ul className="divide-y divide-nx-line/40 max-h-[480px] overflow-y-auto">
             {energyDevices.map(d => (

@@ -88,3 +88,9 @@ export function appendSample(samples, row) {
   if(samples.some(s=>s.id===point.id&&s.at===point.at)) return samples;
   return [...samples,point].slice(-1440);
 }
+
+// Site membership is explicit user input. Never infer it from device names/rooms.
+export function siteRows(rows, siteId, assignments = {}) {
+  if (!['hunstein', 'halsaneset'].includes(siteId)) return [];
+  return rows.filter(row => Object.hasOwn(assignments, row.id) && assignments[row.id] === siteId);
+}

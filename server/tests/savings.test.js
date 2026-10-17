@@ -29,3 +29,19 @@ test('v10 shared device cache suppresses polling after rate limit',async()=>{con
 test('v10 HTTP Retry-After is retained without logging response bodies',async()=>{const {fetchJson}=await import('../lib/http.js');await assert.rejects(fetchJson('https://example.invalid',{}, {fetchImpl:async()=>new Response('SECRET',{status:429,headers:{'Retry-After':'120'}})}),e=>e.upstreamStatus===429&&e.retryAfterMs===120000&&!e.message.includes('SECRET'));});
 
 test('v10 server is independent of frontend sources and uses the same Oslo dates',async()=>{const {osloDate:serverDate}=await import('../lib/energyReader.js');for(const t of ['2026-10-17T22:30:00Z','2026-03-29T01:30:00Z','2026-10-25T01:30:00Z'])assert.equal(serverDate(Date.parse(t)),osloDate(Date.parse(t)));const {readFile}=await import('node:fs/promises');assert.ok(!(await readFile(new URL('../routes/savings.js',import.meta.url),'utf8')).includes('client/src'));});
+
+test('site boundaries exclude unknown and other-site meters from totals and simulation', async()=>{
+  const {siteRows}=await import('../../client/src/lib/savingsModel.js');
+  const assignments={main:'hunstein',light:'halsaneset'};
+  const scoped=siteRows(rows(),'hunstein',assignments);
+  assert.equal(overview(scoped,'main',['light','unknown']).subtotal,null);
+  assert.equal(simulate(plan,scoped).ok,false);
+  assert.equal(siteRows(rows(),'unknown',assignments).length,0);
+  assert.equal(siteRows(rows(),'hunstein').length,0);
+  assert.deepEqual(siteRows(rows(),'halsaneset',assignments).map(r=>r.id),['light']);
+});
+test('429 reason survives cache hits rather than becoming a generic missing source',async()=>{
+  const r=energyReader(async()=>{throw {upstreamStatus:429};});
+  assert.match((await r()).reason,/429/);
+  assert.match((await r()).reason,/429/);
+});
