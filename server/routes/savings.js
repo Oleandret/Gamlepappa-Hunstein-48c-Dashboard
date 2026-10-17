@@ -1,9 +1,8 @@
 import { Router } from 'express';
 import { homeyClient } from '../lib/homeyClient.js';
-import { energyReader } from '../lib/energyReader.js';
+import { energyReader, osloDate } from '../lib/energyReader.js';
 import { isDemoMode } from '../config.js';
 import { MOCK_DEVICES, MOCK_ZONES } from '../lib/mockData.js';
-import { osloDate } from '../../client/src/lib/savingsModel.js';
 // Kept separate from legacy /energy: its response schema is not a verified Homey schema.
 export function createSavingsRoutes(client=homeyClient, demo=isDemoMode) {
   const router=Router();

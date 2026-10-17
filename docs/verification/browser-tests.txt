@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "screenshots": 5,
+  "checks": [
+    "main/submeter selection",
+    "W to kWh simulation",
+    "explicit preview activation",
+    "pause and stop",
+    "session log",
+    "390px overflow",
+    "stale and missing states",
+    "existing Devices and Energy navigation",
+    "zero write requests",
+    "zero browser errors"
+  ]
+}

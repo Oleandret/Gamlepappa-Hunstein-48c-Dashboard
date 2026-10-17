@@ -1,6 +1,9 @@
-// Pure read-only energy domain model.
+// Pure domain logic shared by the UI and isolated Node tests. No command adapter.
 export const MAX_AGE_MS = 120_000;
 export const finite = value => typeof value === 'number' && Number.isFinite(value);
+export function osloDate(now = Date.now()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Oslo', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date(now));
+}
 export function reading(cap, quality, now = Date.now(), available = true) {
   const value = cap?.value;
   const at = Date.parse(cap?.lastUpdated || '');
@@ -33,9 +36,6 @@ export function overview(rows, mainId, subIds = []) {
   };
 }
 // Samples are cumulative meter readings, never instantaneous watts treated as kWh.
-export function osloDate(now = Date.now()) {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Oslo', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date(now));
-}
 export function meterHistory(samples, mainId) {
   const points = samples.filter(s=>s.id===mainId&&finite(s.kwh)&&finite(s.at)).sort((a,b)=>a.at-b.at);
   const intervals = [];
@@ -45,12 +45,6 @@ export function meterHistory(samples, mainId) {
     intervals.push({start:a.at,end:b.at,kwh:delta>=0?delta:null,quality:delta>=0?'measured':'missing',reason:delta<0?'Måleren er nullstilt eller har endret retning':null});
   }
   return intervals;
-}
-export function appendSample(samples, row) {
-  if(row?.meter.quality!=='measured') return samples;
-  const point={id:row.id,at:row.meter.at,kwh:row.meter.value};
-  if(samples.some(s=>s.id===point.id&&s.at===point.at)) return samples;
-  return [...samples,point].slice(-1440);
 }
 export function intervalCost(intervals, prices) {
   // Exact matching avoids spreading daily kWh over hourly prices or inventing missing prices.
@@ -87,4 +81,10 @@ export function simulate(plan, rows) {
   const d=rows.find(d=>d.id===plan.deviceId);
   return {ok:true,deviceId:d.id,watts:d.power.value,estimatedKwh:Math.max(0,d.power.value)/1000*plan.minutes/60,
     note:'Estimert energiforskjell hvis observert effekt varer hele perioden og lyset ellers ville vært på. Ikke dokumentert besparelse.',physicalExecution:false};
+}
+export function appendSample(samples, row) {
+  if(row?.meter.quality!=='measured') return samples;
+  const point={id:row.id,at:row.meter.at,kwh:row.meter.value};
+  if(samples.some(s=>s.id===point.id&&s.at===point.at)) return samples;
+  return [...samples,point].slice(-1440);
 }

@@ -56,6 +56,7 @@ import { TibberCard } from './components/special/TibberCard.jsx';
 const EnergyWidget = lazy(() =>
   import('./components/EnergyWidget.jsx').then(m => ({ default: m.EnergyWidget }))
 );
+const SavingsView = lazy(() => import('./components/views/SavingsView.jsx').then(m => ({ default: m.SavingsView })));
 const EnergyView = lazy(() =>
   import('./components/views/EnergyView.jsx').then(m => ({ default: m.EnergyView }))
 );
@@ -188,7 +189,7 @@ export default function App() {
   }), [data.devices, data.flows, data.zones, favorites.ids]);
 
   return (
-    <div className="relative min-h-screen bg-nx-bg bg-scanlines overflow-hidden">
+    <div data-active-section={section} className="relative min-h-screen bg-nx-bg bg-scanlines overflow-hidden">
       <Particles />
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <div className="absolute -top-40 left-1/3 h-96 w-96 rounded-full bg-nx-cyan/15 blur-[120px]" />
@@ -405,6 +406,9 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
 
     case 'chat':
       return wrapper(<ChatView />, false);
+
+    case 'stromsparing':
+      return wrapper(<Suspense fallback={<LoadingPanel label="LASTER STRØMSPARING..." />}><SavingsView /></Suspense>, false);
 
     case 'energi':
       return wrapper(

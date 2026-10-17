@@ -17,3 +17,8 @@ export function energyReader(load, {ttl=60_000, now=Date.now}={}) {
     return pending;
   };
 }
+
+// Server-only date helper: production image contains client/dist, not client/src.
+export function osloDate(now = Date.now()) {
+  return new Intl.DateTimeFormat('en-CA', {timeZone:'Europe/Oslo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(now));
+}

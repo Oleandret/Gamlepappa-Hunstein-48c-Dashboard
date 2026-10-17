@@ -38,3 +38,10 @@ V8: cumulative focused checks passed.
 
 V9: cumulative focused checks passed.
 
+## V10 — Integrasjon, mobilkontroll og regresjonsbevis
+
+Fanen er koblet til eksisterende navigasjon og innlogging. Mobiloppsettet begrenses til Strømsparing. Lysvelgeren har eksplisitt tilgjengelighetsetikett. Serverens Oslo-hjelper er uavhengig av klientkilde, slik at eksisterende Docker-pakkestruktur bevares.
+
+Sluttkontroll: 64 av 64 tester bestått; Vite produksjonsbygg bestått. Nettlesertest verifiserte hoved-/undermåler, estimert scenario, eksplisitt lokal aktivering, pause, stopp, logg, 390px uten horisontal overflyt, manglende/foreldede data og eksisterende Enheter/Energi-navigasjon. Null skrivende API-kall og null nettleserfeil. Fem skjermbilder er lagret og skrivebord/mobil/simulering visuelt kontrollert. Google-innlogging, 3D-hus og VoiceAssistant-kildefiler er uendret.
+
+Se `verification/final-tests.txt`, `verification/final-build.txt`, `verification/browser-tests.txt` og `STROMSPARING.md`. Utkastet har ingen fysisk automasjonsmotor, verifisert prisadapter eller AI-kobling. Publisering avventer særskilt godkjenning.
