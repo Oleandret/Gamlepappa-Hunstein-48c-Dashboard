@@ -56,6 +56,7 @@ import { TibberCard } from './components/special/TibberCard.jsx';
 const EnergyWidget = lazy(() =>
   import('./components/EnergyWidget.jsx').then(m => ({ default: m.EnergyWidget }))
 );
+const HeatingView = lazy(() => import('./components/views/HeatingView.jsx'));
 const SavingsView = lazy(() => import('./components/views/SavingsView.jsx').then(m => ({ default: m.SavingsView })));
 const EnergyView = lazy(() =>
   import('./components/views/EnergyView.jsx').then(m => ({ default: m.EnergyView }))
@@ -407,6 +408,8 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
     case 'chat':
       return wrapper(<ChatView />, false);
 
+    case 'varmestyring':
+      return wrapper(<Suspense fallback={<LoadingPanel label="LASTER VARMEDATA..." />}><HeatingView /></Suspense>, false);
     case 'stromsparing':
       return wrapper(<Suspense fallback={<LoadingPanel label="LASTER STRØMSPARING..." />}><SavingsView /></Suspense>, false);
 

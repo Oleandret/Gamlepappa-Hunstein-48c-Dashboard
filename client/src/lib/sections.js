@@ -1,4 +1,4 @@
-import { Home, LayoutGrid, Boxes, Workflow, Zap, ShieldCheck, Star, Settings, Music, Map, Bot, Anchor, Wrench, Bookmark, Activity, Sparkles, MessageSquare, Box } from 'lucide-react';
+import { Thermometer, Home, LayoutGrid, Boxes, Workflow, Zap, ShieldCheck, Star, Settings, Music, Map, Bot, Anchor, Wrench, Bookmark, Activity, Sparkles, MessageSquare, Box } from 'lucide-react';
 
 /** Single source of truth for top-level navigation. */
 export const SECTIONS = [
@@ -12,6 +12,7 @@ export const SECTIONS = [
   { id: 'lyd',               label: 'Lyd',             Icon: Music },
   { id: 'automasjon',        label: 'Automasjon',      Icon: Workflow },
   { id: 'flow-favoritter',   label: 'Flow-favoritter', Icon: Star },
+  { id: 'varmestyring', label: 'Varmestyring', Icon: Thermometer },
   { id: 'stromsparing', label: 'Strømsparing', Icon: Zap },
   { id: 'energi',            label: 'Energi',          Icon: Zap },
   { id: 'sikkerhet',         label: 'Sikkerhet',       Icon: ShieldCheck },

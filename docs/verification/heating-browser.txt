@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "screenshots": 3,
+  "checks": [
+    "disconnected",
+    "negative and missing readings",
+    "search and category",
+    "stale source overrides fresh point",
+    "390px overflow",
+    "zero write requests",
+    "zero browser errors"
+  ]
+}
