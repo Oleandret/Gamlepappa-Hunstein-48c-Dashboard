@@ -35,7 +35,7 @@ test('expired inventory session triggers login and does not download an error re
   assert.match(h.errors[0],/401/);assert.deepEqual(h.loading,[true,false]);
 });
 
-test('voice indicator describes isolated access without claiming an active connection',async()=>{
+test('voice indicator points to the widget without claiming an active connection',async()=>{
   const { createRequire }=await import('node:module');
   const requireClient=createRequire(new URL('../../client/package.json',import.meta.url));
   const {transformWithOxc}=await import(requireClient.resolve('vite'));
@@ -47,8 +47,8 @@ test('voice indicator describes isolated access without claiming an active conne
   const context=vm.createContext({React,setTimeout:forbidden,window:{customElements:{get:forbidden}},document:{addEventListener:forbidden}});
   vm.runInContext(code+'\nglobalThis.Component=AIConnection;',context);
   const html=renderToStaticMarkup(React.createElement(context.Component));
-  assert.match(html,/aria-label="Taleassistent i isolert panel"/);
-  assert.match(html,/Isolert/);
+  assert.match(html,/aria-label="Taleassistent: ElevenLabs-widget nede til høyre"/);
+  assert.match(html,/Widget/);
   assert.doesNotMatch(html,/tilkobler|online|AI CONNECTION|animate-pulseGlow/i);
 });
 

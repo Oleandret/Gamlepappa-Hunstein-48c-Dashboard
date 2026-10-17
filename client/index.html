@@ -17,6 +17,10 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
 
-    <!-- Voice embeds must run in an isolated origin; never load third-party scripts into the authenticated dashboard. -->
+    <!-- ElevenLabs ConvAI-widget (rendres betinget i VoiceAssistant.jsx). Låst versjon med SRI:
+         nettleseren avviser filen hvis den endres på CDN-et. Oppdater versjon + integrity sammen. -->
+    <script src="https://unpkg.com/@elevenlabs/convai-widget-embed@0.18.1/dist/index.js"
+      integrity="sha384-XvWW14iVN5ShLLtK82Bs9f6O11Ts1EuybLOPFG40AqUXtQ7ltjuDp1lMAkB5MFZP"
+      crossorigin="anonymous" async type="text/javascript"></script>
   </body>
 </html>

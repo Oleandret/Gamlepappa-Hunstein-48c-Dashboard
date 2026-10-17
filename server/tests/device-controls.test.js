@@ -99,32 +99,22 @@ test('capability validation and queue rejection retain actionable HTTP status',a
   }
 });
 
-test('voice widget is embedded only in a sandboxed opaque-origin frame per existing agent',async()=>{
+test('standard ElevenLabs widget keeps both existing agents and the original appearance',async()=>{
   const render=await componentHarness('VoiceAssistant.jsx','VoiceAssistant');
   assert.equal(render({section:'chat'}),null);assert.equal(render({section:'avatar'}),null);
-  const find=(node,pred)=>{if(!node||typeof node!=='object')return null;if(pred(node))return node;
-    for(const c of [].concat(node.children||[]).flat()){const r=find(c,pred);if(r)return r;}return null;};
-  for(const [section,key] of [['oversikt','oversikt'],['3d','standard']]){
-    const fresh=await componentHarness('VoiceAssistant.jsx','VoiceAssistant');
-    let tree=fresh({section});
-    assert.equal(find(tree,n=>n.type==='iframe'),null,'third-party frame must not load before the user opens it');
-    find(tree,n=>n.type==='button'&&n.props['aria-expanded']===false).props.onClick();
-    tree=fresh({section});const frame=find(tree,n=>n.type==='iframe');
-    assert.equal(frame.props.src,`/voice/widget?agent=${key}`);
-    assert.doesNotMatch(frame.props.sandbox,/allow-same-origin/);assert.match(frame.props.sandbox,/allow-scripts/);
-    assert.match(frame.props.allow,/microphone/);assert.equal(frame.props.referrerPolicy,'no-referrer');
+  for(const [section,agent] of [['oversikt','SCOI5nAeUm2P90tPlhxJ'],['hus-3d','agent_4501kc02r47xec2s0r87f0awxdj6']]){
+    const el=render({section});assert.equal(el.type,'elevenlabs-convai');
+    assert.equal(el.props['agent-id'],agent);assert.equal(el.props.variant,'compact');assert.equal(el.props.placement,'bottom-right');
+    assert.equal(el.props['avatar-orb-color-1'],'#22e6ff');assert.equal(el.props['avatar-orb-color-2'],'#7d5cff');
   }
 });
 
-test('voice widget page is sandboxed by CSP, pinned with SRI and limited to known agents',async()=>{
-  const {voiceWidget,VOICE_AGENTS,WIDGET_SCRIPT}=await import('../routes/voiceWidget.js');
-  const run=agent=>{const res={headers:{'X-Frame-Options':'DENY'},body:'',removeHeader(h){delete this.headers[h];},set(h){Object.assign(this.headers,h);},send(b){this.body=b;}};
-    voiceWidget({query:{agent}},res);return res;};
-  const res=run('oversikt');const csp=res.headers['Content-Security-Policy'];
-  assert.equal(res.headers['X-Frame-Options'],undefined);
-  assert.match(csp,/(^|; )sandbox allow-scripts/);assert.doesNotMatch(csp,/allow-same-origin/);
-  assert.match(csp,/frame-ancestors 'self'/);assert.match(csp,/default-src 'none'/);
-  assert.match(res.body,new RegExp(`agent-id="${VOICE_AGENTS.oversikt}"`));
-  assert.ok(res.body.includes(`integrity="${WIDGET_SCRIPT.integrity}"`));assert.match(WIDGET_SCRIPT.src,/@\d+\.\d+\.\d+\//);
-  assert.match(run('"><script>alert(1)</script>').body,new RegExp(`agent-id="${VOICE_AGENTS.standard}"`));
+test('widget script is pinned with SRI and allowed by CSP only from that exact package version',async()=>{
+  const html=fs.readFileSync(new URL('../../client/index.html',import.meta.url),'utf8');
+  const tag=html.match(/<script[^>]+convai-widget-embed@(\d+\.\d+\.\d+)\/dist\/index\.js[^>]*>/);
+  assert.ok(tag,'widget script must reference an exact version');
+  assert.match(tag[0],/integrity="sha384-[A-Za-z0-9+/=]+"/);assert.match(tag[0],/crossorigin="anonymous"/);
+  const server=fs.readFileSync(new URL('../index.js',import.meta.url),'utf8');
+  assert.ok(server.includes(`script-src 'self' https://unpkg.com/@elevenlabs/convai-widget-embed@${tag[1]}/`));
+  assert.doesNotMatch(server,/script-src[^;]*'unsafe-(inline|eval)'/);
 });
