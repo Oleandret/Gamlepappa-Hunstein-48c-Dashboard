@@ -1,3 +1,4 @@
+import {NetworkView} from './components/views/NetworkView.jsx';
 import { ExperienceView } from './components/views/ExperienceView.jsx';
 import { VoiceAssistant } from './components/VoiceAssistant.jsx';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -259,6 +260,7 @@ export default function App() {
 }
 
 function SectionView({ section, system, data, counts, setCapability, runFlow, favorites, pinConfig, imageConfig, frontSensors, flowFavorites, links, floorPlanPins, planFlows, frontSpecials }) {
+  if (section === 'nettverk') return <NetworkView />;
   if (section === 'huspuls') return <ExperienceView devices={data.devices || {}} />;
   const userName = system?.user || 'Ole';
   const greetingPanel = (
