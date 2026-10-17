@@ -72,6 +72,7 @@ export default function App() {
     activity: null, security: null, weather: null
   });
   const [loaded, setLoaded] = useState(false);
+  const [focusZoneId,setFocusZoneId]=useState(null);
   const [section, setSection] = useState(() => new URLSearchParams(window.location.search).has('myuplink') ? 'varmestyring' : 'oversikt');
   const visible = usePageVisibility();
   const favorites = useFavorites();
@@ -223,6 +224,8 @@ export default function App() {
           {loaded && (data.quality?.devices !== 'live' || data.quality?.energy !== 'live') && <p role="status" className="panel p-3 my-3 text-nx-amber">Datakvalitet: enheter {data.quality?.devices || 'ukjent'} · energi {data.quality?.energy || 'ukjent'}. Utdaterte data må ikke brukes som bekreftet status.</p>}
           {loaded && (
             <SectionView
+              onOpen3D={zoneId=>{setFocusZoneId(zoneId);setSection('hus-3d');}}
+              focusZoneId={focusZoneId}
               section={section}
               system={system}
               data={data}
@@ -259,7 +262,7 @@ export default function App() {
   );
 }
 
-function SectionView({ section, system, data, counts, setCapability, runFlow, favorites, pinConfig, imageConfig, frontSensors, flowFavorites, links, floorPlanPins, planFlows, frontSpecials }) {
+function SectionView({ onOpen3D, focusZoneId, section, system, data, counts, setCapability, runFlow, favorites, pinConfig, imageConfig, frontSensors, flowFavorites, links, floorPlanPins, planFlows, frontSpecials }) {
   if (section === 'nettverk') return <NetworkView />;
   if (section === 'huspuls') return <ExperienceView devices={data.devices || {}} />;
   const userName = system?.user || 'Ole';
@@ -305,6 +308,7 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
     case 'rom':
       return wrapper(
         <ZonesView
+          onOpen3D={onOpen3D}
           devices={data.devices || {}}
           zones={data.zones || {}}
           onSet={setCapability}
@@ -353,6 +357,7 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
       return wrapper(
         <Suspense fallback={<p className="p-6 font-mono text-xs text-nx-mute">Laster 3D-modell …</p>}>
           <House3DView
+            initialHomeyZoneId={focusZoneId}
             devices={data.devices || {}}
             zones={data.zones || {}}
             floorPlanPins={floorPlanPins}
@@ -380,6 +385,7 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
     case 'flow-favoritter':
       return wrapper(
         <FlowFavoritesView
+          zones={data.zones || {}}
           flows={data.flows || {}}
           onRun={runFlow}
           flowFavorites={flowFavorites}

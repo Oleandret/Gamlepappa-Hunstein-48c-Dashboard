@@ -1,3 +1,4 @@
+import {roomPhotoRoutes} from './routes/roomPhotos.js';
 import {networkRoutes} from './routes/network.js';
 import {priceRoutes} from './routes/prices.js';
 import {startPriceLogger,stopPriceLogger,priceLogStatus} from './workers/priceLogger.js';
@@ -69,6 +70,7 @@ app.use('/api/savings', savingsRoutes);
 app.get('/api/prices/status', (_req,res)=>res.json(priceLogStatus));
 app.use('/api/prices',priceRoutes);
 app.use('/api/network',networkRoutes);
+app.use('/api/room-photos',roomPhotoRoutes);
 app.get('/api/heating/history/status', (_req,res)=>res.json(heatingLogStatus));
 app.use('/api/heating', heatingRoutes);
 app.use('/api/weather', weatherRoutes);

@@ -1,0 +1,5 @@
+# Private room photos
+Existing Homey room cards/details retain their stable zone IDs and devices. Room detail now offers multiple JPEG/PNG/WebP uploads and a 3D navigation link. The 3D view selects a room only if its existing Homey mapping resolves uniquely; existing geometry and mappings remain intact.
+Photos are private authenticated API resources under the existing persistent volume (sibling of config.json), never public static files. Writes retain existing admin and CSRF requirements. Sharp decodes and re-encodes JPEG, strips metadata, limits 5MB input/32MP/2400px output, rejects unsupported formats and animations. UUID filenames, no user paths, 0600 files/0700 directory,20 per room/200MiB global/64MiB free-space reserve. Editable descriptions and confirmation are distinct from analysisStatus not_analyzed.
+No image model call, credential creation or third-party upload. Existing chat path has no verified room-image analysis workflow. Automated room understanding and precise 3D reconstruction remain unimplemented.
+128 isolated tests passed before 3D navigation wiring; final build/test recorded with delivery.

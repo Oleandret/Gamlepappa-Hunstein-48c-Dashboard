@@ -730,7 +730,7 @@ function Ground({ mode }) {
 
 // ─── Hovedvisning ───────────────────────────────────────────────────────
 
-export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) {
+export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapability, floorPlanPins }) {
   const roomsCfg = useHouse3dRooms();
   const groupCommand = useDeviceCommand();
   const [mode, setMode] = useState('interior');
@@ -749,6 +749,7 @@ export function House3DView({ devices, zones, onSetCapability, floorPlanPins }) 
   const controlsRef = useRef();
 
   const roomData = useRoomData(devices, zones, roomsCfg.config, floorPlanPins);
+  useEffect(()=>{if(!initialHomeyZoneId)return;const matches=Object.values(roomData.byRoom).filter(r=>r.zoneIds.includes(initialHomeyZoneId));setSelectedRoomId(matches.length===1?matches[0].room.id:null);},[initialHomeyZoneId,roomsCfg.config, zones]);
   const doorMeta = useDoorMeta();
   const doorsCfg = useHouse3dDoors();
   const doorIndex = useMemo(() => new Map(doorMeta.map(d => [d.id, d])), [doorMeta]);

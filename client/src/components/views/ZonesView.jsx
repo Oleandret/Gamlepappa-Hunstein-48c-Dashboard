@@ -1,15 +1,17 @@
+import {RoomPhotos} from '../RoomPhotos.jsx';
 import { useMemo, useState } from 'react';
 import { ChevronLeft, Home as HomeIcon, Building2 } from 'lucide-react';
 import { DeviceCard } from '../DeviceCard.jsx';
 import { classLabel } from '../../lib/deviceUtils.js';
 
-export function ZonesView({ devices, zones, onSet, favorites }) {
+export function ZonesView({ onOpen3D, devices, zones, onSet, favorites }) {
   const [openZoneId, setOpenZoneId] = useState(null);
   const tree = useMemo(() => buildZoneTree(zones, devices), [zones, devices]);
 
   if (openZoneId) {
     return (
       <ZoneDetail
+        onOpen3D={onOpen3D}
         zoneId={openZoneId}
         zones={zones}
         devices={devices}
@@ -72,7 +74,7 @@ function RoomCard({ room, onClick }) {
   );
 }
 
-function ZoneDetail({ zoneId, zones, devices, tree, onBack, onOpen, onSet, favorites }) {
+function ZoneDetail({ onOpen3D, zoneId, zones, devices, tree, onBack, onOpen, onSet, favorites }) {
   const node = findZone(tree, zoneId);
   const zoneName = node?.name || zones?.[zoneId]?.name || 'Ukjent rom';
   const descendantIds = useMemo(() => collectZoneIds(zones, zoneId), [zones, zoneId]);
@@ -91,6 +93,8 @@ function ZoneDetail({ zoneId, zones, devices, tree, onBack, onOpen, onSet, favor
         <ChevronLeft size={14} aria-hidden="true" /> ALLE ROM
       </button>
       <h2 className="mt-3 text-xl font-semibold">{zoneName}</h2>
+      <button className="chip mt-3" onClick={()=>onOpen3D?.(zoneId)}>Åpne romtilknytning i 3D-hus</button>
+      <RoomPhotos key={zoneId} zoneId={zoneId} />
       <p className="text-xs text-nx-mute font-mono mt-1">
         {list.length} enheter
         {subRooms.length > 0 && ` · ${subRooms.length} underrom`}
