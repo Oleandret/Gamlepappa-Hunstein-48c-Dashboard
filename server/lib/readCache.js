@@ -1,12 +1,12 @@
 export function cachedReader(loader, ttlMs = 5000) {
-  let value, expires = 0, pending, generation = 0, failure, retryAt = 0, failures = 0;
+  let value, expires = 0, pending, generation = 0, failure, retryAt = 0, failures = 0, updatedAt = null;
   const read = async () => {
     if (value !== undefined && Date.now() < expires) return value;
     if (failure && Date.now() < retryAt) throw failure;
     if (!pending) {
       const startedGeneration = generation;
       const request = Promise.resolve().then(loader).then(data => {
-        if (generation === startedGeneration) { value = data; expires = Date.now() + ttlMs; failure = null; failures = 0; retryAt = 0; }
+        if (generation === startedGeneration) { value = data; updatedAt = Date.now(); expires = updatedAt + ttlMs; failure = null; failures = 0; retryAt = 0; }
         return data;
       }).catch(error => {
         if (generation === startedGeneration) {
@@ -19,6 +19,7 @@ export function cachedReader(loader, ttlMs = 5000) {
     }
     return pending;
   };
+  read.snapshot = () => ({value,updatedAt,retryAt,failure:!!failure});
   read.invalidate = () => { generation++; expires = 0; pending = null; };
   return read;
 }

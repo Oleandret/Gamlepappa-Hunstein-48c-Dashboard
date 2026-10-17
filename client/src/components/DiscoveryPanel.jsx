@@ -5,7 +5,7 @@ import { api } from '../lib/api.js';
 /**
  * Lets the user run a full Homey discovery from the dashboard itself.
  * Replaces the need for the local CLI script — they can download the
- * inventory JSON directly or copy a summary, then share with Claude.
+ * inventory JSON directly or copy a summary, keep it private.
  */
 export function DiscoveryPanel() {
   const [inv, setInv] = useState(null);
@@ -19,7 +19,7 @@ export function DiscoveryPanel() {
     try {
       const data = await api.inventory();
       setInv(data);
-    } catch (e) { setError(e.message); }
+    } catch (e) { setError(e.message); setInv(old=>old?{...old,_quality:'stale'}:old); }
     finally { setLoading(false); }
   }
 
@@ -91,7 +91,7 @@ export function DiscoveryPanel() {
           <p className="panel-title">Discovery</p>
           <h3 className="mt-1 text-lg font-semibold">Full kartlegging av Homey</h3>
           <p className="mt-1 text-xs text-nx-mute max-w-xl">
-            Last ned hele enhetslisten og del med Claude for skreddersydde widgets.
+            Kartlegging av enheter, rom og flows fra Homey.
             Krever ingen lokal terminal — alt skjer rett her.
           </p>
         </div>
@@ -122,6 +122,7 @@ export function DiscoveryPanel() {
         </div>
       )}
 
+      {inv && <p role="status" className="text-xs mt-3">Datakvalitet: {inv._quality || 'ukjent'} · eldste datakilde: {inv._updatedAt ? new Date(inv._updatedAt).toLocaleString('nb-NO',{timeZone:'Europe/Oslo'}) : 'ukjent'}. {inv._quality==='stale'?'Viser sist gyldige data under leseavbrudd.':''}{Object.entries(inv.sources||{}).map(([key,v])=>` ${key}: ${v.quality}${v.error?` (${v.error})`:''}`).join(' · ')}</p>}
       {loading && !inv && (
         <p className="mt-6 text-sm text-nx-mute">Henter inventar...</p>
       )}

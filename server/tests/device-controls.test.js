@@ -1,3 +1,4 @@
+import {createInventoryReader} from '../lib/inventoryReader.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -78,7 +79,7 @@ test('control exposes pending/errors and suppresses double-clicks while a comman
 });
 function routeHarness({commandError=null,failAudit=false}={}) {
   const routes=new Map();let executions=0,audits=0;
-  const context=vm.createContext({console:{warn(){}},Router:()=>({get(){},post:(p,h)=>routes.set(p,h)}),isDemoMode:()=>false,
+  const context=vm.createContext({console:{warn(){}},createInventoryReader,Router:()=>({get(){},post:(p,h)=>routes.set(p,h)}),isDemoMode:()=>false,
     recordAction:async()=>{if(++audits===2&&failAudit)throw Error('fixture audit failure');return 1;},
     homeyClient:{runFlow:async()=>{executions++;},setCapability:async()=>{if(commandError)throw commandError;executions++;},refreshDevices:async()=>({fixture:{capabilities:{dim:.1}}})},
     capValue:(d,cap)=>d?.capabilities?.[cap]

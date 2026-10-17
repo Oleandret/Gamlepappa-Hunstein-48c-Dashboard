@@ -1,3 +1,4 @@
+import {createInventoryReader} from '../lib/inventoryReader.js';
 import { recordAction } from '../lib/audit.js';
 import { capValue } from '../lib/validation.js';
 import { Router } from 'express';
@@ -81,25 +82,11 @@ homeyRoutes.get('/activity', safe(
 
 /** Inventory: total opptelling av alle devices/zones/flows + capability-statistikk
  *  Pass ?full=true for å inkludere raw devices/zones/flows (større respons). */
-homeyRoutes.get('/inventory', safe(
-  async (req) => {
-    const [devices, zones, flows] = await Promise.all([
-      homeyClient.listDevices(),
-      homeyClient.listZones(),
-      homeyClient.listFlows()
-    ]);
-    const inv = buildInventory({ devices, zones, flows });
-    if (req.query.full === 'true') inv.raw = { devices, zones, flows };
-    return inv;
-  },
-  async (req) => {
-    const inv = buildInventory({ devices: MOCK_DEVICES, zones: MOCK_ZONES, flows: MOCK_FLOWS });
-    if (req.query.full === 'true') {
-      inv.raw = { devices: MOCK_DEVICES, zones: MOCK_ZONES, flows: MOCK_FLOWS };
-    }
-    return inv;
-  }
-));
+const inventoryRead=createInventoryReader(homeyClient);
+homeyRoutes.get('/inventory',async(req,res)=>{
+ if(isDemoMode()){const data=buildInventory({devices:MOCK_DEVICES,zones:MOCK_ZONES,flows:MOCK_FLOWS});return res.json({...data,_quality:'demo',_updatedAt:null});}
+ try{const result=await inventoryRead(req.query.full==='true');res.status(result.status).json(result.body);}catch{res.status(503).json({error:'Kartlegging kunne ikke bygges',_quality:'unavailable'});}
+});
 
 homeyRoutes.get('/security', safe(
   async () => {

@@ -1,3 +1,4 @@
+import {createInventoryReader} from '../lib/inventoryReader.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -110,7 +111,7 @@ test('scenes cannot include locks, duplicate capabilities or flows',()=>{
 test('Homey outage returns unavailable, then stale only after a real success',async()=>{
  const routes=new Map();const homeyClient={listDevices:async()=>devices};
  const {homeyRoutes}=sandbox('routes/homey.js',{
-   Router:()=>({get:(name,handler)=>routes.set(name,handler),post(){}}),homeyClient,
+   createInventoryReader,Router:()=>({get:(name,handler)=>routes.set(name,handler),post(){}}),homeyClient,
    isDemoMode:()=>false,buildInventory:()=>({}),MOCK_DEVICES:{fixture:'must not leak'},MOCK_ZONES:{},MOCK_FLOWS:{},MOCK_ACTIVITY:[],mockEnergyReport:()=>({})
  },'homeyRoutes');
  const handler=routes.get('/devices');
@@ -132,7 +133,7 @@ function sceneHarness({expired=false,changed=false}={}) {
  let writes=0;const statuses=[];
  const action={deviceId:'lamp',capability:'dim',value:.2,before:.5,confirmed:true};
  sandbox('routes/experience.js',{
- Router:()=>({get(){},put(){},post:(name,handler)=>routes.set(name,handler)}),
+ createInventoryReader,Router:()=>({get(){},put(){},post:(name,handler)=>routes.set(name,handler)}),
  isDemoMode:()=>false,isEnabled:()=>true,
  query:async(sql,args)=>{
    if(sql.includes('RETURNING detail'))return{rows:expired?[]:[{detail:{actions:[action]}}]};
