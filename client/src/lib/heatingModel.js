@@ -58,6 +58,8 @@ export function normalizeHeatingPoints(points, options = {}) {
       category: text(point.category),
       value,
       valueType,
+      enumLabel: text(point.enumLabel),
+      invalidSentinel: value === -32768,
       strVal: typeof point.strVal === 'string' ? point.strVal : null,
       measuredAt,
       quality,

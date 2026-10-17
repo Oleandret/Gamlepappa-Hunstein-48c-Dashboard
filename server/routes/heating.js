@@ -3,7 +3,7 @@ import { createMyUplinkReader } from '../lib/myuplinkReader.js';
 import { myuplinkOAuth } from '../lib/myuplinkOAuth.js';
 const disconnected=createMyUplinkReader();
 let reader, revision;
-async function connectedRead() {
+export async function connectedRead() {
   const state=await myuplinkOAuth.status();
   if(!state.connected||!state.selected||state.reauthorizationRequired)return {...await disconnected(),reason:state.reauthorizationRequired?'Lesetilgangen er utløpt. Koble til på nytt.':state.connected?'Velg den bekreftede varmepumpen for å lese målinger.':state.reason};
   if(!reader || revision!==myuplinkOAuth.revision()) {

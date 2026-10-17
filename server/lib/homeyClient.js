@@ -1,3 +1,4 @@
+import {createMotionHistory} from './motionHistory.js';
 /**
  * Lightweight client for the Homey Web API.
  * Authenticates with a Personal Access Token from
@@ -6,6 +7,8 @@
  * The Auth header is never logged. Errors are sanitised in routes/homey.js.
  */
 import { fetchJson } from './http.js';
+import { createTeslaSnapshots } from './teslaSnapshots.js';
+import { getNamespace, setNamespace } from './configStore.js';
 import { cachedReader } from './readCache.js';
 import { validateCapability } from './validation.js';
 import { cfg } from '../config.js';
@@ -55,7 +58,9 @@ async function homeyFetch(pathPart, opts = {}) {
   });
 }
 
-const devicesReader = cachedReader(() => homeyFetch('/manager/devices/device'));
+const teslaSnapshots = createTeslaSnapshots({load:()=>getNamespace('_teslaSnapshots'),save:value=>setNamespace('_teslaSnapshots',value)});
+export const motionHistory=createMotionHistory({load:()=>getNamespace('_motionHistory'),save:v=>setNamespace('_motionHistory',v)});
+const devicesReader = cachedReader(async () => { const devices=await homeyFetch('/manager/devices/device'); await motionHistory.observe(devices).catch(()=>console.warn('[motion-history] storage unavailable')); return teslaSnapshots.project(devices); });
 const zonesReader = cachedReader(() => homeyFetch('/manager/zones/zone'), 60000);
 const flowsReader = cachedReader(() => homeyFetch('/manager/flow/flow'), 60000);
 
@@ -63,6 +68,7 @@ const legacyEnergyReaders = new Map();
 
 export const homeyClient = {
   listDevices: devicesReader,
+  updateTeslaSnapshot: async id => { const result=await teslaSnapshots.update(id); devicesReader.invalidate(); return result; },
   refreshDevices: () => { devicesReader.invalidate(); return devicesReader(); },
   listZones: zonesReader,
   listFlows: flowsReader,

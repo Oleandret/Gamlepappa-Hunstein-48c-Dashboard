@@ -1,8 +1,18 @@
+import { useState, useRef } from 'react';
+import { apiFetch } from '../../lib/api.js';
 import { Car, Battery, BatteryLow, Plug, Gauge } from 'lucide-react';
 import { capValue } from '../../lib/deviceUtils.js';
 
 /** Custom widget for Tesla Model 3 — battery, charging, software, tyre pressure. */
-export function TeslaCard({ device }) {
+export function TeslaCard({ device: supplied }) {
+  const [snapshot,setSnapshot]=useState(null),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
+  const pending=useRef(false);
+  const device=snapshot?.device.id===supplied?.id?{...snapshot.device,_teslaSnapshot:{savedAt:snapshot.savedAt}}:supplied;
+  async function refresh() {
+    if(pending.current)return;pending.current=true;setBusy(true);setMessage('');
+    try {const r=await apiFetch(`/api/homey/tesla/${encodeURIComponent(device.id)}/refresh`,{method:'POST'});if(!r.ok)throw Error();setSnapshot(await r.json());setMessage('Siste tilgjengelige Homey-data lagret. Bilen ble ikke kontaktet.');}
+    catch{setMessage('Ingen lagrede Homey-data tilgjengelig. Prøv senere.');}finally{pending.current=false;setBusy(false);}
+  }
   if (!device) return null;
   const battery = capValue(device, 'measure_battery');
   const charging = capValue(device, 'ev_charging_state');
@@ -28,7 +38,7 @@ export function TeslaCard({ device }) {
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold leading-tight">{device.name}</div>
           <div className="text-[10px] text-nx-mute font-mono uppercase tracking-[0.18em]">
-            {carState || 'parkert'}{swVer ? ` · v${swVer}` : ''}
+            {carState || 'Status ukjent'}{swVer ? ` · v${swVer}` : ''}
           </div>
         </div>
         {isCharging && (
@@ -38,6 +48,10 @@ export function TeslaCard({ device }) {
         )}
       </header>
 
+      <p className="text-xs text-nx-mute">Lagret fra Homey: {device._teslaSnapshot?.savedAt ? `${new Date(device._teslaSnapshot.savedAt).toLocaleString('nb-NO',{timeZone:'Europe/Oslo'})} (${Math.max(0,Math.floor((Date.now()-device._teslaSnapshot.savedAt)/60000))} min siden)` : 'ikke hentet ennå'}. Bilens faktiske måletid kan være eldre.</p>
+      <button className="chip" disabled={busy} onClick={refresh}>Oppdater Tesla</button>
+      <p className="text-xs text-nx-mute">Kun manuell visning. Henter Homeys hurtiglager, uten å vekke bilen. Minst 5 minutter mellom oppdateringer. Homeys egen Tesla-polling styres separat.</p>
+      {message && <p role="status" className="text-xs">{message}</p>}
       {battery != null && (
         <div>
           <div className="flex items-center justify-between text-xs mb-1">

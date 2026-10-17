@@ -1,3 +1,5 @@
+import {startPriceLogger,stopPriceLogger,priceLogStatus} from './workers/priceLogger.js';
+import {startHeatingLogger,stopHeatingLogger,heatingLogStatus} from './workers/heatingLogger.js';
 import { accessControl, authConfigured } from './lib/auth.js';
 import { googleAuth } from './lib/googleAuth.js';
 import { experienceRoutes } from './routes/experience.js';
@@ -62,6 +64,8 @@ app.post('/api/logout', googleAuth.logout);
 app.use('/api/system', systemRoutes);
 app.use('/api/homey', homeyRoutes);
 app.use('/api/savings', savingsRoutes);
+app.get('/api/prices/status', (_req,res)=>res.json(priceLogStatus));
+app.get('/api/heating/history/status', (_req,res)=>res.json(heatingLogStatus));
 app.use('/api/heating', heatingRoutes);
 app.use('/api/weather', weatherRoutes);
 app.use('/api/config', configRoutes);
@@ -141,9 +145,10 @@ const server = app.listen(PORT, async () => {
     if (!ok) return;
   }
   ready = authConfigured() || (!isProd && process.env.DEMO_MODE === 'true');
+  if(ready && !isDemoMode()) { startHeatingLogger(); startPriceLogger(); }
 });
 for (const signal of ['SIGTERM','SIGINT']) process.on(signal, () => {
-  ready = false; stopDevicePoller();
+  ready = false; stopDevicePoller(); stopHeatingLogger(); stopPriceLogger();
   server.close(async () => { await shutdown(); process.exit(0); });
   setTimeout(() => process.exit(1), 15000).unref();
 });

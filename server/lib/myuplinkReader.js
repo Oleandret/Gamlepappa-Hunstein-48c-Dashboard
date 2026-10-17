@@ -22,6 +22,8 @@ function pickPoint(point) {
     else if (typeof value === 'string') picked[field] = value.slice(0, 1000);
     else if (value === null || typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))) picked[field] = value;
   }
+  const match=Array.isArray(point.enumValues)?point.enumValues.find(e=>String(e.value)===String(point.value)&&typeof e.text==='string'):null;
+  if(match)picked.enumLabel=match.text.slice(0,1000);
   return picked;
 }
 

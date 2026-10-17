@@ -399,13 +399,13 @@ function TeslaPin({ tesla, pos, customLabel }) {
   const charging = String(capValue(tesla, 'ev_charging_state') || '').toLowerCase().includes('charging');
   const displayName = customLabel || tesla.name;
   return (
-    <PinShell pos={pos} ariaLabel={`Tesla ${displayName}: batteri ${battery}%`}>
+    <PinShell pos={pos} ariaLabel={`Tesla ${displayName}: lagret batteri ${battery ?? "ukjent"}%`}>
       <div className="text-[8px] tracking-[0.18em] text-nx-mute font-mono leading-none flex items-center gap-1">
         <Car size={9} aria-hidden="true" /> {displayName?.toUpperCase()}
       </div>
       {battery != null && (
         <div className="text-[12px] font-mono text-nx-cyan leading-tight">
-          {Math.round(battery)}%
+          {Math.round(battery)}% · lagret
           {charging && <span className="ml-1 text-nx-green">⚡</span>}
         </div>
       )}

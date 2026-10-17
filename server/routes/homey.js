@@ -1,7 +1,7 @@
 import { recordAction } from '../lib/audit.js';
 import { capValue } from '../lib/validation.js';
 import { Router } from 'express';
-import { homeyClient } from '../lib/homeyClient.js';
+import { homeyClient, motionHistory } from '../lib/homeyClient.js';
 import { isDemoMode } from '../config.js';
 import { buildInventory } from '../lib/inventory.js';
 import {
@@ -42,6 +42,8 @@ function sanitizeMessage(s) {
           .slice(0, 200);
 }
 
+homeyRoutes.get('/motion-history',async(_req,res)=>{try{const state=await motionHistory.read();const zones=await homeyClient.listZones().catch(()=>({}));res.json({startedAt:state.startedAt,retentionDays:7,limit:2000,events:state.events.slice().reverse().map(e=>({...e,room:zones[e.zone]?.name||'Ukjent rom'}))});}catch{res.status(503).json({error:'Bevegelseslogg utilgjengelig'});}});
+
 // ── Reads ────────────────────────────────────────────────────────────────
 
 homeyRoutes.get('/zones', safe(
@@ -53,6 +55,14 @@ homeyRoutes.get('/devices', safe(
   async () => ({ devices: await homeyClient.listDevices() }),
   async () => ({ devices: MOCK_DEVICES })
 ));
+
+// Explicit local snapshot import, never a Tesla request or a Homey command.
+homeyRoutes.post('/tesla/:id/refresh', async (req,res) => {
+  try {
+    const result=await homeyClient.updateTeslaSnapshot(req.params.id);
+    res.json(result);
+  } catch(error) { res.status(error.status===409?409:503).json({error:'Ingen lagrede Tesla-data tilgjengelig fra Homey. Prøv senere.'}); }
+});
 
 homeyRoutes.get('/flows', safe(
   async () => ({ flows: await homeyClient.listFlows() }),

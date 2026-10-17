@@ -27,7 +27,7 @@ function valid(ns) { return ALLOWED_NS.has(ns); }
 configRoutes.get('/', async (_req, res, next) => {
   try {
     const all = await getAll();
-    res.json(all);
+    res.json(Object.fromEntries(Object.entries(all).filter(([key])=>valid(key))));
   } catch (err) { next(err); }
 });
 
