@@ -33,3 +33,22 @@ export function overview(rows, mainId, subIds = []) {
   };
 }
 // Samples are cumulative meter readings, never instantaneous watts treated as kWh.
+export function osloDate(now = Date.now()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Oslo', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date(now));
+}
+export function meterHistory(samples, mainId) {
+  const points = samples.filter(s=>s.id===mainId&&finite(s.kwh)&&finite(s.at)).sort((a,b)=>a.at-b.at);
+  const intervals = [];
+  for (let i=1;i<points.length;i++) {
+    const a=points[i-1], b=points[i], delta=b.kwh-a.kwh;
+    if (b.at<=a.at) continue;
+    intervals.push({start:a.at,end:b.at,kwh:delta>=0?delta:null,quality:delta>=0?'measured':'missing',reason:delta<0?'Måleren er nullstilt eller har endret retning':null});
+  }
+  return intervals;
+}
+export function appendSample(samples, row) {
+  if(row?.meter.quality!=='measured') return samples;
+  const point={id:row.id,at:row.meter.at,kwh:row.meter.value};
+  if(samples.some(s=>s.id===point.id&&s.at===point.at)) return samples;
+  return [...samples,point].slice(-1440);
+}

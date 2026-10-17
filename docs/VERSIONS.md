@@ -14,3 +14,7 @@ V2: cumulative focused checks passed.
 
 V3: cumulative focused checks passed.
 
+## V4 — Målerhistorikk og Oslo-tid
+
+V4: cumulative focused checks passed.
+
