@@ -1,3 +1,4 @@
+import {sourceTime} from './hunsteinMeter.js';
 // Pure domain logic shared by the UI and isolated Node tests. No command adapter.
 export const MAX_AGE_MS = 120_000;
 export const finite = value => typeof value === 'number' && Number.isFinite(value);
@@ -6,7 +7,7 @@ export function osloDate(now = Date.now()) {
 }
 export function reading(cap, quality, now = Date.now(), available = true) {
   const value = cap?.value;
-  const at = Date.parse(cap?.lastUpdated || '');
+  const at = sourceTime(cap?.lastUpdated);
   if (!finite(value)) return { value:null, quality:'missing', at:null };
   if (quality === 'demo') return { value, quality:'demo', at:finite(at)?at:null };
   if (!available || quality !== 'live' || !finite(at) || now - at > MAX_AGE_MS || at > now + 5000) return { value, quality:'stale', at:finite(at)?at:null };

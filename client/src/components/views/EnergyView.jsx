@@ -1,12 +1,10 @@
-import { lazy, Suspense, useMemo } from 'react';
-import { Zap, TrendingDown, TrendingUp } from 'lucide-react';
+import {PriceHistory} from '../PriceHistory.jsx';
+import {HunsteinEnergy} from '../HunsteinEnergy.jsx';
+import { useMemo } from 'react';
+import { Zap } from 'lucide-react';
 import { capValue } from '../../lib/deviceUtils.js';
 
-const EnergyWidget = lazy(() =>
-  import('../EnergyWidget.jsx').then(m => ({ default: m.EnergyWidget }))
-);
-
-export function EnergyView({ devices, zones, energy }) {
+export function EnergyView({ devices, zones, energy, quality }) {
   const energyDevices = useMemo(() => {
     return Object.values(devices)
       .map(d => {
@@ -38,9 +36,7 @@ export function EnergyView({ devices, zones, energy }) {
     <div className="space-y-5">
       <header className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="panel p-4 lg:col-span-2">
-          <Suspense fallback={<div className="h-40 grid place-items-center text-nx-mute font-mono text-xs">LASTER GRAF...</div>}>
-            <EnergyWidget energy={energy} />
-          </Suspense>
+          <HunsteinEnergy devices={devices} quality={quality} />
         </div>
         <div className="panel p-4">
           <p className="panel-title">Enhetsoversikt</p>
@@ -52,18 +48,10 @@ export function EnergyView({ devices, zones, energy }) {
           <p className="mt-1 text-xs text-nx-mute">
             Ingen totalsum: listen kan inneholde hovedmålere, undermålere og ulike anlegg. Bruk Strømsparing for brukerbekreftet anlegg og måleroppsett.
           </p>
-          {energy?.today && (
-            <div className="mt-4">
-              <p className="panel-title">I dag</p>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className="font-mono text-2xl">{energy.today.kwh}</span>
-                <span className="text-xs text-nx-mute">kWh</span>
-                <Trend value={energy.today.trend} />
-              </div>
-            </div>
-          )}
+
         </div>
       </header>
+      <PriceHistory/>
 
       <section>
         <h3 className="panel-title">Målere per rom</h3>
@@ -104,15 +92,5 @@ export function EnergyView({ devices, zones, energy }) {
         </div>
       </section>
     </div>
-  );
-}
-
-function Trend({ value = 0 }) {
-  const down = value <= 0;
-  const Icon = down ? TrendingDown : TrendingUp;
-  return (
-    <span className={['flex items-center gap-1 text-xs font-mono', down ? 'text-nx-green' : 'text-nx-amber'].join(' ')}>
-      <Icon size={12} aria-hidden="true" /> {Math.abs(value)}%
-    </span>
   );
 }

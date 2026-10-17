@@ -8,7 +8,7 @@ export function createPriceLogger({binding,archive,fetchImpl=fetch,now=Date.now}
   if(now()<state.retryAt)return state;
   pending=(async()=>{
    const b=await binding();
-   if(b?.site!=='hunstein'||!/^NO[1-5]$/.test(b.area)||!b.deviceId||!b.evidence||!b.verifiedAt){state.enabled=false;return state;}
+   if(b?.site!=='hunstein'||!/^NO[1-5]$/.test(b.area)||(!b.deviceId&&b.verification!=='owner-confirmed-contract')||!b.evidence||!b.verifiedAt){state.enabled=false;return state;}
    state.enabled=true;state.reason=null;
    // Three dates per hour: today, published tomorrow, one bounded historical day.
    const anchor=Date.parse(`${localDate(now())}T12:00:00Z`);
@@ -29,7 +29,7 @@ export function createPriceLogger({binding,archive,fetchImpl=fetch,now=Date.now}
  }
  return {run,state};
 }
-const logger=createPriceLogger({binding:()=>getNamespace('_verifiedPriceArea'),archive:createPriceArchive({dir:path.join(path.dirname(configPath()),'spot-prices')})});
+const logger=createPriceLogger({binding:async()=>await getNamespace('_verifiedPriceArea')||{site:'hunstein',area:'NO2',verification:'owner-confirmed-contract',evidence:'Owner confirmed NO2 on electricity contract, 2026-10-17',verifiedAt:'2026-10-17T20:49:00Z'},archive:createPriceArchive({dir:path.join(path.dirname(configPath()),'spot-prices')})});
 export const priceLogStatus=logger.state;
 let timer,stopped=true;
 export function startPriceLogger(){if(!stopped)return;stopped=false;const tick=async()=>{try{await logger.run();}catch{priceLogStatus.reason='Prisoppsett kunne ikke leses';}if(!stopped){timer=setTimeout(tick,3600000);timer.unref();}};timer=setTimeout(tick,30000);timer.unref();}

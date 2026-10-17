@@ -11,11 +11,14 @@ test('spot intervals preserve negatives, 23/25-hour Oslo DST days and quarter ho
 });
 test('archive survives recreation, deduplicates and retains changed price revision',async()=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'prices-'));const now=()=>Date.parse('2026-10-17T12:00:00Z');const options={dir,now,minFreeBytes:0};
- try{const r=normalizePrices(day('2026-10-16T22:00:00Z',24),{date:'2026-10-17',area:'NO2'});const a=createPriceArchive(options);assert.equal((await a.save(r)).changed,true);assert.equal((await createPriceArchive(options).save(r)).changed,false);r.intervals[0].value=-1;await a.save(r);const names=await fs.readdir(dir);assert.equal(names.length,2);for(const n of names){const file=path.join(dir,n);assert.equal((await fs.stat(file)).mode&511,384);assert.equal(JSON.parse(await fs.readFile(file)).area,'NO2');}}finally{await fs.rm(dir,{recursive:true,force:true});}
+ try{const r=normalizePrices(day('2026-10-16T22:00:00Z',24),{date:'2026-10-17',area:'NO2'});const a=createPriceArchive(options);assert.equal((await a.save(r)).changed,true);assert.equal((await createPriceArchive(options).save(r)).changed,false);r.intervals[0].value=-1;await a.save(r);r.intervals[0].value=-.5;await a.save(r);const names=await fs.readdir(dir);assert.equal(names.length,3);for(const n of names){const file=path.join(dir,n);assert.equal((await fs.stat(file)).mode&511,384);assert.equal(JSON.parse(await fs.readFile(file)).area,'NO2');}}finally{await fs.rm(dir,{recursive:true,force:true});}
 });
 import {createPriceLogger} from '../workers/priceLogger.js';
 test('unverified area makes zero requests; 429 backs off and concurrent runs share work',async()=>{
  let calls=0,t=Date.parse('2026-10-17T12:00:00Z');const no=createPriceLogger({binding:async()=>null,archive:{},fetchImpl:async()=>{calls++;},now:()=>t});await no.run();assert.equal(calls,0);
  const l=createPriceLogger({binding:async()=>({site:'hunstein',area:'NO2',deviceId:'mock',evidence:'mock-test-only',verifiedAt:t}),archive:{save:async()=>({changed:true})},now:()=>t,fetchImpl:async()=>{calls++;return new Response('',{status:429,headers:{'retry-after':'7200'}});}});
  await Promise.all([l.run(),l.run()]);assert.equal(calls,1);await l.run();assert.equal(calls,1);assert.equal(l.state.retryAt,t+7200000);
+});
+test('explicit owner-confirmed contract enables bounded historical/today/tomorrow collection without device ID',async()=>{
+ const dates=[],records=[];const t=Date.parse('2026-10-17T12:00:00Z');const l=createPriceLogger({binding:async()=>({site:'hunstein',area:'NO2',verification:'owner-confirmed-contract',evidence:'test fixture',verifiedAt:t}),archive:{save:async r=>{records.push(r);return {changed:true};}},now:()=>t,fetchImpl:async url=>{dates.push(url);return new Response('[]',{status:200});}});await l.run();assert.equal(dates.length,3);assert.ok(dates.every(u=>u.endsWith('_NO2.json')));assert.equal(records.length,3);assert.ok(records.every(r=>r.complete===false));assert.equal(l.state.enabled,true);
 });

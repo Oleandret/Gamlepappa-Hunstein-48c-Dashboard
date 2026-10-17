@@ -7,3 +7,11 @@ test('motion observation persists transitions on/off, initial states, concurrent
  t++;await Promise.all([h.observe({a:d(false,2000),b:d(true,2000)}),h.observe({a:d(false,2000),b:d(true,2000)})]);assert.equal(state.events.length,6);
  await h.observe({a:d(true,500),b:d(false,500)});assert.equal(state.events.length,6);assert.equal(state.events.at(-1).sourceAt,2000);
 });
+test('numeric source timestamps advance watermark without inventing events; retention prunes without transitions',async()=>{
+ let state,t=1792270000000;const h=createMotionHistory({load:async()=>structuredClone(state),save:async s=>{state=structuredClone(s);},now:()=>t});const d=(value,lastUpdated)=>({s:{name:'s',capabilitiesObj:{alarm_motion:{value,lastUpdated}}}});
+ await h.observe(d(false,t));await h.observe(d(false,t+2000));assert.equal(state.events.length,1);await h.observe(d(true,t+1000));assert.equal(state.events.length,1);assert.equal(state.last['s:alarm_motion'].sourceAt,t+2000);t+=8*86400000;await h.observe(d(false,t));assert.equal(state.events.length,0);
+});
+import {motionLocation} from '../../client/src/lib/motionLocation.js';
+test('explicit zone ancestry distinguishes properties without assuming unknown rooms are Hunstein',()=>{
+ const zones={room:{name:'Stue',parent:'home'},home:{name:'Hunstein 48C'},cabin:{name:'Halsaneset'}};assert.equal(motionLocation({zone:'room'},zones).site,'Hunstein (Homey-sonenavn)');assert.equal(motionLocation({zone:'cabin'},zones).site,'Halsaneset (Homey-sonenavn)');assert.equal(motionLocation({zone:'missing'},zones).room,'Ukjent rom');assert.equal(motionLocation({zone:'missing'},zones).site,'Anlegg ubekreftet');
+});

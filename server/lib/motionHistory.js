@@ -8,15 +8,16 @@ export function createMotionHistory({load,save,now=Date.now}) {
    const caps=d.capabilitiesObj||{};
    for(const [cap,p]of Object.entries(caps)){
     if(!/^(alarm_motion|alarm_presence)(\.|$)/.test(cap)||typeof p?.value!=='boolean')continue;
-    const key=`${id}:${cap}`,at=Date.parse(p.lastUpdated),sourceAt=Number.isFinite(at)?at:null,prev=state.last[key];
+    const key=`${id}:${cap}`,at=typeof p.lastUpdated==='number'?p.lastUpdated:Date.parse(p.lastUpdated),sourceAt=Number.isFinite(at)?at:null,prev=state.last[key];
     // Out-of-order reports are ignored. Poll observation time is never called event time.
     if(prev?.sourceAt&&sourceAt&&sourceAt<prev.sourceAt)continue;
-    if(prev&&prev.value===p.value)continue;
+    if(prev&&prev.value===p.value){if(sourceAt&&sourceAt!==prev.sourceAt){state.last[key]={value:p.value,sourceAt};changed=true;}continue;}
     const row={id:key+':'+t,deviceId:id,name:String(d.name||id).slice(0,200),zone:d.zone||null,capability:cap,value:p.value,sourceAt,observedAt:t,kind:prev?'transition':'initial',site:'unverified'};
     state.last[key]={value:p.value,sourceAt};state.events.push(row);changed=true;
    }
   }
-  state.events=state.events.filter(e=>e.observedAt>t-7*86400000).slice(-2000);
+  const beforeRetention=state.events.length;
+  state.events=state.events.filter(e=>e.observedAt>t-7*86400000).slice(-2000);if(state.events.length!==beforeRetention)changed=true;
   const activeIds=new Set(Object.keys(devices));for(const key of Object.keys(state.last))if(!activeIds.has(key.split(':')[0])){delete state.last[key];changed=true;}
   if(changed)await save(state);
  });queue=task;return task;}

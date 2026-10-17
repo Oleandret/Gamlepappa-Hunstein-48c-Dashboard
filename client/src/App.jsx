@@ -417,6 +417,7 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
       return wrapper(
         <Suspense fallback={<LoadingPanel label="LASTER ENERGI..." />}>
           <EnergyView
+            quality={data.quality?.devices}
             devices={data.devices || {}}
             zones={data.zones || {}}
             energy={data.energy}
@@ -460,7 +461,7 @@ function SectionView({ section, system, data, counts, setCapability, runFlow, fa
           <HouseView devices={data.devices || {}} zones={data.zones || {}} weather={data.weather} customPins={pinConfig?.config} imageConfig={imageConfig?.config} />
         </div>
         <div className="col-span-12 panel p-5">
-          <SecurityActivityLog />
+          <SecurityActivityLog zones={data.zones||{}} />
         </div>
         <div className="col-span-12 panel p-5">
           <ActivityFeed activity={data.activity || []} />

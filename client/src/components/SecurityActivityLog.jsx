@@ -1,3 +1,4 @@
+import {motionLocation} from '../lib/motionLocation.js';
 import {apiFetch} from '../lib/api.js';
 import { useMemo, useState, useEffect } from 'react';
 import { Lock, Unlock, DoorOpen, Activity, ShieldAlert, Power, Hand, RefreshCw, Camera, Flame, Droplets, Filter } from 'lucide-react';
@@ -46,11 +47,11 @@ function colorFor(entry) {
   return 'text-nx-cyan';
 }
 
-export function SecurityActivityLog() {
+export function SecurityActivityLog({zones={}}) {
   const local = useActivityLog();
   const [history,setHistory]=useState(null),[error,setError]=useState(false);
   useEffect(()=>{let alive=true,timer;const controller=new AbortController();async function read(){try{const r=await apiFetch('/api/homey/motion-history',{signal:controller.signal});if(!r.ok)throw Error();const data=await r.json();if(alive){setHistory(data);setError(false);}}catch(e){if(alive&&e.name!=='AbortError')setError(true);}finally{if(alive)timer=setTimeout(read,60000);}}read();return()=>{alive=false;controller.abort();clearTimeout(timer);};},[]);
-  const log=useMemo(()=>[...(history?.events||[]).map(e=>({id:e.id,ts:e.observedAt,type:'motion',source:'Homey-observasjon',text:`${e.capability.startsWith('alarm_presence')?'Tilstedeværelse (ikke nødvendigvis bevegelse)':'Bevegelse'} ${e.value?'aktiv':'inaktiv'} — ${e.name} (${e.room}) · Anlegg ubekreftet · ${e.kind==='initial'?'Første observerte status':'Statusendring'} · Kildetid ${e.sourceAt?new Date(e.sourceAt).toLocaleString('nb-NO',{timeZone:'Europe/Oslo'}):'ukjent'} · observert ${new Date(e.observedAt).toLocaleString('nb-NO',{timeZone:'Europe/Oslo'})}`})),...local.filter(e=>e.type!=='motion')].sort((a,b)=>b.ts-a.ts),[history,local]);
+  const log=useMemo(()=>[...(history?.events||[]).map(e=>({id:e.id,ts:e.observedAt,type:'motion',source:'Homey-observasjon',text:`${e.capability.startsWith('alarm_presence')?'Tilstedeværelse (ikke nødvendigvis bevegelse)':'Bevegelse'} ${e.value?'aktiv':'inaktiv'} — ${e.name} (${motionLocation(e,zones).room}) · ${motionLocation(e,zones).site} · ${e.kind==='initial'?'Første observerte status':'Statusendring'} · Kildetid ${e.sourceAt?new Date(e.sourceAt).toLocaleString('nb-NO',{timeZone:'Europe/Oslo'}):'ukjent'} · observert ${new Date(e.observedAt).toLocaleString('nb-NO',{timeZone:'Europe/Oslo'})}`})),...local.filter(e=>e.type!=='motion')].sort((a,b)=>b.ts-a.ts),[history,local,zones]);
   const [filter, setFilter] = useState('all');
 
   const active = FILTERS.find(f => f.id === filter) || FILTERS[0];
@@ -91,7 +92,7 @@ export function SecurityActivityLog() {
         </div>
       </div>
 
-      <p className="text-xs text-nx-mute mb-3">Historikk fra {history?.startedAt?new Date(history.startedAt).toLocaleString('nb-NO',{timeZone:'Europe/Oslo'}):'første registrering'}. Opptil 7 dager / 2000 observasjoner. Bruker eksisterende Homey-avlesninger; korte bevegelser mellom avlesninger kan mangle. Anleggstilhørighet er ikke verifisert. Første status er ikke en historisk hendelse.</p>
+      <p className="text-xs text-nx-mute mb-3">Historikk fra {history?.startedAt?new Date(history.startedAt).toLocaleString('nb-NO',{timeZone:'Europe/Oslo'}):'første registrering'}. Opptil 7 dager / 2000 observasjoner. Bruker eksisterende Homey-avlesninger; korte bevegelser mellom avlesninger kan mangle. Anlegg oppgis fra eksplisitte Homey-sonenavn der tilgjengelig, ellers ubekreftet. Første status er ikke en historisk hendelse.</p>
       {filtered.length === 0 ? (
         <p className="text-xs text-nx-mute italic py-6 text-center">
           Ingen hendelser i denne kategorien ennå.
