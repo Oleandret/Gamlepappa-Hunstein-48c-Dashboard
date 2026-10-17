@@ -22,3 +22,7 @@ V4: cumulative focused checks passed.
 
 V5: cumulative focused checks passed.
 
+## V6 — Forklarbare anbefalinger og avviksvurdering
+
+V6: cumulative focused checks passed.
+

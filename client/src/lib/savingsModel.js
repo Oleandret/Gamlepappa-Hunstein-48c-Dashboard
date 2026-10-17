@@ -61,3 +61,12 @@ export function intervalCost(intervals, prices) {
   }
   return {cost:covered ? cost:null,covered,complete:intervals.length>0&&covered===intervals.length};
 }
+export function recommendations(rows, summary) {
+  const result=[];
+  if(summary.total===null) result.push({title:'Identifiser hovedmåleren',body:'Velg bekreftet hovedmåler med fersk effektmåling før du vurderer hele husets forbruk.'});
+  if(summary.stale) result.push({title:'Kontroller datakildene',body:`${summary.stale} enheter har foreldet eller ukjent måletid. De er utelatt fra beregningene.`});
+  if(summary.inconsistent) result.push({title:'Mulig overlapp eller usamtidige målinger',body:'Valgte undermålere overstiger hovedmåleren. Kontroller målerhierarkiet før du bruker romfordelingen.'});
+  const top=rows.filter(r=>r.power.quality==='measured'&&r.power.value>0).sort((a,b)=>b.power.value-a.power.value)[0];
+  if(top) result.push({title:`Undersøk ${top.name}`,body:`Høyeste observerte effekt er ${Math.round(top.power.value)} W. Dette er ikke et bekreftet avvik; historisk normalnivå mangler. Ingen besparelse er beregnet.`});
+  return result;
+}
