@@ -5,11 +5,11 @@ export default {
     extend: {
       colors: {
         nx: {
-          bg: '#05070d',
-          panel: '#0b1322',
+          bg: '#0b1119',
+          panel: '#141e2b',
           panel2: '#0f1a2e',
-          line: '#1c2a44',
-          cyan: '#22e6ff',
+          line: '#2a394b',
+          cyan: '#7ce2c4',
           cyan2: '#5cf2ff',
           teal: '#19d4b5',
           purple: '#7d5cff',
@@ -17,7 +17,7 @@ export default {
           amber: '#ffb84a',
           green: '#3ddc84',
           red: '#ff5c7a',
-          mute: '#7c8aa8',
+          mute: '#a1b2c7',
           text: '#e6f0ff'
         }
       },

@@ -31,7 +31,7 @@ export function FrontSensors({ sensors, devices }) {
       ...s,
       device: dev,
       value,
-      formatted: formatCapability(s.capability, value),
+      formatted: formatCapability(s.capability, value, dev?.capabilitiesObj?.[s.capability]),
       Icon: ICON_FOR_CAP[s.capability] || Activity
     };
   }), [sensors, devices]);

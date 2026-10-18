@@ -1,3 +1,5 @@
+import {powerWatts,sourceAt} from '../lib/measurements.js';
+import {allCaps,formatCapability} from '../lib/deviceUtils.js';
 import { memo } from 'react';
 import {
   Lightbulb, Power, Thermometer, Lock, Unlock, Camera, Wind,
@@ -20,7 +22,7 @@ export const DeviceCard = memo(function DeviceCard({ device, zoneName, onSet, is
   const temp = capValue(device, 'measure_temperature');
   const target = capValue(device, 'target_temperature');
   const humidity = capValue(device, 'measure_humidity');
-  const power = capValue(device, 'measure_power');
+  const power = powerWatts(device.capabilitiesObj?.measure_power || {value:capValue(device,'measure_power')});
   const battery = capValue(device, 'measure_battery');
   const locked = capValue(device, 'locked');
   const alarms = readAlarms(device);
@@ -190,7 +192,8 @@ export const DeviceCard = memo(function DeviceCard({ device, zoneName, onSet, is
         </div>
       )}
 
-      {!device.available && (
+      <details className="device-source-details"><summary>Målepunkter og kildetider · {allCaps(device).length}</summary><div className="device-source-scroll"><table><thead><tr><th>Målepunkt</th><th>Sist rapportert</th><th>Kildetid</th></tr></thead><tbody>{allCaps(device).map(id=>{const c=device.capabilitiesObj?.[id],at=sourceAt(c?.lastUpdated);return <tr key={id}><td>{c?.title || id}<small>{id}</small></td><td>{formatCapability(id,capValue(device,id),c)}{c?.units && <small>Kildens enhet: {c.units}</small>}</td><td>{at?new Date(at).toLocaleString('nb-NO',{timeZone:'Europe/Oslo'}):'Ikke oppgitt'}</td></tr>})}</tbody></table></div><p>Kildetid kan være siste verdiendring. En gammel verdi er ikke en fersk måling. Ingen av disse feltene kan endres her.</p></details>
+      {device.available === false && (
         <div className="text-[10px] uppercase tracking-[0.18em] text-nx-amber font-mono">offline</div>
       )}
     </div>

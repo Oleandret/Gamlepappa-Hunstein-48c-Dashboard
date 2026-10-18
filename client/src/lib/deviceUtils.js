@@ -37,14 +37,14 @@ export function hasCap(device, cap) {
   return Boolean(device.capabilitiesObj?.[cap]);
 }
 
-/** All capabilities present on a device (deduped, root names only). */
+/** All capabilities present on a device; instance IDs must remain distinct. */
 export function allCaps(device) {
   if (!device) return [];
   let raw = [];
   if (Array.isArray(device.capabilities)) raw = device.capabilities;
   else if (device.capabilities) raw = Object.keys(device.capabilities);
   else if (device.capabilitiesObj) raw = Object.keys(device.capabilitiesObj);
-  return [...new Set(raw.map(c => String(c).split('.')[0]))];
+  return [...new Set([...raw, ...Object.keys(device.capabilitiesObj || {})].map(String))];
 }
 
 /** Pick the most relevant capability for displaying a one-line summary. */
@@ -56,8 +56,10 @@ export function primaryCapability(device) {
 }
 
 /** Human-friendly label for a capability value. */
-export function formatCapability(cap, value) {
+export function formatCapability(cap, value, metadata) {
   if (value == null) return '—';
+  if (cap === 'dim' && typeof value === 'number') return `${Math.round(value * 100)}%`;
+  if (metadata?.units && typeof value === 'number') return `${Number(value).toLocaleString('nb-NO',{maximumFractionDigits:3})} ${metadata.units}`;
   switch (cap) {
     case 'onoff': return value ? 'På' : 'Av';
     case 'locked': return value ? 'Låst' : 'Ulåst';
@@ -116,7 +118,7 @@ export function classLabel(cls) {
 export function describeDevice(device) {
   const cap = primaryCapability(device);
   if (!cap) return classLabel(device.class);
-  return `${classLabel(device.class)} · ${formatCapability(cap, capValue(device, cap))}`;
+  return `${classLabel(device.class)} · ${formatCapability(cap, capValue(device, cap), device.capabilitiesObj?.[cap])}`;
 }
 
 /** Group an array of devices by zone id. */

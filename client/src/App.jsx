@@ -195,7 +195,7 @@ export default function App() {
 
   return (
     <div data-active-section={section} className="relative min-h-screen bg-nx-bg bg-scanlines overflow-hidden">
-      <Particles />
+
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <div className="absolute -top-40 left-1/3 h-96 w-96 rounded-full bg-nx-cyan/15 blur-[120px]" />
         <div className="absolute -bottom-40 right-1/4 h-96 w-96 rounded-full bg-nx-purple/15 blur-[120px]" />
@@ -213,7 +213,7 @@ export default function App() {
           pinned={sidebar.pinned}
           onTogglePin={sidebar.toggle}
         />
-        <main className="flex-1 px-4 lg:px-8 py-6 min-w-0">
+        <main className="dashboard-main flex-1 px-4 lg:px-8 py-6 min-w-0">
           <TopBar system={system} section={section} onSection={setSection} />
 
           {!loaded && (
@@ -223,7 +223,7 @@ export default function App() {
             </div>
           )}
 
-          {loaded && (data.quality?.devices !== 'live' || data.quality?.energy !== 'live') && <p role="status" className="panel p-3 my-3 text-nx-amber">Datakvalitet: enheter {data.quality?.devices || 'ukjent'} · energi {data.quality?.energy || 'ukjent'}. Utdaterte data må ikke brukes som bekreftet status.</p>}
+          {loaded && (system?.demo || data.quality?.devices !== 'live' || data.quality?.energy !== 'live') && <p role="status" className="quality-notice">{system?.demo ? 'Demonstrasjon · syntetiske testdata, ikke faktiske målinger.' : `Datakvalitet: enheter ${data.quality?.devices || 'ukjent'} · energi ${data.quality?.energy || 'ukjent'}. Eldre data er ikke bekreftet nå-status.`}</p>}
           {loaded && (
             <SectionBoundary key={section}><SectionView
               onOpen3D={zoneId=>{setFocusZoneId(zoneId);setSection('hus-3d');}}
@@ -557,39 +557,9 @@ function SectionView({ onOpen3D, focusZoneId, section, system, data, counts, set
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35 }}
-          className="mt-3 grid grid-cols-12 gap-2"
+          className="overview-grid mt-6 grid grid-cols-12 gap-5"
         >
-          {/* Kompakt hilsen-bar */}
-          <div className="col-span-12 panel px-3 py-1.5 flex flex-wrap items-center gap-1.5 justify-between">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <h1 className="text-xs font-semibold">
-                God kveld, <span className="neon-text">{system?.user || 'Ole'}</span>
-              </h1>
-              <span className="chip text-[10px] px-2 py-0.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-nx-green animate-pulseGlow" />
-                Hjemmemodus
-              </span>
-              <span className="chip text-[10px] px-2 py-0.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-nx-cyan" />
-                {system?.demo ? 'Demo' : data.quality?.devices === 'live' ? 'Sist innhentet' : 'Utdatert / utilgjengelig'}
-              </span>
-              <span className="chip text-[10px] px-2 py-0.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-nx-purple" />
-                {counts.devices} enh · {counts.zones} rom · {counts.flows} flows
-              </span>
-            </div>
-            <div className="flex items-center gap-2 text-[10px] text-nx-mute font-mono">
-              {data.weather?.now?.temp != null && (
-                <span>UTE <span className="text-nx-cyan">{Math.round(data.weather.now.temp)}°</span></span>
-              )}
-              {data.energy?.live?.watts != null && (
-                <span>NÅ <span className="text-nx-cyan">{Math.round(data.energy.live.watts).toLocaleString('no-NO')} W</span></span>
-              )}
-              {data.energy?.today?.kwh != null && (
-                <span>I DAG <span className="text-nx-cyan">{data.energy.today.kwh} kWh</span></span>
-              )}
-            </div>
-          </div>
+          <section className="overview-welcome col-span-12"><div><p className="dashboard-eyebrow">HJEMME HOS DEG</p><h1>Hei, {system?.user || 'Ole'}.</h1><p>Oversikt over målingene og enhetene dine.</p></div><div className="overview-counts"><div><strong>{counts.devices}</strong><span>enheter</span></div><div><strong>{counts.zones}</strong><span>rom</span></div><div><strong>{counts.flows}</strong><span>flows</span></div></div></section>
 
           {/* Brukervalgte sensor-chips (vises bare hvis listen ikke er tom) */}
           <FrontSensors sensors={frontSensors.list} devices={data.devices || {}} />
@@ -603,37 +573,37 @@ function SectionView({ onOpen3D, focusZoneId, section, system, data, counts, set
           </div>
 
           {/* Rad 1: Sikkerhet + 3 spesial-widgets */}
-          <div className="col-span-6 lg:col-span-3 panel p-2">
+          <div className="col-span-12 sm:col-span-6 xl:col-span-3 panel p-5">
             <SecurityWidget security={data.security} />
           </div>
-          {tibber && <div className="col-span-6 lg:col-span-3"><TibberCard device={tibber} /></div>}
-          {tesla && <div className="col-span-6 lg:col-span-3"><TeslaCard device={tesla} /></div>}
-          {roborock && <div className="col-span-6 lg:col-span-3"><RoborockCard device={roborock} onSet={setCapability} /></div>}
+          {tibber && <div className="col-span-12 sm:col-span-6 xl:col-span-3"><TibberCard device={tibber} /></div>}
+          {tesla && <div className="col-span-12 sm:col-span-6 xl:col-span-3"><TeslaCard device={tesla} /></div>}
+          {roborock && <div className="col-span-12 sm:col-span-6 xl:col-span-3"><RoborockCard device={roborock} onSet={setCapability} /></div>}
 
           {/* Rad 2: Hurtigkontroller + Energi-graf + Vær */}
-          <div className="col-span-12 sm:col-span-6 lg:col-span-3 panel p-2">
+          <div className="col-span-12 sm:col-span-6 xl:col-span-3 panel p-5">
             <QuickControls flows={data.flows || {}} onRun={runFlow} />
           </div>
-          <div className="col-span-12 sm:col-span-12 lg:col-span-6 panel p-2">
+          <div className="col-span-12 sm:col-span-12 lg:col-span-6 panel p-5">
             <Suspense fallback={<LoadingPanel label="LASTER GRAF..." />}>
               <EnergyWidget energy={data.energy} />
             </Suspense>
           </div>
-          <div className="col-span-12 sm:col-span-6 lg:col-span-3 panel p-2">
+          <div className="col-span-12 sm:col-span-6 xl:col-span-3 panel p-5">
             <WeatherWidget weather={data.weather} />
           </div>
 
           {/* Rad 3: 4 widgets på en rad */}
-          <div className="col-span-6 lg:col-span-3 panel p-2">
+          <div className="col-span-12 sm:col-span-6 xl:col-span-3 panel p-5">
             <RoomTemps devices={data.devices || {}} zones={data.zones || {}} />
           </div>
-          <div className="col-span-6 lg:col-span-3 panel p-2">
+          <div className="col-span-12 sm:col-span-6 xl:col-span-3 panel p-5">
             <Lighting devices={data.devices || {}} zones={data.zones || {}} onSet={setCapability} />
           </div>
-          <div className="col-span-6 lg:col-span-3 panel p-2">
+          <div className="col-span-12 sm:col-span-6 xl:col-span-3 panel p-5">
             <ActivityFeed activity={data.activity || []} />
           </div>
-          <div className="col-span-6 lg:col-span-3 panel p-2">
+          <div className="col-span-12 sm:col-span-6 xl:col-span-3 panel p-5">
             <FavoriteAutomations flows={data.flows || {}} onRun={runFlow} />
           </div>
         </motion.div>

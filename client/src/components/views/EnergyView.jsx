@@ -1,3 +1,4 @@
+import {powerWatts,energyKwh,sourceAt} from '../../lib/measurements.js';
 import {PriceHistory} from '../PriceHistory.jsx';
 import {HunsteinEnergy} from '../HunsteinEnergy.jsx';
 import { useMemo } from 'react';
@@ -8,12 +9,13 @@ export function EnergyView({ devices, zones, energy, quality }) {
   const energyDevices = useMemo(() => {
     return Object.values(devices)
       .map(d => {
-        const watts = capValue(d, 'measure_power');
-        const kwh = capValue(d, 'meter_power');
+        const watts = powerWatts(d.capabilitiesObj?.measure_power || {value:capValue(d,'measure_power')});
+        const kwh = energyKwh(d.capabilitiesObj?.meter_power || {value:capValue(d,'meter_power')});
         if (!Number.isFinite(watts) && !Number.isFinite(kwh)) return null;
         return {
           id: d.id,
           name: d.name,
+          at:sourceAt(d.capabilitiesObj?.measure_power?.lastUpdated),available:d.available,
           zone: zones?.[d.zone]?.name || '—',
           watts: Number.isFinite(watts) ? watts : null,
           kwh:   Number.isFinite(kwh) ? kwh : null,
@@ -76,7 +78,7 @@ export function EnergyView({ devices, zones, energy, quality }) {
                   d.on ? 'bg-nx-cyan animate-pulseGlow' : 'bg-nx-mute/40'
                 ].join(' ')} aria-hidden="true" />
                 <span className="text-sm flex-1 truncate" title={d.name}>{d.name}</span>
-                <span className="text-[11px] text-nx-mute font-mono">{d.zone}</span>
+                <span className="text-[11px] text-nx-mute font-mono">{d.zone}<small className="block">{d.available===false?'Utilgjengelig':d.at?new Date(d.at).toLocaleString('nb-NO',{timeZone:'Europe/Oslo'}):'Kildetid mangler'}</small></span>
                 <span className="font-mono text-sm w-20 text-right text-nx-cyan">
                   {Number.isFinite(d.watts) ? `${Math.round(d.watts).toLocaleString('no-NO')} W` : '—'}
                 </span>

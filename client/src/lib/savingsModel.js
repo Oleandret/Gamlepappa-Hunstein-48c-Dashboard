@@ -1,3 +1,4 @@
+import {powerWatts,energyKwh} from './measurements.js';
 import {sourceTime} from './hunsteinMeter.js';
 // Pure domain logic shared by the UI and isolated Node tests. No command adapter.
 export const MAX_AGE_MS = 120_000;
@@ -16,8 +17,8 @@ export function reading(cap, quality, now = Date.now(), available = true) {
 export function inventory(devices = {}, zones = {}, quality, now = Date.now()) {
   return Object.entries(devices).map(([id,d]) => ({
     id, name:d.name || id, room:zones[d.zone]?.name || 'Ukjent rom', kind:d.class || 'unknown',
-    power:reading(d.capabilitiesObj?.measure_power, quality, now, d.available !== false),
-    meter:reading(d.capabilitiesObj?.meter_power, quality, now, d.available !== false),
+    power:reading({...d.capabilitiesObj?.measure_power,value:powerWatts(d.capabilitiesObj?.measure_power)}, quality, now, d.available !== false),
+    meter:reading({...d.capabilitiesObj?.meter_power,value:energyKwh(d.capabilitiesObj?.meter_power)}, quality, now, d.available !== false),
     // A light classification alone is not authorization to control it.
     canPlan:d.class === 'light' && typeof d.capabilitiesObj?.onoff?.value === 'boolean'
   }));

@@ -1,4 +1,5 @@
 import { capValue } from './validation.js';
+import { powerObservation } from './energySummary.js';
 export function roomOverview(devices, zones, quality = 'live', updatedAt = null) {
   return Object.values(zones || {}).map(zone => {
     const members = Object.values(devices || {}).filter(d => d.zone === zone.id);
@@ -19,11 +20,14 @@ export function houseBrief(rooms, quality) {
   ]);
   return items.length ? items : [{severity:'info',text:'Ingen avvik i de tilgjengelige avlesningene. Dette er ikke en bekreftelse på at alle systemer er trygge.'}];
 }
-export function energyDetective(devices) {
-  const measured=Object.values(devices || {}).filter(d=>d.available!==false && Number.isFinite(capValue(d,'measure_power')))
-    .map(d=>({deviceId:d.id,name:d.name,watts:capValue(d,'measure_power'),basis:'measured'})).sort((a,b)=>b.watts-a.watts);
-  return {measured, estimated:[], note:'Målt øyeblikkseffekt per måler. Målerne kan overlappe og summeres derfor ikke til husforbruk. Ingen beregnet besparelse eller kostnad uten tidsserie og prisgrunnlag.'};
+export function energyDetective(devices, now=Date.now()) {
+  const measured=Object.values(devices || {}).flatMap(d=>{
+    const result=powerObservation(d,now);
+    return result.watts===null?[]:[{deviceId:d.id,name:d.name,watts:result.watts,basis:'measured',sourceAt:result.sourceAt}];
+  }).sort((a,b)=>b.watts-a.watts);
+  return {measured,estimated:[],note:'Effekt med kildetid innen 15 minutter og kjent W/kW-enhet. Eldre eller utilgjengelige målinger utelates. Målerne kan overlappe og summeres ikke til husforbruk.'};
 }
+
 export function learnedRoutines(events) {
   const groups=new Map();
   for (const e of events) {

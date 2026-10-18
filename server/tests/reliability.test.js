@@ -1,3 +1,4 @@
+import {publicDevices} from '../lib/deviceProjection.js';
 import {createInventoryReader} from '../lib/inventoryReader.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,11 +15,11 @@ import { roomOverview, houseBrief, energyDetective, learnedRoutines, simulate, s
 // Every external dependency in worker/executor tests is an injected stub. No production imports.
 function sandbox(file, globals, names) {
   const src=fs.readFileSync(new URL('../'+file,import.meta.url),'utf8').replace(/^import[\s\S]*?;\n/gm,'').replace(/^export /gm,'');
-  const ctx=vm.createContext({console:{log(){},warn(){},error(){}},structuredClone, ...globals});
+  const ctx=vm.createContext({console:{log(){},warn(){},error(){}},structuredClone, publicDevices, ...globals});
   vm.runInContext(src+'\nglobalThis.result={'+names+'}',ctx);return ctx.result;
 }
 const tick=()=>new Promise(r=>setImmediate(r));
-const devices={lamp:{id:'lamp',name:'Lampe',zone:'room',class:'light',capabilitiesObj:{onoff:{value:true,type:'boolean',setable:true},dim:{value:.5,type:'number',min:0,max:1,setable:true},measure_power:{value:12,type:'number',setable:false}}}};
+const devices={lamp:{id:'lamp',name:'Lampe',zone:'room',class:'light',capabilitiesObj:{onoff:{value:true,type:'boolean',setable:true},dim:{value:.5,type:'number',min:0,max:1,setable:true},measure_power:{value:12,type:'number',units:'W',lastUpdated:Date.now(),setable:false}}}};
 test('auth fails closed and roles cannot be supplied by caller',()=>{
  const config=JSON.stringify({viewer:'fixture-only-not-a-real-secret'});
  assert.equal(authenticate('Bearer fixture-only-not-a-real-secret',config),'viewer');

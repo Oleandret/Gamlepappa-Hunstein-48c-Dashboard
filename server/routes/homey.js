@@ -1,3 +1,4 @@
+import {publicDevices} from '../lib/deviceProjection.js';
 import {createInventoryReader} from '../lib/inventoryReader.js';
 import { recordAction } from '../lib/audit.js';
 import { capValue } from '../lib/validation.js';
@@ -56,15 +57,6 @@ homeyRoutes.get('/devices', safe(
   async () => ({ devices: publicDevices(await homeyClient.listDevices()) }),
   async () => ({ devices: MOCK_DEVICES }), homeyClient.listDevices
 ));
-
-// Driver pairing/configuration fields can contain credentials and are never UI data.
-function publicDevices(devices) {
-  return Object.fromEntries(Object.entries(devices).map(([id, device]) => {
-    if (!device || typeof device !== 'object') return [id, device];
-    const {data, settings, settingsObj, ...visible} = device;
-    return [id, visible];
-  }));
-}
 
 // Explicit local snapshot import, never a Tesla request or a Homey command.
 homeyRoutes.post('/tesla/:id/refresh', async (req,res) => {
