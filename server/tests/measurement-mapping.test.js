@@ -13,3 +13,5 @@ test('source time requires unambiguous timezone and displays source unit',()=>{a
 test('energy insight excludes missing, old and unavailable readings',()=>{const now=Date.now(),make=(value,units,lastUpdated,available=true)=>({id:String(value),available,capabilitiesObj:{measure_power:{value,units,lastUpdated}}});const r=energyDetective({fresh:make(2,'kW',now),old:make(500,'W',now-900001),unknown:make(12,'kWh',now),offline:make(600,'W',now,false)},now);assert.equal(r.measured.length,1);assert.equal(r.measured[0].watts,2000);assert.equal(r.total,undefined);});
 
 test('normalized dim remains percent when metadata declares percent',()=>{assert.equal(formatCapability('dim',.42,{units:'%'}),'42%');});
+
+test('dim instance values use normalized percent without changing their lookup ID',()=>{const d={capabilities:['dim.1'],capabilitiesObj:{'dim.1':{value:.42,units:'%'}}};const id=allCaps(d)[0];assert.equal(id,'dim.1');assert.equal(formatCapability(id,capValue(d,id),d.capabilitiesObj[id]),'42%');});

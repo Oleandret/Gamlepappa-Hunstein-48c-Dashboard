@@ -58,7 +58,7 @@ export function primaryCapability(device) {
 /** Human-friendly label for a capability value. */
 export function formatCapability(cap, value, metadata) {
   if (value == null) return '—';
-  if (cap === 'dim' && typeof value === 'number') return `${Math.round(value * 100)}%`;
+  if ((cap === 'dim' || cap.startsWith('dim.')) && typeof value === 'number') return `${Math.round(value * 100)}%`;
   if (metadata?.units && typeof value === 'number') return `${Number(value).toLocaleString('nb-NO',{maximumFractionDigits:3})} ${metadata.units}`;
   switch (cap) {
     case 'onoff': return value ? 'På' : 'Av';
