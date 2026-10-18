@@ -22,25 +22,25 @@ export function EnergyWidget({ energy }) {
           <div className="mt-1 flex items-baseline gap-3">
             <span className="text-3xl font-semibold font-mono">{energy.today?.kwh ?? '—'}</span>
             <span className="text-xs text-nx-mute">kWh i dag</span>
-            <span className={[
+            {Number.isFinite(energy.today?.trend) && <span className={[
               'flex items-center gap-1 text-xs font-mono',
               trendDown ? 'text-nx-green' : 'text-nx-amber'
             ].join(' ')}>
-              <TrendIcon size={12} /> {Math.abs(energy.today?.trend ?? 0)}%
-            </span>
+              <TrendIcon size={12} /> {Math.abs(energy.today.trend)}%
+            </span>}
           </div>
-          <p className="text-xs text-nx-mute mt-1">vs. samme dag forrige uke</p>
+          <p className="text-xs text-nx-mute mt-1">{energy.source || 'Energikilde'}</p>
         </div>
         <div className="flex flex-col items-end gap-1 text-right">
           <span className="chip text-xs">
             <Zap size={12} className="text-nx-cyan" />
             <span className="font-mono">{energy.live?.watts ?? '—'} W</span>
           </span>
-          <span className="text-[10px] uppercase tracking-[0.18em] text-nx-mute">Sol: {energy.live?.solar ?? 0} W</span>
+          <span className="text-[10px] uppercase tracking-[0.18em] text-nx-mute">Sol: {energy.live?.solar ?? '—'} W</span>
         </div>
       </div>
 
-      <div className="mt-3 h-32">
+      {points.length > 0 ? <div className="mt-3 h-32">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={points} margin={{ left: -20, right: 0, top: 5, bottom: 0 }}>
             <defs>
@@ -60,7 +60,7 @@ export function EnergyWidget({ energy }) {
             <Area type="monotone" dataKey="kwh" stroke="#22e6ff" strokeWidth={2} fill="url(#enArea)" />
           </AreaChart>
         </ResponsiveContainer>
-      </div>
+      </div> : <p className="text-xs text-nx-mute mt-3">{energy.note || 'Ingen verifisert energiserie.'}</p>}
     </div>
   );
 }

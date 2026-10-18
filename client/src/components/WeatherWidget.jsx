@@ -11,10 +11,10 @@ function pickIcon(symbol = '') {
 }
 
 export function WeatherWidget({ weather }) {
-  if (!weather) return (
+  if (!weather?.now || !Number.isFinite(weather.now.temp)) return (
     <div>
       <p className="panel-title">Vær</p>
-      <p className="mt-2 text-sm text-nx-mute">Henter værdata...</p>
+      <p className="mt-2 text-sm text-nx-mute">Værdata er ikke tilgjengelige.</p>
     </div>
   );
   const Icon = pickIcon(weather.now?.symbol);
@@ -22,6 +22,7 @@ export function WeatherWidget({ weather }) {
   return (
     <div>
       <p className="panel-title">Vær</p>
+      {weather._quality==='stale' && <p className="text-xs text-nx-amber mt-2">Siste lagrede værdata · oppdatering feilet</p>}
       <div className="mt-2 flex items-center gap-3">
         <div className="relative grid h-14 w-14 place-items-center rounded-2xl bg-nx-panel/60 border border-nx-line/70">
           <Icon size={26} className="text-nx-cyan" />
@@ -30,7 +31,7 @@ export function WeatherWidget({ weather }) {
         <div>
           <div className="font-mono text-3xl">{Math.round(weather.now?.temp ?? 0)}°</div>
           <div className="text-xs text-nx-mute">
-            {weather.place} · Luftfuktighet {Math.round(weather.now?.humidity ?? 0)}%
+            {weather.place} · Luftfuktighet {Number.isFinite(weather.now?.humidity) ? Math.round(weather.now.humidity) : '—'}%
           </div>
         </div>
       </div>

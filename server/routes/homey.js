@@ -15,17 +15,17 @@ import {
 
 export const homeyRoutes = Router();
 
-const safe = (handler, fallback) => {
+const safe = (handler, fallback, reader) => {
   const snapshots = new Map();
   return async (req, res) => {
     const key = req.originalUrl;
     if (isDemoMode()) return res.json({ ...(await fallback(req)), _quality: 'demo', _updatedAt: null });
     try {
       const data = await handler(req);
-      const updatedAt = new Date().toISOString();
+      const updatedAt = new Date(reader?.snapshot?.().updatedAt ?? Date.now()).toISOString();
       snapshots.set(key, { data, updatedAt });
       if (snapshots.size > 50) snapshots.delete(snapshots.keys().next().value);
-      res.json({ ...data, _quality: 'live', _updatedAt: updatedAt });
+      res.json({ ...data, _quality: data.report?.quality === 'unavailable' ? 'unavailable' : 'live', _updatedAt: updatedAt });
     } catch (err) {
       const previous = snapshots.get(key);
       const recent = previous && Date.now() - Date.parse(previous.updatedAt) < 5 * 60_000;
@@ -49,12 +49,12 @@ homeyRoutes.get('/motion-history',async(_req,res)=>{try{const state=await motion
 
 homeyRoutes.get('/zones', safe(
   async () => ({ zones: await homeyClient.listZones() }),
-  async () => ({ zones: MOCK_ZONES })
+  async () => ({ zones: MOCK_ZONES }), homeyClient.listZones
 ));
 
 homeyRoutes.get('/devices', safe(
   async () => ({ devices: publicDevices(await homeyClient.listDevices()) }),
-  async () => ({ devices: MOCK_DEVICES })
+  async () => ({ devices: MOCK_DEVICES }), homeyClient.listDevices
 ));
 
 // Driver pairing/configuration fields can contain credentials and are never UI data.
@@ -76,12 +76,12 @@ homeyRoutes.post('/tesla/:id/refresh', async (req,res) => {
 
 homeyRoutes.get('/flows', safe(
   async () => ({ flows: await homeyClient.listFlows() }),
-  async () => ({ flows: MOCK_FLOWS })
+  async () => ({ flows: MOCK_FLOWS }), homeyClient.listFlows
 ));
 
 homeyRoutes.get('/energy', safe(
   async () => ({ report: await homeyClient.getEnergyReport('today') }),
-  async () => ({ report: mockEnergyReport() })
+  async () => ({ report: mockEnergyReport() }), homeyClient.listDevices
 ));
 
 homeyRoutes.get('/activity', safe(

@@ -137,7 +137,7 @@ export function HouseView({ devices, zones, weather, forceLocation = null, custo
             {allSecure
               ? <ShieldCheck size={12} className="text-nx-green" aria-hidden="true" />
               : <ShieldAlert size={12} className="text-nx-amber" aria-hidden="true" />}
-            {allSecure ? 'Sikret' : 'Sjekk'}
+            {locationDevices.length === 0 ? 'Ukjent' : allSecure ? 'Ingen registrerte varsler' : 'Sjekk'}
           </h2>
         </div>
         <div className="flex items-center gap-2 flex-wrap text-[10px] font-mono">
@@ -211,7 +211,7 @@ export function HouseView({ devices, zones, weather, forceLocation = null, custo
         </motion.div>
 
         <div className="absolute bottom-3 left-3 font-mono text-[10px] uppercase tracking-[0.22em] text-nx-mute">
-          ◉ {cur.address.toUpperCase()} · LIVE
+          ◉ {cur.address.toUpperCase()} · SIST RAPPORTERT
         </div>
 
         {pins.map((p, i) => {

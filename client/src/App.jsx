@@ -1,3 +1,4 @@
+import {SectionBoundary} from './components/SectionBoundary.jsx';
 import {PlanHouseView} from './components/views/PlanHouseView.jsx';
 import {HistoryView} from './components/views/HistoryView.jsx';
 import {NetworkView} from './components/views/NetworkView.jsx';
@@ -107,8 +108,8 @@ export default function App() {
           api.devices(sig).catch(() => ({ _quality:'unavailable' })),
           api.flows(sig).catch(() => ({ _quality: 'unavailable' })),
           api.energy(sig).catch(() => ({ report: null, _quality:'unavailable' })),
-          api.activity(sig).catch(() => ({ activity: [] })),
-          api.security(sig).catch(() => ({ devices: [], armed: false })),
+          api.activity(sig).catch(() => ({ _quality:'unavailable' })),
+          api.security(sig).catch(() => ({ _quality:'unavailable' })),
           api.weather(sig).catch(() => null)
         ]);
         if (cancelled) return;
@@ -124,10 +125,10 @@ export default function App() {
           devices: devices?.devices || previous.devices,
           quality: {devices:devices?._quality,energy:energy?._quality},
           flows: flows?.flows || previous.flows,
-          energy: energy?.report,
-          activity: activity?.activity,
-          security,
-          weather
+          energy: energy?.report ?? previous.energy,
+          activity: activity?.activity ?? previous.activity,
+          security: security?._quality === 'unavailable' ? {...previous.security, armed:null, _quality:'unavailable'} : security,
+          weather: weather ?? (previous.weather ? {...previous.weather,_quality:'stale'} : null)
         }));
         if (initial) setLoaded(true);
       } catch (err) {
@@ -171,14 +172,13 @@ export default function App() {
   }, [data.quality?.devices]);
 
   const runFlow = useCallback(async (flowId) => {
-    let flowName = flowId;
-    setData(d => { flowName = d.flows?.[flowId]?.name || flowId; return d; });
+    const flowName = data.flows?.[flowId]?.name || flowId;
     try { await api.runFlow(flowId); pushEvent({type:'flow',text:`Homey mottok flow: ${flowName}. Sluttresultat er ikke bekreftet.`,source:'manuell'}); }
     catch (e) {
       console.error('runFlow failed:', e.message);
       pushEvent({ type: 'alarm', text: `Flow feilet: ${flowName} (${e.message})`, source: 'feil' });
     }
-  }, []);
+  }, [data.flows]);
 
   function formatValue(v) {
     if (typeof v === 'boolean') return v ? 'på' : 'av';
@@ -225,7 +225,7 @@ export default function App() {
 
           {loaded && (data.quality?.devices !== 'live' || data.quality?.energy !== 'live') && <p role="status" className="panel p-3 my-3 text-nx-amber">Datakvalitet: enheter {data.quality?.devices || 'ukjent'} · energi {data.quality?.energy || 'ukjent'}. Utdaterte data må ikke brukes som bekreftet status.</p>}
           {loaded && (
-            <SectionView
+            <SectionBoundary key={section}><SectionView
               onOpen3D={zoneId=>{setFocusZoneId(zoneId);setSection('hus-3d');}}
               focusZoneId={focusZoneId}
               section={section}
@@ -243,7 +243,7 @@ export default function App() {
               floorPlanPins={floorPlanPins}
               planFlows={planFlows}
               frontSpecials={frontSpecials}
-            />
+            /></SectionBoundary>
           )}
 
           <footer className="mt-10 mb-4 flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-nx-mute font-mono">
@@ -285,7 +285,7 @@ function SectionView({ onOpen3D, focusZoneId, section, system, data, counts, set
         </span>
         <span className="chip">
           <span className="h-1.5 w-1.5 rounded-full bg-nx-cyan" />
-          {system?.demo ? 'Demo' : 'Live'}
+          {system?.demo ? 'Demo' : data.quality?.devices === 'live' ? 'Sist innhentet' : 'Utdatert / utilgjengelig'}
         </span>
         <span className="chip">
           <span className="h-1.5 w-1.5 rounded-full bg-nx-purple" />
@@ -571,7 +571,7 @@ function SectionView({ onOpen3D, focusZoneId, section, system, data, counts, set
               </span>
               <span className="chip text-[10px] px-2 py-0.5">
                 <span className="h-1.5 w-1.5 rounded-full bg-nx-cyan" />
-                {system?.demo ? 'Demo' : 'Live'}
+                {system?.demo ? 'Demo' : data.quality?.devices === 'live' ? 'Sist innhentet' : 'Utdatert / utilgjengelig'}
               </span>
               <span className="chip text-[10px] px-2 py-0.5">
                 <span className="h-1.5 w-1.5 rounded-full bg-nx-purple" />

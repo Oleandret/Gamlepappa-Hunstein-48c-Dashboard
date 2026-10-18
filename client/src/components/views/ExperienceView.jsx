@@ -12,15 +12,15 @@ export function ExperienceView({devices={}}) {
   async function load() {
     const responses=await Promise.allSettled([request('/overview'),request('/timeline'),api.events.autoFlows(),request('/scenes')]);
     const [d,t,f,s]=responses;
-    if(d.status==='fulfilled') setData(d.value);
+    if(d.status==='fulfilled' && Array.isArray(d.value?.rooms) && Array.isArray(d.value?.brief) && Array.isArray(d.value?.routines) && Array.isArray(d.value?.energy?.measured)) setData(d.value);
     else setData(previous=>previous?{...previous,quality:'stale'}:null);
-    if(t.status==='fulfilled')setTimeline(t.value.items);
-    if(f.status==='fulfilled')setFlows(f.value.flows);
+    if(t.status==='fulfilled')setTimeline(Array.isArray(t.value.items)?t.value.items:[]);
+    if(f.status==='fulfilled')setFlows(Array.isArray(f.value.flows)?f.value.flows:[]);
     if(s.status==='fulfilled'){
-      setScenes(s.value.scenes);
-      if(!sceneLoaded.current){setActions(s.value.scenes.film?.actions || []);sceneLoaded.current=true;}
+      setScenes(s.value.scenes || {});
+      if(!sceneLoaded.current){setActions(s.value.scenes?.film?.actions || []);sceneLoaded.current=true;}
     }
-    setError(responses.filter(r=>r.status==='rejected').map(r=>r.reason.message).join(' · '));
+    setError(responses.filter(r=>r.status==='rejected').map(r=>r.reason.message).join(' · ') || (d.status==='fulfilled' && !Array.isArray(d.value?.rooms) ? 'Ufullstendig svar fra datakilden' : ''));
   }
   useEffect(()=>{load();},[]);
   async function task(fn){setBusy(true);setError('');try{await fn();}catch(e){setError(e.message);}finally{setBusy(false);}}

@@ -35,7 +35,7 @@ export function SecurityWidget({ security }) {
         </span>
       </div>
 
-      <div className="relative mx-auto mt-3 h-36 w-36" role="img" aria-label={`Sikkerhets-helse ${score} av 100`}>
+      <div className="relative mx-auto mt-3 h-36 w-36" role="img" aria-label={`Enhetstilgjengelighet ${score ?? 'ukjent'} av 100`}>
         <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
           <circle cx="60" cy="60" r="50" fill="none" stroke="#1c2a44" strokeWidth="6"/>
           <circle
@@ -68,10 +68,7 @@ export function SecurityWidget({ security }) {
         <Tile Icon={Camera}     label="Kamera"    value={counts.cameras} />
       </div>
 
-      <button className="btn w-full mt-3 justify-between text-xs" aria-label="Se kamera-feed">
-        <span>SE KAMERAER</span>
-        <span className="text-nx-cyan" aria-hidden="true">→</span>
-      </button>
+      <p className="text-xs text-nx-mute mt-3">Poengsummen gjelder tilgjengelighet og batterivarsler, ikke bekreftet sikring av huset.</p>
     </div>
   );
 }

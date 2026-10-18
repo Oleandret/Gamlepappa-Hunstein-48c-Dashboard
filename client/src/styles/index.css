@@ -81,3 +81,19 @@ body {
 .glow-cyan {
   box-shadow: 0 0 20px rgba(34,230,255,0.25), inset 0 0 0 1px rgba(34,230,255,0.45);
 }
+
+/* Consistent navigation across every view, including phones. */
+.mobile-section-picker{display:none}
+main>footer{gap:12px;flex-wrap:wrap}
+:focus-visible{outline:2px solid #63e6be;outline-offset:3px}
+@media(max-width:767px){
+ aside[aria-label="Hoved-navigasjon"],aside[aria-label="Rom-flows"]{display:none}
+ [data-active-section] main{padding:16px 12px 80px}
+ [data-active-section] nav[aria-label="Seksjons-navigasjon"]{display:none}
+ .mobile-section-picker{display:grid;gap:6px;min-width:0;flex:1;color:#9aacbf;font-size:11px}
+ .mobile-section-picker select{width:100%;min-height:44px;background:#101b2b;border:1px solid #34475e;border-radius:10px;color:#e3edf8;padding:8px;font-size:15px}
+ .dashboard-topbar{flex-wrap:nowrap;gap:12px;align-items:center}
+ main>footer{flex-direction:column;align-items:flex-start;letter-spacing:.06em}
+ .panel{min-width:0}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}

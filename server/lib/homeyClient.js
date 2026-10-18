@@ -1,3 +1,4 @@
+import { energySummary } from './energySummary.js';
 import {createMotionHistory} from './motionHistory.js';
 /**
  * Lightweight client for the Homey Web API.
@@ -60,11 +61,13 @@ async function homeyFetch(pathPart, opts = {}) {
 
 const teslaSnapshots = createTeslaSnapshots({load:()=>getNamespace('_teslaSnapshots'),save:value=>setNamespace('_teslaSnapshots',value)});
 export const motionHistory=createMotionHistory({load:()=>getNamespace('_motionHistory'),save:v=>setNamespace('_motionHistory',v)});
-const devicesReader = cachedReader(async () => { const devices=await homeyFetch('/manager/devices/device'); await motionHistory.observe(devices).catch(()=>console.warn('[motion-history] storage unavailable')); return teslaSnapshots.project(devices); });
+const devicesReader = cachedReader(async () => { const devices=await homeyFetch('/manager/devices/device'); await motionHistory.observe(devices).catch(()=>console.warn('[motion-history] storage unavailable')); return teslaSnapshots.project(devices); }, 60_000);
 const zonesReader = cachedReader(() => homeyFetch('/manager/zones/zone'), 60000);
+const liveEnergyReader = cachedReader(() => homeyFetch('/manager/energy/live'), 60_000);
+let energyDate, dayEnergyReader;
 const flowsReader = cachedReader(() => homeyFetch('/manager/flow/flow'), 60000);
 
-const legacyEnergyReaders = new Map();
+
 
 export const homeyClient = {
   listDevices: devicesReader,
@@ -96,16 +99,14 @@ export const homeyClient = {
       () => homeyFetch(`/manager/flow/flow/${encodeURIComponent(flowId)}/trigger`, { method: 'POST' }),
       `runFlow ${flowId}`
     ),
-  getEnergyLive: () => homeyFetch('/manager/energy/live'),
+  getEnergyLive: liveEnergyReader,
   getEnergyDay: (date) => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Ugyldig dato');
-    return homeyFetch(`/manager/energy/report/day?date=${encodeURIComponent(date)}`);
+    if (energyDate !== date) { energyDate=date; dayEnergyReader=cachedReader(() => homeyFetch(`/manager/energy/report/day?date=${encodeURIComponent(date)}`), 900_000); }
+    return dayEnergyReader();
   },
-  // Preserve the legacy contract while caching failures, including the observed 404.
-  getEnergyReport: (scope = 'today') => {
-    if (!legacyEnergyReaders.has(scope)) legacyEnergyReaders.set(scope, cachedReader(() => homeyFetch(`/manager/energy/report/${encodeURIComponent(scope)}`), 300000));
-    return legacyEnergyReaders.get(scope)();
-  }
+  // The retired report/today endpoint returned 404. Use the verified main meter.
+  getEnergyReport: async () => energySummary(await devicesReader())
 };
 
 export function isConfigured() {

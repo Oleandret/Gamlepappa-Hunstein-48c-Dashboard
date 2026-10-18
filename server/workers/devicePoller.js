@@ -196,6 +196,7 @@ async function performPoll({ manual = false } = {}) {
           value: c.next,
           prev_value: c.prev,
           kind: 'transition',
+          sourceTs: sourceTimestamp(d.capabilitiesObj?.[c.capability]?.lastUpdated),
           ...ctx
         });
         allChanges.push({
@@ -210,7 +211,7 @@ async function performPoll({ manual = false } = {}) {
       // Snapshot: kun for sensor-aktige capabilities som ikke gir transitions
       // (temp, batteri, fuktighet, lux, effekt)
       if (shouldSnapshot) {
-        for (const cap of ['measure_temperature', 'measure_humidity', 'measure_luminance', 'measure_battery', 'measure_power']) {
+        for (const cap of ['measure_temperature', 'measure_humidity', 'measure_luminance', 'measure_battery', 'measure_power', 'meter_power']) {
           if (caps[cap] !== undefined) {
             snapshotRows.push({
               device_id: d.id,
@@ -231,8 +232,10 @@ async function performPoll({ manual = false } = {}) {
       nextState.set(d.id, structuredClone(caps));
     }
 
-    transitions = await insertEvents(transitionRows);
-    snapshots = await insertEvents(snapshotRows);
+    // One statement is atomic: a snapshot failure cannot leave committed transitions.
+    await insertEvents([...transitionRows, ...snapshotRows]);
+    transitions = transitionRows.length;
+    snapshots = snapshotRows.length;
     lastState = nextState;
     if (shouldSnapshot && snapshotRows.length > 0) lastSnapshotTs = Date.now();
 
@@ -348,7 +351,7 @@ export async function triggerPollNow() {
 }
 
 function sourceTimestamp(value) {
-  if (typeof value !== 'string') return null;
-  const ts = Date.parse(value);
-  return Number.isFinite(ts) && ts <= Date.now() && ts >= Date.now() - effectiveInterval() * 2 ? new Date(ts).toISOString() : null;
+  const ts = typeof value === 'number' ? value : typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/i.test(value) ? Date.parse(value) : NaN;
+  // Preserve older source times; observed_at already records when we read them.
+  return Number.isFinite(ts) && ts >= Date.UTC(2000, 0, 1) && ts <= Date.now() ? new Date(ts).toISOString() : null;
 }

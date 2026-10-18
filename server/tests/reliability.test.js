@@ -156,3 +156,23 @@ test('Homey device responses omit pairing secrets without changing cached origin
  assert.equal(body.devices.fixture.settings,undefined);assert.equal(body.devices.fixture.data,undefined);assert.equal(body.devices.fixture.settingsObj,undefined);
  assert.equal(privateDevices.fixture.settings.apikey,'fixture-key');assert.equal(privateDevices.fixture.data.token,'fixture-secret');
 });
+
+test('poller preserves numeric and older source timestamps and rejects invalid/future times',()=>{
+ const p=sandbox('workers/devicePoller.js',{process:{env:{}}},'sourceTimestamp');
+ const old=Date.now()-3600000;
+ assert.equal(p.sourceTimestamp(old),new Date(old).toISOString());
+ assert.equal(p.sourceTimestamp(new Date(old).toISOString()),new Date(old).toISOString());
+ for(const value of [null,'',true,NaN,Date.now()+60000,1700000000,'123','2026-10-17T12:00:00'])assert.equal(p.sourceTimestamp(value),null);
+});
+test('poller writes snapshots and transitions atomically, preserves meter source time, and retries failed batch',async()=>{
+ let value=100,fail=false,writes=[];const source=Date.now()-60000;
+ const p=sandbox('workers/devicePoller.js',{
+ process:{env:{}},isEnabled:()=>true,isDemoMode:()=>false,
+ homeyClient:{listDevices:async()=>({meter:{id:'meter',capabilitiesObj:{measure_power:{value,lastUpdated:source},meter_power:{value:value/10,lastUpdated:source}}}}),listZones:async()=>({})},
+ query:async(sql,values)=>{if(fail)throw Error('Mock write failure');writes.push(values);return{rows:[]};},onDeviceChanges:async()=>({fired:0}),setTimeout:()=>0,setInterval:()=>0,clearInterval(){},clearTimeout(){}
+ },'triggerPollNow');
+ await p.triggerPollNow();assert.equal(writes.length,1);assert.equal(writes[0].length,28);assert.equal(writes[0][13],'device');
+ value=200;fail=true;assert.equal((await p.triggerPollNow()).ok,false);assert.equal(writes.length,1);
+ fail=false;const result=await p.triggerPollNow();assert.equal(result.transitions,2);assert.equal(writes.length,2);assert.equal(writes[1][11],new Date(source).toISOString());
+ await p.triggerPollNow();assert.equal(writes.length,2);
+});
