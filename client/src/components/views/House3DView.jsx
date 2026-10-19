@@ -7,6 +7,8 @@ import {
   RotateCw, Power, ChevronRight, X, Move3d, Activity, DoorOpen, Lock, Unlock, Maximize2, Minimize2
 } from 'lucide-react';
 import { FLOORS, ALL_ROOMS, roomPoly, roomCenter, roomArea, planPctToWorld, BIM_MODEL_URL } from '../../lib/house3dModel.js';
+import { bimFurnitureMasks, INTERIORS } from '../../lib/house3dInteriors.js';
+import { RoomInterior } from './House3DInterior.jsx';
 import { capValue, hasCap } from '../../lib/deviceUtils.js';
 import { useHouse3dRooms } from '../../lib/useHouse3dRooms.js';
 import { DeviceControls } from '../FloorPlanPin.jsx';
@@ -433,6 +435,9 @@ function GarageDoor() {
 
 const BIM_GROUP_FLOOR = { basement: 'basement', floor1: 'floor1', floor2: 'floor2' };
 const CLIP_HEIGHT = 1.35;   // dukkehus-snitt over gulv i interiør-modus
+// Generiske BIM-møbler skjules i rom som er modellert fra rombilder (house3dInteriors.js).
+const FURNITURE_MASKS = bimFurnitureMasks(ALL_ROOMS);
+const _box = new THREE.Box3(), _center = new THREE.Vector3();
 
 /** Deler GLB-scenen i grupper (basement/floor1/floor2/roof/site) én gang. */
 function useBimGroups() {
@@ -454,7 +459,7 @@ function doorIdOf(obj) {
   return null;
 }
 
-function BimGroup({ items, offsetY = 0, clipY = null, interior, onPick, onDoor, dim = 1, doorIndex, registry }) {
+function BimGroup({ items, offsetY = 0, clipY = null, interior, onPick, onDoor, dim = 1, doorIndex, registry, masks = null }) {
   const group = useMemo(() => {
     const g = new THREE.Group();
     const plane = clipY == null ? null : new THREE.Plane(new THREE.Vector3(0, -1, 0), clipY);
@@ -462,6 +467,10 @@ function BimGroup({ items, offsetY = 0, clipY = null, interior, onPick, onDoor, 
     for (const { mesh, type, gid, mi } of items) {
       // I interiør skjules tak/dekker over snittet og terreng; gulvplater tegnes av rommene
       if (interior && (type === 'IfcSlab' || type === 'IfcRoof' || type === 'IfcCovering')) continue;
+      if (masks && type === 'IfcFurnishingElement') {
+        _box.setFromObject(mesh).getCenter(_center);
+        if (masks.some(([x0, z0, x1, z1]) => _center.x >= x0 && _center.x <= x1 && _center.z >= z0 && _center.z <= z1)) continue;
+      }
       const m = mesh.clone();
       m.matrix.copy(mesh.matrixWorld);
       m.matrix.decompose(m.position, m.quaternion, m.scale);
@@ -505,7 +514,7 @@ function BimGroup({ items, offsetY = 0, clipY = null, interior, onPick, onDoor, 
     }
     g.userData.doorPivots = pivots;
     return g;
-  }, [items, clipY, interior, dim, doorIndex]);
+  }, [items, clipY, interior, dim, doorIndex, masks]);
 
   useEffect(() => {
     if (!registry) return undefined;
@@ -557,7 +566,7 @@ function BimModel({ mode, visibleFloors, floorY, onPick, onDoor, doorIndex, regi
         return (
           <BimGroup
             key={floor.id} items={items} offsetY={y - floor.level} clipY={y + CLIP_HEIGHT} interior
-            onDoor={onDoor} doorIndex={doorIndex} registry={registry}
+            onDoor={onDoor} doorIndex={doorIndex} registry={registry} masks={FURNITURE_MASKS[floor.id] || null}
           />
         );
       })}
@@ -1026,6 +1035,11 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                     .map(l => ({ ...l, y: floorY(l.floorId) + (mode === 'interior' ? Math.min(l.ceiling - 0.1, CLIP_HEIGHT + 0.6) : l.ceiling - 0.1) }))}
                 />
               )}
+              {mode === 'interior' && visibleFloors.flatMap(floor => floor.rooms.filter(r => INTERIORS[r.id]).map(room => (
+                <group key={`int-${room.id}`} position={[0, floorY(floor.id), 0]}>
+                  <RoomInterior roomId={room.id} clipY={floorY(floor.id) + CLIP_HEIGHT} overlay={overlay} />
+                </group>
+              )))}
               {mode === 'interior' && overlay !== 'temp' && overlay !== 'security' && visibleFloors.flatMap(floor =>
                 floor.rooms.filter(r => !r.outdoor).map(room => {
                   const st = roomData.byRoom[room.id].stats;
