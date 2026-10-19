@@ -33,7 +33,7 @@ export function accessControl(req, res, next) {
   if (attempts.size > 10000 || ++bucket.count > limit) return res.status(429).json({error:'For mange forespørsler'});
   attempts.set(bucketKey,bucket);
   if (!['GET','HEAD'].includes(req.method) && !(req.method === 'POST' && req.path === '/logout')) {
-    const required = /^\/(homey|chat)\//.test(req.path) || /^\/avvik(\/|$)/.test(req.path) || /^\/experience\/scenes\/[^/]+\/(run|undo)$/.test(req.path) ? 'operator' : 'admin';
+    const required = /^\/(homey|chat)\//.test(req.path) || /^\/(avvik|huset)(\/|$)/.test(req.path) || /^\/experience\/scenes\/[^/]+\/(run|undo)$/.test(req.path) ? 'operator' : 'admin';
     if (role === 'viewer' || (required === 'admin' && role !== 'admin')) return res.status(403).json({error:'Mangler rettighet'});
   }
   req.user = { role, method: session ? 'google' : demo ? 'demo' : 'bearer', ...(session ? { csrfToken: session.csrfToken } : {}) };

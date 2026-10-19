@@ -24,10 +24,16 @@ export function parseAvvik(body, now = new Date()) {
   if (!CATEGORIES.includes(kategori)) throw new Error('Ukjent kategori');
   if (!beskrivelse) throw new Error('Skriv hva som skjedde');
   if (beskrivelse.length > MAX_TEXT) throw new Error(`Beskrivelsen kan være maks ${MAX_TEXT} tegn`);
-  return { id: randomUUID(), person, registrertAv, kategori, beskrivelse, opprettet: now.toISOString(), status: 'apen', lost: null };
+  const forslag = text(body?.forslag);
+  if (forslag.length > MAX_TEXT) throw new Error(`Forslaget kan være maks ${MAX_TEXT} tegn`);
+  const regelId = typeof body?.regelId === 'string' && /^[\w-]{1,100}$/.test(body.regelId) ? body.regelId : null;
+  return { id: randomUUID(), person, registrertAv, kategori, beskrivelse, forslag, regelId, opprettet: now.toISOString(), status: 'apen', lost: null };
 }
 
-export function createAvvikRoutes({ read = () => getNamespace(NS), update = fn => updateNamespace(NS, fn), clock = () => new Date() } = {}) {
+// A suggestion can be proposed as a new house rule; it lands as 'forslag' until someone approves it.
+const proposeToRules = rule => updateNamespace('_husregler', prev => [rule, ...list(prev)].slice(0, 1000));
+
+export function createAvvikRoutes({ read = () => getNamespace(NS), update = fn => updateNamespace(NS, fn), proposeRule = proposeToRules, clock = () => new Date() } = {}) {
   const r = Router();
   const payload = items => ({ items: list(items), residents: RESIDENTS, categories: CATEGORIES });
 
@@ -45,7 +51,12 @@ export function createAvvikRoutes({ read = () => getNamespace(NS), update = fn =
         if (list(prev).length >= MAX_ITEMS) throw new Error('full');
         return [item, ...list(prev)];
       });
-      res.status(201).json({ item, ...payload(items) });
+      let rule = null;
+      if (req.body?.foreslaRegel === true && item.forslag) {
+        rule = { id: randomUUID(), tekst: item.forslag, kategori: item.kategori, status: 'forslag', av: item.registrertAv, opprettet: item.opprettet, fraAvvik: item.id };
+        await proposeRule(rule).catch(() => { rule = null; });
+      }
+      res.status(201).json({ item, rule, ...payload(items) });
     } catch { res.status(503).json({ error: 'Avviket kunne ikke lagres' }); }
   });
 

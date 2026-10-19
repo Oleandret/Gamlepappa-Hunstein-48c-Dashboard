@@ -2,7 +2,7 @@ import {SectionBoundary} from './components/SectionBoundary.jsx';
 import {PlanHouseView} from './components/views/PlanHouseView.jsx';
 import {HistoryView} from './components/views/HistoryView.jsx';
 import {NetworkView} from './components/views/NetworkView.jsx';
-import {AvvikView} from './components/views/AvvikView.jsx';
+import {HusetView} from './components/huset/HusetView.jsx';
 import { ExperienceView } from './components/views/ExperienceView.jsx';
 import { VoiceAssistant } from './components/VoiceAssistant.jsx';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -268,7 +268,7 @@ export default function App() {
 function SectionView({ onOpen3D, focusZoneId, section, system, data, counts, setCapability, runFlow, favorites, pinConfig, imageConfig, frontSensors, flowFavorites, links, floorPlanPins, planFlows, frontSpecials }) {
   if (section === 'historikk') return <HistoryView/>;
   if (section === 'nettverk') return <NetworkView />;
-  if (section === 'avvik') return <AvvikView />;
+  if (section === 'huset') return <HusetView />;
   if (section === 'huspuls') return <ExperienceView devices={data.devices || {}} />;
   const userName = system?.user || 'Ole';
   const greetingPanel = (

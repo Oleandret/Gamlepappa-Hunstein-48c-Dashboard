@@ -166,3 +166,5 @@ body{background:#0b1119;color:#e8eef6;font-size:14px;line-height:1.5}
 .avvik-mobile .avvik-chip{padding:.6rem 1rem;font-size:.95rem}
 .avvik-mobile .avvik-submit{width:100%;padding:.9rem 1rem;font-size:.85rem}
 .avvik-mobile textarea,.avvik-mobile select{font-size:16px}
+.avvik-mobile .huset-tab{padding:.65rem 1rem;font-size:.95rem}
+.avvik-mobile input:not([type=checkbox]){font-size:16px}

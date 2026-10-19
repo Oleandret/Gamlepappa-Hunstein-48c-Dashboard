@@ -1,7 +1,7 @@
 import { useNow, formatTime, formatDateLong } from '../lib/useNow.js';
 import { SECTIONS } from '../lib/sections.js';
 import { AIConnection } from './AIConnection.jsx';
-const descriptions={oversikt:'Huset, hytta og det som trenger oppmerksomhet.',stromsparing:'Forstå forbruket. Vurder tiltak før du automatiserer.',varmestyring:'Temperaturer og drift, med kilden bak hvert tall.',historikk:'Se utviklingen i målingene dine.',rom:'Et tydelig overblikk, rom for rom.',enheter:'Finn enheten, målepunktet og kildetiden.', 'plantegning-hus':'Utforsk rom, plasseringer og enheter.', 'hus-3d':'Huset i tre dimensjoner.',huspuls:'Observasjoner, avvik og forslag du kan vurdere.',avvik:'Små ting vi kan gjøre bedre, så det blir godt å bo her.'};
+const descriptions={oversikt:'Huset, hytta og det som trenger oppmerksomhet.',stromsparing:'Forstå forbruket. Vurder tiltak før du automatiserer.',varmestyring:'Temperaturer og drift, med kilden bak hvert tall.',historikk:'Se utviklingen i målingene dine.',rom:'Et tydelig overblikk, rom for rom.',enheter:'Finn enheten, målepunktet og kildetiden.', 'plantegning-hus':'Utforsk rom, plasseringer og enheter.', 'hus-3d':'Huset i tre dimensjoner.',huspuls:'Observasjoner, avvik og forslag du kan vurdere.',huset:'Avvik, gjøremål og husregler, så det blir godt å bo her.'};
 export function TopBar({section,onSection,system}){
  const now=useNow(1000),current=SECTIONS.find(s=>s.id===section);
  return <header className="dashboard-topbar">

@@ -22,7 +22,7 @@ export const SECTIONS = [
   { id: 'chat',              label: 'AI-chat',         Icon: MessageSquare },
   { id: 'favoritter',        label: 'Favoritter',      Icon: Star },
   { id: 'lenker',            label: 'Lenker',          Icon: Bookmark },
-  { id: 'avvik',             label: 'Avvik',           Icon: HeartHandshake },
+  { id: 'huset',             label: 'Huset',           Icon: HeartHandshake },
   { id: 'vedlikehold',       label: 'Vedlikehold',     Icon: Wrench },
   { id: 'innsikt',           label: 'Innsikt',         Icon: Activity },
   { id: 'ai-flows',          label: 'AI-flows',        Icon: Sparkles },
