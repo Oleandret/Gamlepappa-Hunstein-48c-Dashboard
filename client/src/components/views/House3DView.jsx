@@ -4,7 +4,7 @@ import { OrbitControls, Html, Edges, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import {
   Box, Layers, Lightbulb, Thermometer, ShieldAlert, Home as HomeIcon, Edit2,
-  RotateCw, Power, ChevronRight, X, Move3d, Activity, DoorOpen, Lock, Unlock
+  RotateCw, Power, ChevronRight, X, Move3d, Activity, DoorOpen, Lock, Unlock, Maximize2, Minimize2
 } from 'lucide-react';
 import { FLOORS, ALL_ROOMS, roomPoly, roomCenter, roomArea, planPctToWorld, BIM_MODEL_URL } from '../../lib/house3dModel.js';
 import { capValue, hasCap } from '../../lib/deviceUtils.js';
@@ -741,7 +741,33 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
   const [hoveredRoomId, setHoveredRoomId] = useState(null);
   const [selectedMarkerId, setSelectedMarkerId] = useState(null);
   const [editing, setEditing] = useState(false);
-  const [autoRotate, setAutoRotate] = useState(false);
+  // Rotasjon og fart huskes per enhet, så fullskjerm på f.eks. et nettbrett kan stå og rotere.
+  const [autoRotate, setAutoRotate] = useState(() => { try { return localStorage.getItem('nexora.house3d.rotate') === '1'; } catch { return false; } });
+  const [rotateSpeed, setRotateSpeed] = useState(() => { try { return Number(localStorage.getItem('nexora.house3d.rotateSpeed')) || 0.6; } catch { return 0.6; } });
+  useEffect(() => { try { localStorage.setItem('nexora.house3d.rotate', autoRotate ? '1' : '0'); localStorage.setItem('nexora.house3d.rotateSpeed', String(rotateSpeed)); } catch {} }, [autoRotate, rotateSpeed]);
+  // Fullskjerm: ekte Fullscreen API der det finnes, ellers (iPhone) et skjermfyllende lag.
+  const stageRef = useRef(null);
+  const [nativeFs, setNativeFs] = useState(false);
+  const [overlayFs, setOverlayFs] = useState(false);
+  const fullscreen = nativeFs || overlayFs;
+  useEffect(() => {
+    const sync = () => setNativeFs(Boolean(document.fullscreenElement || document.webkitFullscreenElement) && (document.fullscreenElement || document.webkitFullscreenElement) === stageRef.current);
+    document.addEventListener('fullscreenchange', sync); document.addEventListener('webkitfullscreenchange', sync);
+    return () => { document.removeEventListener('fullscreenchange', sync); document.removeEventListener('webkitfullscreenchange', sync); };
+  }, []);
+  useEffect(() => {
+    if (!overlayFs) return;
+    const onKey = e => { if (e.key === 'Escape') setOverlayFs(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [overlayFs]);
+  async function toggleFullscreen() {
+    if (overlayFs) return setOverlayFs(false);
+    if (document.fullscreenElement || document.webkitFullscreenElement) return (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    const el = stageRef.current, request = el?.requestFullscreen || el?.webkitRequestFullscreen;
+    if (!request) return setOverlayFs(true);
+    try { await request.call(el); } catch { setOverlayFs(true); }
+  }
   const [flyTo, setFlyTo] = useState(null);
   const [bimOn, setBimOn] = useState(true);
   const [bimFailed, setBimFailed] = useState(false);
@@ -952,8 +978,9 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
 
       <div className="flex flex-col xl:flex-row gap-3 items-stretch">
         <div
-          className="relative flex-1 min-w-0 overflow-hidden rounded-xl border border-nx-line/60 bg-nx-bg"
-          style={{ height: 'calc(100vh - 300px)', minHeight: 480, maxHeight: 900 }}
+          ref={stageRef}
+          className={fullscreen ? `${overlayFs ? 'fixed inset-0' : 'relative'} overflow-hidden bg-nx-bg` : 'relative flex-1 min-w-0 overflow-hidden rounded-xl border border-nx-line/60 bg-nx-bg'}
+          style={fullscreen ? { width: '100vw', height: overlayFs ? '100dvh' : '100vh', ...(overlayFs ? { zIndex: 2147483000 } : {}) } : { height: 'calc(100vh - 300px)', minHeight: 480, maxHeight: 900 }}
         >
           <Canvas
             shadows
@@ -1064,7 +1091,7 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
               minDistance={4}
               maxDistance={90}
               autoRotate={autoRotate}
-              autoRotateSpeed={0.6}
+              autoRotateSpeed={rotateSpeed}
             />
             <CameraRig flyTo={flyTo} controlsRef={controlsRef} />
           </Canvas>
@@ -1087,6 +1114,20 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                   autoRotate ? 'border-nx-cyan/60 bg-nx-cyan/15 text-nx-cyan' : 'border-nx-line/70 bg-nx-bg/70 text-nx-mute hover:text-nx-cyan'
                 ].join(' ')}
               ><RotateCw size={10} /> Roter</button>
+              {autoRotate && [[0.3, 'Sakte'], [0.6, 'Normal'], [1.5, 'Rask']].map(([v, label]) => (
+                <button key={v} onClick={() => setRotateSpeed(v)} aria-pressed={rotateSpeed === v}
+                  className={['rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em] backdrop-blur', rotateSpeed === v ? 'border-nx-cyan/60 bg-nx-cyan/15 text-nx-cyan' : 'border-nx-line/70 bg-nx-bg/70 text-nx-mute hover:text-nx-cyan'].join(' ')}
+                >{label}</button>
+              ))}
+              <button
+                onClick={toggleFullscreen}
+                aria-pressed={fullscreen}
+                aria-label={fullscreen ? 'Avslutt fullskjerm' : 'Vis 3D-modellen i fullskjerm'}
+                className={[
+                  'inline-flex items-center gap-1 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em] backdrop-blur',
+                  fullscreen ? 'border-nx-cyan/60 bg-nx-cyan/15 text-nx-cyan' : 'border-nx-line/70 bg-nx-bg/70 text-nx-mute hover:text-nx-cyan'
+                ].join(' ')}
+              >{fullscreen ? <Minimize2 size={10} /> : <Maximize2 size={10} />} {fullscreen ? 'Lukk fullskjerm' : 'Fullskjerm'}</button>
             </div>
             {mode === 'interior' && (
               <label className="pointer-events-auto flex items-center gap-2 rounded border border-nx-line/70 bg-nx-bg/70 px-2 py-1 backdrop-blur">
@@ -1105,7 +1146,7 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
           {overlay === 'temp' && <TempLegend />}
 
           <p className="pointer-events-none absolute bottom-2 left-2 font-mono text-[10px] text-nx-mute/80">
-            Dra for å rotere · scroll for zoom · høyreklikk for å flytte · klikk et rom for å styre det
+            {fullscreen ? 'Esc eller «Lukk fullskjerm» for å gå tilbake · dra for å rotere · scroll for zoom' : 'Dra for å rotere · scroll for zoom · høyreklikk for å flytte · klikk et rom for å styre det'}
           </p>
         </div>
 
