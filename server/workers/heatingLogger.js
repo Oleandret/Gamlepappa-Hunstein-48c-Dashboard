@@ -2,9 +2,10 @@ import path from 'node:path';
 import {createHeatingHistory} from '../lib/heatingHistory.js';
 import {myuplinkConfig,myuplinkOAuth} from '../lib/myuplinkOAuth.js';
 import {connectedRead} from '../routes/heating.js';
+import {settingsLog} from '../lib/heatingControl.js';
 const INTERVAL=15*60*1000;
 let timer, running=false, stopped=true;
-export const heatingLogStatus={enabled:false,intervalMs:INTERVAL,retentionDays:30,maxBytes:64*1024*1024,last:null,error:null};
+export const heatingLogStatus={enabled:false,intervalMs:INTERVAL,retentionDays:30,maxBytes:64*1024*1024,last:null,error:null,settings:null,settingsError:null};
 export function startHeatingLogger() {
   if(!stopped)return;
   const cfg=myuplinkConfig();if(!cfg)return;
@@ -16,7 +17,7 @@ export function startHeatingLogger() {
       const before=await myuplinkOAuth.record();
       if(before?.deviceId) {
         const sample=await connectedRead(),after=await myuplinkOAuth.record();
-        if(after?.deviceId===before.deviceId&&after?.systemId===before.systemId)heatingLogStatus.last=await history.append(sample,{deviceId:before.deviceId,systemId:before.systemId});
+        if(after?.deviceId===before.deviceId&&after?.systemId===before.systemId){const identity={deviceId:before.deviceId,systemId:before.systemId};heatingLogStatus.last=await history.append(sample,identity);heatingLogStatus.settingsError=null;heatingLogStatus.settings=await settingsLog()?.record(sample,identity).catch(()=>{heatingLogStatus.settingsError='Dagens innstillinger kunne ikke lagres';console.warn('[heating-settings] storage unavailable');return null;});}
       }
       heatingLogStatus.error=null;
     }catch{heatingLogStatus.error='Historikk kunne ikke lagres; kontroller disk og tilgang';console.warn('[heating-history] read or storage unavailable');}

@@ -16,14 +16,17 @@ export function myuplinkConfig(env=process.env) {
   try {
     const origin = new URL(env.AUTH_PUBLIC_ORIGIN);
     if (origin.protocol !== 'https:' || origin.origin !== env.AUTH_PUBLIC_ORIGIN || !env.MYUPLINK_CLIENT_ID || !env.MYUPLINK_CLIENT_SECRET || !/^[a-f0-9]{64}$/i.test(env.MYUPLINK_TOKEN_KEY || '') || !path.isAbsolute(env.MYUPLINK_TOKEN_FILE || '')) return null;
-    return { origin: origin.origin, redirectUri: `${origin.origin}/auth/myuplink/callback`, clientId: env.MYUPLINK_CLIENT_ID, clientSecret: env.MYUPLINK_CLIENT_SECRET, key: env.MYUPLINK_TOKEN_KEY, file: env.MYUPLINK_TOKEN_FILE, offline: env.MYUPLINK_OFFLINE_ACCESS_APPROVED === 'true' };
+    return { origin: origin.origin, redirectUri: `${origin.origin}/auth/myuplink/callback`, clientId: env.MYUPLINK_CLIENT_ID, clientSecret: env.MYUPLINK_CLIENT_SECRET, key: env.MYUPLINK_TOKEN_KEY, file: env.MYUPLINK_TOKEN_FILE, offline: env.MYUPLINK_OFFLINE_ACCESS_APPROVED === 'true', write: env.MYUPLINK_WRITE_APPROVED === 'true' };
   } catch { return null; }
 }
-export function validReadScope(scope, offline=false) {
+// WRITESYSTEM is accepted only when the owner has separately approved write access (MYUPLINK_WRITE_APPROVED).
+export function validReadScope(scope, offline=false, write=false) {
   if (typeof scope !== 'string') return false;
   const scopes = scope.trim().split(/\s+/);
-  return scopes.includes('READSYSTEM') && scopes.every(s => s === 'READSYSTEM' || (offline && s === 'offline_access')) && new Set(scopes).size === scopes.length;
+  return scopes.includes('READSYSTEM') && scopes.every(s => s === 'READSYSTEM' || (offline && s === 'offline_access') || (write && s === 'WRITESYSTEM')) && new Set(scopes).size === scopes.length;
 }
+export const hasWriteScope = scope => typeof scope === 'string' && scope.trim().split(/\s+/).includes('WRITESYSTEM');
+const requestedScope = cfg => ['READSYSTEM', ...(cfg.write ? ['WRITESYSTEM'] : []), ...(cfg.offline ? ['offline_access'] : [])].join(' ');
 
 // Constructing a store has no filesystem effects. AES-GCM authenticates configuration binding.
 export function encryptedTokenStore(cfg) {
@@ -64,7 +67,7 @@ export function createMyUplinkOAuth({config=()=>myuplinkConfig(), session=req=>g
   const callback=Router();
   function configured() { const cfg=config(); if(!cfg) return null; if(!store || storeConfig!==JSON.stringify(cfg)){store=storeFactory(cfg);storeConfig=JSON.stringify(cfg);} return cfg; }
   function owner(req,write=false) { const s=req.headers.authorization===undefined?session(req):null; if(!s || s.role!=='admin' || !s.sub || !s.csrfToken || (write && !csrfValid(req,s)))throw safeError(403);return s; }
-  async function record() { const cfg=configured(); if(!cfg)return null;const r=await store.load();if(!r)return null;if(!validReadScope(r.scope,cfg.offline) || typeof r.accessToken!=='string' || !Number.isFinite(r.expiresAt) || typeof r.owner!=='string')throw safeError(503);return r; }
+  async function record() { const cfg=configured(); if(!cfg)return null;const r=await store.load();if(!r)return null;if(!validReadScope(r.scope,cfg.offline,cfg.write) || typeof r.accessToken!=='string' || !Number.isFinite(r.expiresAt) || typeof r.owner!=='string')throw safeError(503);return r; }
   async function tokenRequest(cfg, fields, previous) {
     let response;
     try { response=await fetchImpl('https://api.myuplink.com/oauth/token',{method:'POST',redirect:'error',signal:AbortSignal.timeout(10000),headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({...fields,client_id:cfg.clientId,client_secret:cfg.clientSecret})}); } catch {retryAt=now()+60000;throw safeError(503);}
@@ -75,7 +78,7 @@ export function createMyUplinkOAuth({config=()=>myuplinkConfig(), session=req=>g
       retryAt=now()+Math.max(60000,Number.isFinite(delay)?Math.min(delay,3600000):0);throw safeError(503);
     }
     const scope=typeof body.scope==='string'?body.scope:previous?.scope;
-    if(!validReadScope(scope,cfg.offline) || !/^Bearer$/i.test(body.token_type||'') || typeof body.access_token!=='string' || !body.access_token || body.access_token.length>16000 || !Number.isFinite(body.expires_in) || body.expires_in<60 || body.expires_in>86400 || (body.refresh_token!=null && (typeof body.refresh_token!=='string' || body.refresh_token.length>16000)) || (!cfg.offline && body.refresh_token) || (cfg.offline && !body.refresh_token && !previous?.refreshToken))throw safeError();
+    if(!validReadScope(scope,cfg.offline,cfg.write) || !/^Bearer$/i.test(body.token_type||'') || typeof body.access_token!=='string' || !body.access_token || body.access_token.length>16000 || !Number.isFinite(body.expires_in) || body.expires_in<60 || body.expires_in>86400 || (body.refresh_token!=null && (typeof body.refresh_token!=='string' || body.refresh_token.length>16000)) || (!cfg.offline && body.refresh_token) || (cfg.offline && !body.refresh_token && !previous?.refreshToken))throw safeError();
     retryAt=0;
     return {accessToken:body.access_token,scope,expiresAt:now()+body.expires_in*1000,refreshToken:cfg.offline?(body.refresh_token||previous?.refreshToken||null):null};
   }
@@ -88,7 +91,7 @@ export function createMyUplinkOAuth({config=()=>myuplinkConfig(), session=req=>g
   }
   async function status() {
     const cfg=configured();if(!cfg)return {configured:false,connected:false,selected:false,reason:'myUplink er ikke konfigurert. Eier må godkjenne lesetilgang og serveroppsett.'};
-    try {const r=await record();return {configured:true,connected:Boolean(r),selected:Boolean(r?.deviceId&&r?.systemId),offline:cfg.offline,reauthorizationRequired:Boolean(r && r.expiresAt<=now()+60000 && (!cfg.offline||!r.refreshToken)),reason:r?'Lesetilgang lagret':'Klar for eierens myUplink-innlogging'};}
+    try {const r=await record();return {configured:true,connected:Boolean(r),selected:Boolean(r?.deviceId&&r?.systemId),offline:cfg.offline,writeApproved:cfg.write,writeGranted:Boolean(cfg.write&&hasWriteScope(r?.scope)),reauthorizationRequired:Boolean(r && r.expiresAt<=now()+60000 && (!cfg.offline||!r.refreshToken)),reason:r?'Lesetilgang lagret':'Klar for eierens myUplink-innlogging'};}
     catch{return {configured:true,connected:false,selected:false,reason:'Tokenlageret kan ikke leses. Kontroller serveroppsettet.'};}
   }
   async function start(req,res) {
@@ -97,7 +100,7 @@ export function createMyUplinkOAuth({config=()=>myuplinkConfig(), session=req=>g
     if(attempts.size>=100)throw safeError(429);
     const binding=hash(s.csrfToken);for(const [k,v]of attempts)if(v.binding===binding)attempts.delete(k);
     const state=random(), verifier=random(), browserBinding=random();res.cookie(COOKIE,browserBinding,{...cookieOptions,maxAge:600000});attempts.set(hash(state),{binding,browserBinding:hash(browserBinding),owner:s.sub,verifier,expires:now()+600000,epoch,config:hash(storeConfig)});
-    const url=new URL('https://api.myuplink.com/oauth/authorize');url.search=new URLSearchParams({client_id:cfg.clientId,redirect_uri:cfg.redirectUri,response_type:'code',scope:cfg.offline?'READSYSTEM offline_access':'READSYSTEM',state,code_challenge:hash(verifier),code_challenge_method:'S256'});
+    const url=new URL('https://api.myuplink.com/oauth/authorize');url.search=new URLSearchParams({client_id:cfg.clientId,redirect_uri:cfg.redirectUri,response_type:'code',scope:requestedScope(cfg),state,code_challenge:hash(verifier),code_challenge_method:'S256'});
     return {url:url.href};
   }
   callback.use((_req,res,next)=>{res.set({'Cache-Control':'no-store','Referrer-Policy':'no-referrer'});next();});
@@ -126,6 +129,6 @@ export function createMyUplinkOAuth({config=()=>myuplinkConfig(), session=req=>g
   }
   async function select(req) {owner(req,true);const found=(await systems(req)).find(x=>x.systemId===req.body?.systemId&&x.deviceId===req.body?.deviceId);if(!found)throw safeError();const before=epoch,r=await record();if(!r)throw safeError(409);await commit({...r,systemId:found.systemId,deviceId:found.deviceId},before);return {ok:true};}
   async function disconnect(req) {owner(req,true);if(!configured())throw safeError(503);epoch++;attempts.clear();await pendingRefresh?.catch(()=>{});await commit(null,epoch);return {ok:true};}
-  return {callback,start,status,accessToken,systems,select,disconnect,record,revision:()=>epoch};
+  return {callback,start,status,accessToken,systems,select,disconnect,record,owner,revision:()=>epoch};
 }
 export const myuplinkOAuth=createMyUplinkOAuth();

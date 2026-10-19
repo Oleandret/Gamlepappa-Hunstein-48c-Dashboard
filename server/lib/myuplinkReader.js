@@ -9,7 +9,7 @@ const NOTIFICATIONS_URL = id => `https://api.myuplink.com/v2/systems/${encodeURI
 
 // Allowlist from the verified public-v2 ParameterData contract. The raw response may
 // carry more; only these cross the boundary, and `timestamp` stays exactly as sent.
-const POINT_FIELDS = ['category', 'parameterId', 'parameterName', 'parameterUnit', 'timestamp', 'value', 'strVal', 'smartHomeCategories', 'writable'];
+const POINT_FIELDS = ['category', 'parameterId', 'parameterName', 'parameterUnit', 'timestamp', 'value', 'strVal', 'smartHomeCategories', 'writable', 'minValue', 'maxValue', 'stepValue'];
 
 const trimmed = value => (typeof value === 'string' ? value.trim() : '');
 const authError = message => Object.assign(new Error(message), { myUplinkAuth: true });
@@ -24,6 +24,8 @@ function pickPoint(point) {
   }
   const match=Array.isArray(point.enumValues)?point.enumValues.find(e=>String(e.value)===String(point.value)&&typeof e.text==='string'):null;
   if(match)picked.enumLabel=match.text.slice(0,1000);
+  // Enum choices are kept only for writable points: they are the allowlist for setting changes.
+  if(point.writable===true&&Array.isArray(point.enumValues))picked.enumValues=point.enumValues.filter(e=>e&&['string','number'].includes(typeof e.value)&&typeof e.text==='string').slice(0,100).map(e=>({value:String(e.value).slice(0,100),text:e.text.slice(0,200)}));
   return picked;
 }
 
@@ -42,7 +44,7 @@ function unavailableAlarms(reason) {
   return { available: false, count: null, reason };
 }
 
-export function createMyUplinkReader({ enabled = false, allowOffline = false, deviceId = '', systemId = '', getAccessToken, fetchImpl = fetch, now = Date.now } = {}) {
+export function createMyUplinkReader({ enabled = false, allowOffline = false, allowWrite = false, deviceId = '', systemId = '', getAccessToken, fetchImpl = fetch, now = Date.now } = {}) {
   const device = trimmed(deviceId);
   const system = trimmed(systemId);
   let lastReason = null;
@@ -52,7 +54,7 @@ export function createMyUplinkReader({ enabled = false, allowOffline = false, de
     const granted = await getAccessToken();
     const token = trimmed(granted?.accessToken);
     if (!token) throw authError('myUplink mangler et gyldig tilgangstoken');
-    if (!validReadScope(granted?.scope, allowOffline)) {
+    if (!validReadScope(granted?.scope, allowOffline, allowWrite)) {
       throw authError('myUplink-tokenet må ha godkjent lesescope');
     }
     return { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Accept-Language': 'en-US' };

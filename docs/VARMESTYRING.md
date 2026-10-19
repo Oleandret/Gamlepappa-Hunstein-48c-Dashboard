@@ -1,6 +1,6 @@
 # Varmestyring og myUplink-lesekobling
 
-Varmestyring viser faktisk eksponerte målepunkter for brukerens NIBE F1255-12 R EM. Manglende, foreldet og ukjent måletid skilles fra ferske målinger. Hentetid erstatter aldri måletid. EM betyr avgitt varme, ikke elektrisk forbruk; ingen COP eller besparelse beregnes uten verifiserte grunnlagsmålinger. Ingen fysisk styring er implementert.
+Varmestyring viser faktisk eksponerte målepunkter for brukerens NIBE F1255-12 R EM. Manglende, foreldet og ukjent måletid skilles fra ferske målinger. Hentetid erstatter aldri måletid. EM betyr avgitt varme, ikke elektrisk forbruk; ingen COP eller besparelse beregnes uten verifiserte grunnlagsmålinger. Endring av innstillinger er mulig bare når skrivetilgang er godkjent (se «Skrivetilgang og innstillingslogg»).
 
 ## Implementert tilkoblingsflyt
 
@@ -32,6 +32,7 @@ Etter godkjenning legges følgende direkte i Railway-tjenestens beskyttede serve
 | `MYUPLINK_TOKEN_KEY` | Separat 32-byte nøkkel kodet som 64 heksadesimale tegn; må opprettes først etter godkjenning |
 | `MYUPLINK_TOKEN_FILE` | Absolutt sti på eksisterende privat persistent volum, i egen privat katalog med 0700, for eksempel `/data/myuplink/tokens.json` bare dersom `/data` er verifisert mount |
 | `MYUPLINK_OFFLINE_ACCESS_APPROVED` | `true` bare etter særskilt godkjent offline_access, ellers utelatt/false |
+| `MYUPLINK_WRITE_APPROVED` | `true` for å be om og godta `WRITESYSTEM`; ellers kun lesing. Krever ny tilkobling etter at den slås på |
 | `AUTH_PUBLIC_ORIGIN` | Eksisterende HTTPS-origin for dashboardet, uten avsluttende skråstrek |
 
 Tokens lagres AES-256-GCM-kryptert med tilfeldig IV, autentisert klient/callback-binding, 0600, atomisk rename og fsync. Ingen automatisk nøkkelgenerering eller ukryptert fallback. Privat katalog og ingen symlink kreves. Korrupsjon eller feil nøkkel gir utilgjengelig lager, ikke stille overskriving. Behold nøkkelen sikkert; nøkkelbytte krever kontrollert migrering eller ny tilkobling.
@@ -47,3 +48,16 @@ https://api.myuplink.com/swagger/index.html beskriver READSYSTEM, ParameterData,
 Mac i stuen bidro med den første leseadapteren/målemodellen og uavhengig sikkerhetsreview av OAuth-plan og kode. Koordinator integrerte, testet og verifiserte. Tester og skjermbilder i `docs/verification` bruker isolerte mocks. Ekte myUplink-grant er ikke utført eller end-to-end-testet.
 
 Mac-agentens avsluttende review fant ingen blokkere. To små forbedringer ble tatt inn etter review: manglende tokenpost ved enhetsvalg avvises, og provider-backoff gjelder også nye innloggingsforsøk. Gjentatt samtidig frakobling kan gi én klient en generell feil selv om lokal tilgang allerede er fjernet; dette gjenoppretter ingen tilgang.
+
+
+## Skrivetilgang og innstillingslogg
+
+Slås på med `MYUPLINK_WRITE_APPROVED=true`. Da ber tilkoblingen om `WRITESYSTEM` i tillegg til `READSYSTEM`, og eier må koble til myUplink på nytt. Uten flagget avvises tokens med `WRITESYSTEM` som før.
+
+- **Endring:** `POST /api/heating/settings` med `{changes:{parameterId:verdi}}`. Krever eierens Google-økt og CSRF. Serveren leser varmepumpen på nytt, godtar bare punkter med `writable: true`, og kontrollerer verdien mot punktets egne `minValue`/`maxValue`/`stepValue` eller `enumValues`. Tall uten oppgitte grenser endres ikke. Maks 20 endringer per forespørsel, én om gangen. Endringen sendes med `PATCH /v2/devices/{deviceId}/points` (fast adresse), og hver verdi bekreftes med en ny lesing etter noen sekunder.
+- **Daglig logg:** Loggeren (hvert 15. minutt) lagrer alle skrivbare innstillinger i `heating-settings/settings-ÅÅÅÅ-MM-DD.json` ved siden av tokenkatalogen. Dagens fil skrives bare om når noe er endret, så den viser hvordan varmepumpen var stilt inn ved siste lesing den dagen. Filene beholdes i 800 dager.
+- **Gjenoppretting:** `GET /api/heating/settings/history/:dato` viser hva som er annerledes nå. `POST /api/heating/settings/restore` med `{date, parameterIds}` skriver tilbake de valgte verdiene, gjennom samme kontroll som en manuell endring.
+- **Endringslogg:** Alle forsøk, også avviste og feilede, legges til i `heating-settings/changes.jsonl` (`GET /api/heating/settings/changes`).
+- `writer.apply(changes, {source})` i `server/lib/heatingControl.js` er inngangen for fremtidig automatikk; ingen automatikk bruker den i dag.
+
+myUplink kan kreve et betalt abonnement (Premium) for å endre innstillinger via API. HTTP 403 ved endring vises som «myUplink nektet endringen». Ekte skriving mot varmepumpen er ikke testet ende-til-ende; tester bruker en simulert enhet.
