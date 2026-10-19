@@ -161,3 +161,8 @@ body{background:#0b1119;color:#e8eef6;font-size:14px;line-height:1.5}
 
 @media(max-width:767px){button[aria-label="Åpne aktivitetslogg"]{top:auto;bottom:16px;left:16px;border:1px solid #34465b;border-radius:10px;min-height:40px;background:#172333}}
 .dashboard-main .heating{max-width:none;padding:0}.dashboard-main .saving-card,.dashboard-main .heating-panel,.dashboard-main .heating-status,.dashboard-main .heating-cards article{background:#131d2a;border-color:#2a394b;border-radius:18px}
+
+/* Mobilsiden /avvik: store trykkflater og 16px tekst så iOS ikke zoomer inn i feltene. */
+.avvik-mobile .avvik-chip{padding:.6rem 1rem;font-size:.95rem}
+.avvik-mobile .avvik-submit{width:100%;padding:.9rem 1rem;font-size:.85rem}
+.avvik-mobile textarea,.avvik-mobile select{font-size:16px}

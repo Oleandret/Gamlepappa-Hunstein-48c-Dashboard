@@ -1,4 +1,4 @@
-import { Network, Thermometer, Home, LayoutGrid, Boxes, Workflow, Zap, ShieldCheck, Star, Settings, Music, Map, Bot, Anchor, Wrench, Bookmark, Activity, Sparkles, MessageSquare, Box } from 'lucide-react';
+import { Network, Thermometer, Home, LayoutGrid, Boxes, Workflow, Zap, ShieldCheck, Star, Settings, Music, Map, Bot, Anchor, Wrench, Bookmark, Activity, Sparkles, MessageSquare, Box, HeartHandshake } from 'lucide-react';
 
 /** Single source of truth for top-level navigation. */
 export const SECTIONS = [
@@ -22,6 +22,7 @@ export const SECTIONS = [
   { id: 'chat',              label: 'AI-chat',         Icon: MessageSquare },
   { id: 'favoritter',        label: 'Favoritter',      Icon: Star },
   { id: 'lenker',            label: 'Lenker',          Icon: Bookmark },
+  { id: 'avvik',             label: 'Avvik',           Icon: HeartHandshake },
   { id: 'vedlikehold',       label: 'Vedlikehold',     Icon: Wrench },
   { id: 'innsikt',           label: 'Innsikt',         Icon: Activity },
   { id: 'ai-flows',          label: 'AI-flows',        Icon: Sparkles },

@@ -81,6 +81,13 @@ export async function setNamespace(ns, value) {
   return value;
 }
 
+// Les-endre-skriv i samme skrivekø, så samtidige endringer ikke overskriver hverandre.
+export async function updateNamespace(ns, update) {
+  let result;
+  await mutate(all => { all[ns] = update(all[ns]); result = all[ns]; });
+  return structuredClone(result);
+}
+
 export async function deleteNamespace(ns) {
   await mutate(all => { delete all[ns]; });
 }
