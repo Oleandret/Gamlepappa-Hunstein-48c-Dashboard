@@ -26,10 +26,11 @@ async function call(path, options = {}) {
   return d;
 }
 
-export function useMe() {
+// A logged-in resident is always themselves; others pick who they are (remembered per device).
+export function useMe(locked = '') {
   const [me, setMeState] = useState(() => { try { return localStorage.getItem(ME_KEY) || ''; } catch { return ''; } });
   const setMe = useCallback(v => { setMeState(v); try { localStorage.setItem(ME_KEY, v); } catch {} }, []);
-  return [me, setMe];
+  return locked ? [locked, () => {}] : [me, setMe];
 }
 
 // Laster avvik og huset-data, og oppdaterer riktig del med svaret fra hver endring.

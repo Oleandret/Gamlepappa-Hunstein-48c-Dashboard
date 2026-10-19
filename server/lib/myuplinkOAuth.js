@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import { constants } from 'node:fs';
 import path from 'node:path';
 import { Router } from 'express';
-import { googleAuth } from './googleAuth.js';
+import { googleAuth, OWNER_EMAIL } from './googleAuth.js';
 
 const hash = s => createHash('sha256').update(s).digest('base64url');
 const COOKIE='__Host-myuplink-login';
@@ -66,7 +66,8 @@ export function createMyUplinkOAuth({config=()=>myuplinkConfig(), session=req=>g
 
   const callback=Router();
   function configured() { const cfg=config(); if(!cfg) return null; if(!store || storeConfig!==JSON.stringify(cfg)){store=storeFactory(cfg);storeConfig=JSON.stringify(cfg);} return cfg; }
-  function owner(req,write=false) { const s=req.headers.authorization===undefined?session(req):null; if(!s || s.role!=='admin' || !s.sub || !s.csrfToken || (write && !csrfValid(req,s)))throw safeError(403);return s; }
+  // Heat pump connection and settings: only the owner's own Google account, never a bearer key or resident login.
+  function owner(req,write=false) { const s=req.headers.authorization===undefined?session(req):null; if(!s || s.role!=='admin' || s.email!==OWNER_EMAIL || !s.sub || !s.csrfToken || (write && !csrfValid(req,s)))throw safeError(403);return s; }
   async function record() { const cfg=configured(); if(!cfg)return null;const r=await store.load();if(!r)return null;if(!validReadScope(r.scope,cfg.offline,cfg.write) || typeof r.accessToken!=='string' || !Number.isFinite(r.expiresAt) || typeof r.owner!=='string')throw safeError(503);return r; }
   async function tokenRequest(cfg, fields, previous) {
     let response;
