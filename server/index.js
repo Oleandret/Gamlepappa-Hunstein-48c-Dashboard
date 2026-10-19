@@ -1,6 +1,9 @@
 import {historyRoutes} from './routes/history.js';
 import {avvikRoutes} from './routes/avvik.js';
 import {husetRoutes} from './routes/huset.js';
+import {beboerRoutes} from './routes/beboere.js';
+import {residents} from './lib/residents.js';
+import {startReminderWorker,stopReminderWorker} from './lib/reminders.js';
 import {roomPhotoRoutes} from './routes/roomPhotos.js';
 import {networkRoutes} from './routes/network.js';
 import {priceRoutes} from './routes/prices.js';
@@ -60,12 +63,13 @@ app.use((req, _res, next) => {
   next();
 });
 
+app.use('/auth/beboer', residents.router);
 app.use('/auth', googleAuth.router);
 app.use('/auth/myuplink', myuplinkOAuth.callback);
 app.use('/api', (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); }, accessControl);
 app.use('/api/experience', experienceRoutes);
 app.get('/api/session', (req,res) => res.json(req.user));
-app.post('/api/logout', googleAuth.logout);
+app.post('/api/logout', async (req,res) => { if (req.user?.method === 'beboer') { await residents.logout(req,res); return res.set('Cache-Control','no-store').json({ok:true}); } return googleAuth.logout(req,res); });
 // API routes
 app.use('/api/system', systemRoutes);
 app.use('/api/homey', homeyRoutes);
@@ -76,6 +80,7 @@ app.use('/api/network',networkRoutes);
 app.use('/api/history',historyRoutes);
 app.use('/api/room-photos',roomPhotoRoutes);
 app.use('/api/avvik',avvikRoutes);
+app.use('/api/huset/admin',beboerRoutes);
 app.use('/api/huset',husetRoutes);
 app.get('/api/heating/history/status', (_req,res)=>res.json(heatingLogStatus));
 app.use('/api/heating', heatingRoutes);
@@ -157,10 +162,10 @@ const server = app.listen(PORT, async () => {
     if (!ok) return;
   }
   ready = authConfigured() || (!isProd && process.env.DEMO_MODE === 'true');
-  if(ready && !isDemoMode()) { startHeatingLogger(); startPriceLogger(); }
+  if(ready && !isDemoMode()) { startHeatingLogger(); startPriceLogger(); startReminderWorker(); }
 });
 for (const signal of ['SIGTERM','SIGINT']) process.on(signal, () => {
-  ready = false; stopDevicePoller(); stopHeatingLogger(); stopPriceLogger();
+  ready = false; stopDevicePoller(); stopHeatingLogger(); stopPriceLogger(); stopReminderWorker();
   server.close(async () => { await shutdown(); process.exit(0); });
   setTimeout(() => process.exit(1), 15000).unref();
 });

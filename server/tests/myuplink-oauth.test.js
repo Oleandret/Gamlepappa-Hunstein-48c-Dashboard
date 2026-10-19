@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createMyUplinkOAuth, encryptedTokenStore, myuplinkConfig, validReadScope} from '../lib/myuplinkOAuth.js';
 const cfg={origin:'https://dashboard.test',redirectUri:'https://dashboard.test/auth/myuplink/callback',clientId:'fixture-client',clientSecret:'fixture-secret',key:'ab'.repeat(32),file:'/unused/test.json',offline:true};
-const user={role:'admin',sub:'owner-fixture',csrfToken:'session-csrf-fixture'};
+const user={role:'admin',sub:'owner-fixture',email:'oleandretorjussen@gmail.com',csrfToken:'session-csrf-fixture'};
 const json=(body,status=200,headers={})=>new Response(JSON.stringify(body),{status,headers});
 const token=(extra={})=>({access_token:'fixture-access',refresh_token:'fixture-refresh',token_type:'Bearer',scope:'READSYSTEM offline_access',expires_in:3600,...extra});
 function harness(options={}) {
@@ -25,7 +25,7 @@ test('configuration and scopes fail closed; disabled touches neither storage nor
  const h=harness({config:()=>null,storeFactory:()=>assert.fail('no file access'),fetchImpl:()=>assert.fail('no network')});assert.equal((await h.auth.status()).configured,false);await assert.rejects(()=>h.auth.start(h.req(),{}));
 });
 test('start requires Google owner session and CSRF, refuses bearer even alongside cookie',async()=>{
- const h=harness();for(const extra of [{identity:null},{identity:{...user,role:'viewer'}},{headers:{}},{headers:{authorization:'Bearer fixture','x-csrf-token':user.csrfToken}}])await assert.rejects(()=>h.auth.start(h.req(extra),{}));assert.equal(h.network.length,0);
+ const h=harness();for(const extra of [{identity:null},{identity:{...user,role:'viewer'}},{identity:{...user,email:'annen@example.com'}},{headers:{}},{headers:{authorization:'Bearer fixture','x-csrf-token':user.csrfToken}}])await assert.rejects(()=>h.auth.start(h.req(extra),{}));assert.equal(h.network.length,0);
 });
 test('PKCE S256, fixed URLs, one-time state and cookie binding',async()=>{
  const h=harness(),url=await h.start();assert.equal(url.origin+url.pathname,'https://api.myuplink.com/oauth/authorize');assert.equal(url.searchParams.get('code_challenge_method'),'S256');assert.equal(url.searchParams.get('scope'),'READSYSTEM offline_access');assert.equal(await h.callback(url),'/?myuplink=connected');

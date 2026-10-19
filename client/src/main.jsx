@@ -17,6 +17,8 @@ const mobilePage = { '/avvik': 'avvik', '/huset': 'gjoremal' }[path];
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <AuthGate>{mobilePage ? <main className="min-h-screen bg-nx-bg text-nx-text"><HusetView standalone initialTab={mobilePage} /></main> : <App />}</AuthGate>
+    <AuthGate>{session => mobilePage || session?.role === 'beboer'
+      ? <main className="min-h-screen bg-nx-bg text-nx-text"><HusetView standalone initialTab={mobilePage || 'gjoremal'} user={session} /></main>
+      : <App />}</AuthGate>
   </React.StrictMode>
 );

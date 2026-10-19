@@ -1,9 +1,11 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { apiFetch } from '../../lib/api.js';
 import { HeartHandshake } from 'lucide-react';
 import { useHuset, useMe } from './shared.js';
 import { AvvikPanel } from './AvvikPanel.jsx';
 import { GjoremalPanel } from './GjoremalPanel.jsx';
 import { HusreglerPanel } from './HusreglerPanel.jsx';
+import { BeborePanel } from './BeborePanel.jsx';
 
 // Grafene lastes bare når statistikken åpnes, så mobilsiden holder seg lett.
 const StatistikkPanel = lazy(() => import('./StatistikkPanel.jsx').then(m => ({ default: m.StatistikkPanel })));
@@ -12,9 +14,12 @@ const StatistikkPanel = lazy(() => import('./StatistikkPanel.jsx').then(m => ({ 
  * Huset: ett system for avvik, gjøremål per beboer, felles husregler og statistikk.
  * Brukes både som fane i dashboardet og som mobilside (/huset og /avvik).
  */
-export function HusetView({ standalone = false, initialTab = 'statistikk' }) {
+export function HusetView({ standalone = false, initialTab = 'statistikk', user = null }) {
   const h = useHuset();
-  const [me, setMe] = useMe();
+  const [session, setSession] = useState(user);
+  useEffect(() => { if (!user) apiFetch('/api/session').then(r => r.ok ? r.json() : null).then(setSession).catch(() => {}); }, [user]);
+  const owner = session?.method === 'google' || session?.method === 'demo';
+  const [me, setMe] = useMe(session?.role === 'beboer' ? session.navn : '');
   const [tab, setTab] = useState(initialTab);
   const overdue = h.tasks.filter(t => t.status === 'aktiv' && t.frist < h.today).length;
   const proposals = h.rules.filter(r => r.status === 'forslag').length;
@@ -23,7 +28,8 @@ export function HusetView({ standalone = false, initialTab = 'statistikk' }) {
     ['statistikk', 'Oversikt', null],
     ['avvik', 'Avvik', open || null],
     ['gjoremal', 'Gjøremål', overdue ? `${overdue} forfalt` : null],
-    ['regler', 'Husregler', proposals ? `${proposals} forslag` : null]
+    ['regler', 'Husregler', proposals ? `${proposals} forslag` : null],
+    ...(owner ? [['beboere', 'Beboere', null]] : [])
   ];
   const props = { h, me, setMe, standalone };
 
@@ -47,6 +53,7 @@ export function HusetView({ standalone = false, initialTab = 'statistikk' }) {
       {h.loaded && tab === 'avvik' && <AvvikPanel {...props} />}
       {h.loaded && tab === 'gjoremal' && <GjoremalPanel {...props} />}
       {h.loaded && tab === 'regler' && <HusreglerPanel {...props} />}
+      {owner && tab === 'beboere' && <BeborePanel standalone={standalone} />}
     </div>
   );
 }

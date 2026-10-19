@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { apiFetch, setCsrfToken } from '../lib/api.js';
+import { ResidentLogin } from './ResidentLogin.jsx';
 
 export function AuthGate({ children }) {
   const [ready, setReady] = useState(false);
+  const [session, setSession] = useState(null);
   const [googleEnabled, setGoogleEnabled] = useState(false);
   const [token, setToken] = useState('');
   const [error, setError] = useState('');
@@ -15,7 +17,7 @@ export function AuthGate({ children }) {
         return;
       }
       const session = await response.json();
-      setCsrfToken(session.csrfToken); setError(''); setReady(true);
+      setCsrfToken(session.csrfToken); setSession(session); setError(''); setReady(true);
     } catch { setError('Serveren er utilgjengelig. Prøv igjen.'); }
   }
   useEffect(() => {
@@ -45,10 +47,12 @@ export function AuthGate({ children }) {
       sessionStorage.removeItem('dashboard.session'); setCsrfToken(''); setReady(false);
     } catch { setError('Kunne ikke logge ut. Prøv igjen.'); }
   }
-  if (ready) return <><button className="btn fixed bottom-2 left-2 z-50 text-xs" onClick={logout}>Logg ut</button>{error && <p role="alert" className="fixed bottom-12 left-2 z-50 panel p-2">{error}</p>}{children}</>;
-  return <main className="min-h-screen grid place-items-center bg-nx-bg text-nx-text"><section className="panel p-8 max-w-md">
-    <h1 className="text-xl">Logg inn i dashboardet</h1>
-    {googleEnabled && <><p className="my-3 text-sm">Logg inn med eierens Google-konto.</p><button className="btn w-full" onClick={() => { sessionStorage.removeItem('dashboard.session'); setCsrfToken(''); sessionStorage.setItem('dashboard.returnTo', window.location.pathname); window.location.assign('/auth/google'); }}>Fortsett med Google</button></>}
+  if (ready) return <><button className="btn fixed bottom-2 left-2 z-50 text-xs" onClick={logout}>Logg ut{session?.navn ? ` (${session.navn})` : ''}</button>{error && <p role="alert" className="fixed bottom-12 left-2 z-50 panel p-2">{error}</p>}{typeof children === 'function' ? children(session) : children}</>;
+  return <main className="min-h-screen grid place-items-center bg-nx-bg text-nx-text p-4"><section className="panel p-6 sm:p-8 w-full max-w-md">
+    <h1 className="text-xl mb-4">Logg inn</h1>
+    <ResidentLogin onLoggedIn={() => check()} />
+    <hr className="my-6 border-nx-line" />
+    {googleEnabled && <><p className="my-3 text-sm">Eier: logg inn med Google-kontoen.</p><button className="btn w-full" onClick={() => { sessionStorage.removeItem('dashboard.session'); setCsrfToken(''); sessionStorage.setItem('dashboard.returnTo', window.location.pathname); window.location.assign('/auth/google'); }}>Fortsett med Google</button></>}
     <details className="mt-4" open={!googleEnabled}><summary>Administratortilgang</summary><form onSubmit={e => {
       e.preventDefault(); sessionStorage.setItem('dashboard.session', token); setToken(''); setError(''); check(true);
     }}><p className="my-3 text-sm">Tilgangsnøkkelen brukes bare i denne nettleserøkten.</p><label>Tilgangsnøkkel<input type="password" required autoComplete="off" value={token} onChange={e => setToken(e.target.value)} className="block w-full bg-nx-bg border p-2 my-2" /></label><button className="btn">Logg inn med nøkkel</button></form></details>
