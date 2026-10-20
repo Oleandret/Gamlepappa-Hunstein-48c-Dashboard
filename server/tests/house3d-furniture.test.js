@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ROOM_FURNISHINGS, furnishedRoomAt, keepsBimElement, wallSegments } from '../../client/src/lib/house3dFurniture.js';
+import { ROOM_FURNISHINGS, furnishedRoomAt, keepsBimElement, hiddenBimElement, wallSegments } from '../../client/src/lib/house3dFurniture.js';
 import { ALL_ROOMS, roomPoly } from '../../client/src/lib/house3dModel.js';
 
 test('møblering fra bilder ligger inne i riktig rom', () => {
@@ -43,11 +43,35 @@ test('rom i 1. etg skjuler feil BIM-møbler, men beholder de som stemmer', () =>
   assert.equal(keepsBimElement('f1-kjokken', 'floor1|IfcFurnishingElement|Spisebord 6|x'), false);
   assert.equal(keepsBimElement('f1-kjokken', 'floor1|IfcFurnishingElement|Kjøkkenøy – underskap (mørk eik)|x'), true);
   assert.equal(keepsBimElement('f1-kjokken', 'floor1|IfcFurnishingElement|Kjøkken Benkskap|x'), true);
-  // Ballbanen beholder alt fra BIM; garasjen beholder ingenting
-  assert.equal(keepsBimElement('f1-ballbane', 'floor1|IfcFurnishingElement|Grill|x'), true);
+  // Feilplasserte BIM-møbler på ballbanen og i garasjen beholdes ikke
+  assert.equal(keepsBimElement('f1-ballbane', 'floor1|IfcFurnishingElement|Grill|x'), false);
   assert.equal(keepsBimElement('f1-garasje', 'floor1|IfcFurnishingElement|Garasjehylle|x'), false);
-  // Alle rom i 1. etg har nå egen møblering, U.etg ikke ennå
+  // Alle rom i 1. etg (inkl. uteplassen med glasstak) har egen møblering, U.etg ikke ennå
   const f1 = Object.values(ROOM_FURNISHINGS).filter(f => f.floorId === 'floor1').length;
-  assert.equal(f1, 11);
+  assert.equal(f1, 12);
   assert.equal(furnishedRoomAt('basement', -8, 2), null);
+});
+
+test('pergola med glasstak og sørrekkverket fra BIM tegnes på nytt ved kjøkkenet', () => {
+  assert.equal(hiddenBimElement('floor1|IfcPlate|Pergola – glasstak (herdet glass)|x'), true);
+  assert.equal(hiddenBimElement('floor1|IfcColumn|Pergola – stolpe #1|x'), true);
+  assert.equal(hiddenBimElement('floor1|IfcRailing|Terrasse 1.etg – glassrekkverk sør|x'), true);
+  assert.equal(hiddenBimElement('floor1|IfcMember|Ballbane – stolpe 98x98|x'), false);
+  const pergola = ROOM_FURNISHINGS['f1-uteplass'].items.find(i => i.type === 'pergola');
+  const [x0, , x1] = pergola.at;
+  // Skyvedøra fra kjøkkenet mot sør står ved x −2,86 … −0,82
+  assert.ok(x0 < -2.86 && x1 > -0.82);
+});
+
+test('garasjen har bare to biler, og vaskerommet står mot walk-in-veggen', () => {
+  const cars = ROOM_FURNISHINGS['f1-garasje'].items;
+  assert.deepEqual(cars.map(c => `${c.type}:${c.model}`), ['car:X', 'car:Y']);
+  for (const it of ROOM_FURNISHINGS['f1-vask'].items.filter(i => i.type === 'washer')) {
+    assert.ok(it.at[2] >= -1.7, 'vaskemaskinen skal stå mot østveggen (x −1,6)');
+  }
+  // Walk-in: ingen hyller mot østveggen med døra til soverommet (x 0,6)
+  for (const w of ROOM_FURNISHINGS['f1-walkin'].items) {
+    const [, z0, x1, z1] = w.at;
+    assert.ok(!(x1 > 0.5 && z0 > -1.55 && z1 < -0.45), 'hylle foran skyvedøra');
+  }
 });

@@ -72,8 +72,14 @@ export const FLOORS = [
         poly: [[-18.96, 2.3], [-5.03, 2.3], [-5.03, 10.25], [-19.29, 10.25]]
       },
       {
+        // Uteplass med glasstak rett ut fra skyvedøra i kjøkkenet (sør). Større enn
+        // på tegningene; målt fra dronebilder 20.10.2026.
+        id: 'f1-uteplass', name: 'Uteplass (glasstak)', match: /uteplass|glasstak/i, kind: 'outdoor', outdoor: true,
+        poly: [[-4.9, 5.1], [2.0, 5.1], [2.0, 8.9], [-4.9, 8.9]]
+      },
+      {
         id: 'f1-terrasse', name: 'Terrasse', match: /terr?asse/i, kind: 'outdoor', outdoor: true,
-        poly: [[5.9, -0.6], [8.55, -0.6], [8.55, 6.3], [-0.7, 6.3], [-0.7, 5.1], [6.2, 5.1]]
+        poly: [[5.9, -0.6], [8.55, -0.6], [8.55, 6.3], [2.0, 6.3], [2.0, 5.1], [6.2, 5.1]]
       }
     ],
     stairs: [[-7.35, -3.9, -5.25, -2.35], [-3.2, 0.2, 0.6, 1.2]]

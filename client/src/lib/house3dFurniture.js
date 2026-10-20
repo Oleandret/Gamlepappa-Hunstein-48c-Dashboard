@@ -94,16 +94,10 @@ export const ROOM_FURNISHINGS = {
     floor: { color: '#b4b2ad', roughness: 0.8 },
     // Kryssfinér på langveggen (ingen dører der)
     walls: [{ side: 'north', from: -13.55, to: -8.05, finish: 'plywood' }],
+    // Bare bilene: Model X der den står på bildene, Model Y på den ledige plassen
     items: [
-      // Tesla Model X, ryggete inn med nesen mot bakveggen
-      { type: 'car', at: [-13.2, -0.15, -8.25, 1.85], color: '#3b3e44' },
-      { type: 'moped', at: [-12.6, -3.3, -11.0, -2.75] },
-      // Arbeidsbenk med verktøytavle på bakveggen (nordre del)
-      { type: 'box', at: [-8.7, -3.95, -8.05, -2.0], y0: 0, y1: 0.9, color: '#c9a46e' },
-      { type: 'box', at: [-8.12, -3.9, -8.05, -2.05], y0: 0.95, y1: 1.9, color: '#8a8f96', wall: true },
-      // Hvite overskap langs langveggen
-      { type: 'box', at: [-12.9, -4.0, -9.0, -3.6], y0: 1.75, y1: 2.3, color: '#f2f2f0', wall: true },
-      { type: 'box', at: [-13.5, -1.4, -13.1, 0.2], y0: 0, y1: 1.2, color: '#f2f2f0' }
+      { type: 'car', model: 'X', at: [-13.2, -0.15, -8.25, 1.85], color: '#3b3e44' },
+      { type: 'car', model: 'Y', at: [-13.2, -3.55, -8.45, -1.6], color: '#e9e9e7' }
     ]
   },
 
@@ -150,15 +144,15 @@ export const ROOM_FURNISHINGS = {
     floorId: 'floor1',
     bounds: [-3.45, -2.1, -1.6, 0.1],
     floor: { color: '#a8a7a3', roughness: 0.5 },
+    // Alt utstyret står mot veggen til walk-in-garderoben (østveggen)
     items: [
-      // Benk med vaskemaskin og tørketrommel under, hyller over
-      { type: 'box', at: [-3.4, -2.05, -1.65, -1.45], y0: 0.86, y1: 0.9, color: '#b9b6b0' },
-      { type: 'washer', at: [-2.9, -2.0, -2.3, -1.45] },
-      { type: 'washer', at: [-2.25, -2.0, -1.68, -1.45] },
-      { type: 'box', at: [-3.4, -2.05, -2.95, -1.5], y0: 0, y1: 0.6, color: '#eceae6' },
-      { type: 'box', at: [-3.4, -2.08, -1.65, -1.75], y0: 1.25, y1: 1.3, color: '#f2f2f0', wall: true },
-      { type: 'box', at: [-3.4, -2.08, -1.65, -1.7], y0: 1.7, y1: 2.3, color: '#ebe7df', wall: true },
-      { type: 'box', at: [-3.35, -0.5, -3.1, -0.25], y0: 0, y1: 0.55, color: '#f6f6f6' }
+      { type: 'box', at: [-2.25, -2.05, -1.65, -0.25], y0: 0.86, y1: 0.9, color: '#b9b6b0' },
+      { type: 'box', at: [-2.2, -2.0, -1.68, -1.45], y0: 0, y1: 0.6, color: '#eceae6' },
+      { type: 'washer', at: [-2.25, -1.4, -1.68, -0.83], face: 'w' },
+      { type: 'washer', at: [-2.25, -0.8, -1.68, -0.25], face: 'w' },
+      { type: 'box', at: [-1.95, -2.05, -1.65, -0.25], y0: 1.25, y1: 1.3, color: '#f2f2f0', wall: true },
+      { type: 'box', at: [-2.0, -2.05, -1.65, -0.25], y0: 1.7, y1: 2.3, color: '#ebe7df', wall: true },
+      { type: 'box', at: [-3.35, -2.05, -3.1, -1.8], y0: 0, y1: 0.55, color: '#f6f6f6' }
     ]
   },
 
@@ -167,17 +161,16 @@ export const ROOM_FURNISHINGS = {
     bounds: [-1.5, -2.1, 0.6, 0.1],
     floor: { color: '#c9c1b2', roughness: 1 },
     items: [
-      { type: 'wardrobe', at: [-1.48, -2.08, -0.98, -0.2] },
-      { type: 'wardrobe', at: [-0.95, -2.08, 0.05, -1.58] },
-      { type: 'wardrobe', at: [0.08, -2.08, 0.58, -0.2] }
+      // Hyller på alle vegger unntatt østveggen med skyvedøra inn til soverommet
+      { type: 'wardrobe', at: [-1.48, -2.08, -0.98, 0.08] },
+      { type: 'wardrobe', at: [-0.95, -2.08, 0.58, -1.58] },
+      { type: 'wardrobe', at: [-0.95, -0.42, 0.58, 0.08] }
     ]
   },
 
   'f1-sluse': {
     floorId: 'floor1',
     bounds: [-7.95, -0.9, -6.65, 2.13],
-    // BIM-loungesofaen ute på dekket har senter her, men står utenfor boden
-    keepBim: /Lounge/i,
     floor: { color: '#a8a7a3', roughness: 0.6 },
     items: [
       // Nettverksskap og hyller på veggen, støvsuger og bøtte på gulvet
@@ -189,23 +182,44 @@ export const ROOM_FURNISHINGS = {
     ]
   },
 
-  // Ballbane på dekket over bassenget: nett, kurv, mål, utekjøkken, grill og
-  // loungesofa finnes i BIM og beholdes; resten er lagt til fra bildene.
+  // Ballbane på dekket over bassenget. Nett, kurv og mål fra BIM står riktig;
+  // utekjøkken, grill og loungemøbler i BIM sto feil og er flyttet (se uteplass).
   'f1-ballbane': {
     floorId: 'floor1',
     bounds: [-19.25, 2.3, -5.05, 10.25],
     floor: { color: '#d8c59c', roughness: 0.95 },
-    keepBim: /./,
     items: [
-      { type: 'lounger', at: [-10.9, 2.7, -10.2, 4.65] },
-      { type: 'lounger', at: [-9.9, 2.7, -9.2, 4.65] },
-      { type: 'table', at: [-6.5, 3.0, -5.4, 3.9], y1: 0.74, color: '#6e6e6e', legs: '#2a2a2a' },
-      { type: 'chair', at: [-6.4, 2.55, -5.95, 3.0], back: 'n', color: '#f1f1f1' },
-      { type: 'chair', at: [-5.9, 2.55, -5.45, 3.0], back: 'n', color: '#f1f1f1' },
-      { type: 'chair', at: [-6.4, 3.9, -5.95, 4.3], back: 's', color: '#f1f1f1' },
-      { type: 'chair', at: [-5.9, 3.9, -5.45, 4.3], back: 's', color: '#f1f1f1' },
-      // Oppbevaringsbenk ved inngangsdøra
-      { type: 'box', at: [-8.9, 2.35, -7.75, 2.8], y0: 0, y1: 0.6, color: '#4b4f55' }
+      // To solsenger på banen inntil huset
+      { type: 'lounger', at: [-8.3, 2.6, -7.6, 4.55] },
+      { type: 'lounger', at: [-7.4, 2.6, -6.7, 4.55] },
+      // Oppbevaringsbenk foran det store vinduet på kjøkkenets vestvegg
+      { type: 'box', at: [-5.6, 2.9, -5.12, 4.2], y0: 0, y1: 0.6, color: '#4b4f55' },
+      // Utekjøkken/bar (betongblokk og tre, granittplate) på langs mot uteplassen
+      { type: 'outdoorKitchen', at: [-5.75, 5.4, -5.12, 8.4] }
+    ]
+  },
+
+  // Uteplass med glasstak utenfor kjøkkenets skyvedør mot sør
+  'f1-uteplass': {
+    floorId: 'floor1',
+    bounds: [-4.9, 5.1, 2.0, 8.9],
+    floor: { color: '#8e8b86', roughness: 1 },
+    items: [
+      { type: 'pergola', at: [-3.6, 5.15, 1.2, 8.5], y1: 2.55 },
+      // Spisebord med fire hvite stoler
+      { type: 'table', at: [-3.3, 6.3, -2.1, 7.2], y1: 0.74, color: '#6e6e6e', legs: '#2a2a2a' },
+      { type: 'chair', at: [-3.2, 5.85, -2.75, 6.3], back: 'n', color: '#f1f1f1' },
+      { type: 'chair', at: [-2.65, 5.85, -2.2, 6.3], back: 'n', color: '#f1f1f1' },
+      { type: 'chair', at: [-3.2, 7.2, -2.75, 7.6], back: 's', color: '#f1f1f1' },
+      { type: 'chair', at: [-2.65, 7.2, -2.2, 7.6], back: 's', color: '#f1f1f1' },
+      // Loungesofa i rotting (hjørne) med bord, og grill
+      { type: 'sofa', at: [-1.6, 7.65, 0.9, 8.45], back: 's', color: '#5f5a55' },
+      { type: 'sofa', at: [0.1, 6.5, 0.9, 7.65], back: 'e', color: '#5f5a55' },
+      { type: 'box', at: [-1.1, 6.75, -0.2, 7.35], y0: 0, y1: 0.4, color: '#3e3a36' },
+      { type: 'box', at: [1.3, 7.85, 1.9, 8.45], y0: 0, y1: 1.05, color: '#2b2b2b', metalness: 0.5 },
+      { type: 'foldingChair', at: [-4.6, 6.0, -4.1, 6.5], color: '#f1f1f1' },
+      // Rekkverk i mørkt tre mot sør (sjøsiden)
+      { type: 'box', at: [-4.9, 8.82, 2.0, 8.9], y0: 0, y1: 1.0, color: '#3b3029' }
     ]
   },
 
@@ -221,6 +235,16 @@ export const ROOM_FURNISHINGS = {
     ]
   }
 };
+
+/**
+ * BIM-elementer som står feil i virkeligheten og tegnes på nytt her
+ * (uansett rom): pergolaen med glasstak og glassrekkverket mot sør.
+ */
+export const HIDDEN_BIM = [/Pergola/i, /glassrekkverk sør/i];
+
+export function hiddenBimElement(name = '') {
+  return HIDDEN_BIM.some(re => re.test(name));
+}
 
 /** Er punktet (x, z) inne i et rom som har egen møblering på denne etasjen? */
 export function keepsBimElement(roomId, name = '') {

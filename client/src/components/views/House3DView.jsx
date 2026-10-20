@@ -16,7 +16,7 @@ import { DeviceCommandStatus, useDeviceCommand } from '../DeviceCommandStatus.js
 import { SaveButton } from '../SaveButton.jsx';
 import { DeviceMarker3D, RoomLighting, RoomLightVolume, DoorAnimator, isLightDevice, deviceReadout } from './House3DDevices.jsx';
 import { RoomFurnishings } from './House3DFurniture.jsx';
-import { furnishedRoomAt, keepsBimElement, ROOM_FURNISHINGS } from '../../lib/house3dFurniture.js';
+import { furnishedRoomAt, keepsBimElement, hiddenBimElement, ROOM_FURNISHINGS } from '../../lib/house3dFurniture.js';
 import { useDoorMeta, useHouse3dDoors, resolveDoorLinks, isDoorSensor, doorSensorOpen } from '../../lib/house3dDoors.js';
 
 /**
@@ -470,6 +470,8 @@ function BimGroup({ items, floorId = null, offsetY = 0, clipY = null, interior, 
     for (const { mesh, type, gid, mi } of items) {
       // I interiør skjules tak/dekker over snittet og terreng; gulvplater tegnes av rommene
       if (interior && (type === 'IfcSlab' || type === 'IfcRoof' || type === 'IfcCovering')) continue;
+      // BIM-elementer som står feil i virkeligheten (tegnes på nytt i møbleringen)
+      if (hiddenBimElement(mesh.name || mesh.parent?.name)) continue;
       // Rom med faktisk møblering (fra bilder) får arkitektens møbler skjult
       if (type === 'IfcFurnishingElement' && floorId) {
         const c = new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3());
