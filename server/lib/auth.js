@@ -25,6 +25,13 @@ export function accessControl(req, res, next, { residentSession = req => residen
   const demo = process.env.DEMO_MODE === 'true' && process.env.NODE_ENV !== 'production';
   const session = !demo && req.headers.authorization === undefined ? googleAuth.session(req) : null;
   const role = demo ? 'admin' : session?.role || authenticate(req.headers.authorization, process.env.AUTH_TOKENS_JSON);
+  // Egen, smal nøkkel som bare kan lese rombilder (brukes når 3D-modellen skal oppdateres etter bildene).
+  // Gir kun GET på /room-photos — ingen enheter, kontakter, varme eller styring.
+  if (!role && !demo && photoReader(req)) {
+    if (!rateLimited(req, res)) return;
+    req.user = { role: 'photo-reader', method: 'bearer' };
+    return next();
+  }
   if (!role && !demo && req.headers.authorization === undefined && (req.headers.cookie || '').includes(residents.cookieName)) {
     return residentSession(req).then(resident => {
       if (!resident) return res.status(401).json({ error: 'Innlogging kreves', code: 'AUTH_REQUIRED' });
@@ -44,6 +51,13 @@ export function accessControl(req, res, next, { residentSession = req => residen
   }
   req.user = { role, method: session ? 'google' : demo ? 'demo' : 'bearer', ...(session ? { csrfToken: session.csrfToken, email: session.email } : {}) };
   next();
+}
+const PHOTO_READ_PATHS = /^\/room-photos\/(index|rooms\/[a-zA-Z0-9_-]{1,64}|images\/[a-zA-Z0-9_-]{1,64})$/;
+export function photoReader(req, configured = process.env.ROOM_PHOTO_READ_TOKEN) {
+  if (typeof configured !== 'string' || configured.length < 32) return false;
+  if (!['GET', 'HEAD'].includes(req.method) || !PHOTO_READ_PATHS.test(req.path)) return false;
+  const token = /^Bearer (.+)$/.exec(req.headers.authorization || '')?.[1];
+  return Boolean(token && token.length <= 512 && timingSafeEqual(digest(token), digest(configured)));
 }
 function rateLimited(req, res) {
   const now = Date.now();
