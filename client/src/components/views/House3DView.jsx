@@ -15,6 +15,8 @@ import { canWrite } from '../../lib/deviceCommands.js';
 import { DeviceCommandStatus, useDeviceCommand } from '../DeviceCommandStatus.jsx';
 import { SaveButton } from '../SaveButton.jsx';
 import { DeviceMarker3D, RoomLighting, RoomLightVolume, DoorAnimator, isLightDevice, deviceReadout } from './House3DDevices.jsx';
+import { RoomFurnishings } from './House3DFurniture.jsx';
+import { furnishedRoomAt } from '../../lib/house3dFurniture.js';
 import { useDoorMeta, useHouse3dDoors, resolveDoorLinks, isDoorSensor, doorSensorOpen } from '../../lib/house3dDoors.js';
 
 /**
@@ -455,7 +457,7 @@ function doorIdOf(obj) {
   return null;
 }
 
-function BimGroup({ items, offsetY = 0, clipY = null, interior, onPick, onDoor, dim = 1, doorIndex, registry }) {
+function BimGroup({ items, floorId = null, offsetY = 0, clipY = null, interior, onPick, onDoor, dim = 1, doorIndex, registry }) {
   const group = useMemo(() => {
     const g = new THREE.Group();
     const plane = clipY == null ? null : new THREE.Plane(new THREE.Vector3(0, -1, 0), clipY);
@@ -463,6 +465,11 @@ function BimGroup({ items, offsetY = 0, clipY = null, interior, onPick, onDoor, 
     for (const { mesh, type, gid, mi } of items) {
       // I interiør skjules tak/dekker over snittet og terreng; gulvplater tegnes av rommene
       if (interior && (type === 'IfcSlab' || type === 'IfcRoof' || type === 'IfcCovering')) continue;
+      // Rom med faktisk møblering (fra bilder) får arkitektens møbler skjult
+      if (type === 'IfcFurnishingElement' && floorId) {
+        const c = new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3());
+        if (furnishedRoomAt(floorId, c.x, c.z)) continue;
+      }
       const m = mesh.clone();
       m.matrix.copy(mesh.matrixWorld);
       m.matrix.decompose(m.position, m.quaternion, m.scale);
@@ -506,7 +513,7 @@ function BimGroup({ items, offsetY = 0, clipY = null, interior, onPick, onDoor, 
     }
     g.userData.doorPivots = pivots;
     return g;
-  }, [items, clipY, interior, dim, doorIndex]);
+  }, [items, floorId, clipY, interior, dim, doorIndex]);
 
   useEffect(() => {
     if (!registry) return undefined;
@@ -542,7 +549,7 @@ function BimModel({ mode, visibleFloors, floorY, onPick, onDoor, doorIndex, regi
       <group>
         {['site', 'basement', 'floor1', 'floor2', 'roof'].map(k => groups[k] && (
           <BimGroup
-            key={k} items={groups[k]} onPick={k === 'site' ? undefined : onPick} onDoor={onDoor}
+            key={k} items={groups[k]} floorId={k} onPick={k === 'site' ? undefined : onPick} onDoor={onDoor}
             dim={k === 'site' ? 0.42 : 0.9} doorIndex={doorIndex} registry={registry}
           />
         ))}
@@ -557,7 +564,7 @@ function BimModel({ mode, visibleFloors, floorY, onPick, onDoor, doorIndex, regi
         const y = floorY(floor.id);
         return (
           <BimGroup
-            key={floor.id} items={items} offsetY={y - floor.level} clipY={y + CLIP_HEIGHT} interior
+            key={floor.id} items={items} floorId={floor.id} offsetY={y - floor.level} clipY={y + CLIP_HEIGHT} interior
             onDoor={onDoor} doorIndex={doorIndex} registry={registry}
           />
         );
@@ -1081,6 +1088,14 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                 </BimBoundary>
               )}
               {bim && <DoorAnimator registry={doorRegistry} openState={doorOpen} />}
+              {visibleFloors.map(floor => (
+                <RoomFurnishings
+                  key={`furn-${floor.id}`}
+                  floorId={floor.id}
+                  baseY={floorY(floor.id)}
+                  clipY={mode === 'interior' ? floorY(floor.id) + CLIP_HEIGHT : null}
+                />
+              ))}
               {bim && mode === 'exterior' && <ExteriorGlow roomData={roomData} />}
               {overlay !== 'temp' && overlay !== 'security' && (
                 <RoomLighting
