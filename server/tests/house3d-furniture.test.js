@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ROOM_FURNISHINGS, furnishedRoomAt } from '../../client/src/lib/house3dFurniture.js';
+import { ROOM_FURNISHINGS, furnishedRoomAt, wallSegments } from '../../client/src/lib/house3dFurniture.js';
 import { ALL_ROOMS, roomPoly } from '../../client/src/lib/house3dModel.js';
 
 test('møblering fra bilder ligger inne i riktig rom', () => {
@@ -17,6 +17,16 @@ test('møblering fra bilder ligger inne i riktig rom', () => {
       assert.ok(x0 >= bx0 - 1e-9 && x1 <= bx1 + 1e-9 && z0 >= bz0 - 1e-9 && z1 <= bz1 + 1e-9, `${roomId}/${it.type} står utenfor rommet`);
     }
   }
+});
+
+test('veggflatene har åpninger der dørene står', () => {
+  const f = ROOM_FURNISHINGS['f1-sov3'];
+  const west = f.walls.find(w => w.side === 'west');
+  assert.deepEqual(wallSegments(west, f.doors), [[-3.97, -3.27], [-2.37, -1.5], [-0.7, -0.09]]);
+  const south = f.walls.find(w => w.side === 'south');
+  assert.deepEqual(wallSegments(south, f.doors), [[0.94, 1.38], [2.28, 5.3]]);
+  assert.deepEqual(wallSegments({ side: 'north', from: 0, to: 1 }, f.doors), [[0, 1]]);
+  assert.equal(f.doors.length, 3);
 });
 
 test('Soverom 3 skjuler arkitektens møbler bare inne i rommet', () => {

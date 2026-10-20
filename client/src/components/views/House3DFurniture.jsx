@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
-import { ROOM_FURNISHINGS } from '../../lib/house3dFurniture.js';
+import { ROOM_FURNISHINGS, FLOOR_TOP, wallSegments } from '../../lib/house3dFurniture.js';
 
 /**
  * Tegner faktisk møblering (fra bilder) for rom i ROOM_FURNISHINGS.
@@ -17,8 +17,9 @@ const COLORS = {
   wood: '#4a3426',
   black: '#141414',
   screen: '#1b2a4a',
-  chair: '#b9b2a6',
-  chairDark: '#7d776e'
+  chair: '#b3ab9e',
+  chairShell: '#d6cfc3',
+  chairDark: '#5e5951'
 };
 
 let _forest = null;
@@ -47,12 +48,12 @@ function forestTexture() {
   return _forest;
 }
 
-function Box({ x0, z0, x1, z1, y0 = 0, y1, color, clip, roughness = 0.85, map, emissive, emissiveIntensity }) {
+function Box({ x0, z0, x1, z1, y0 = 0, y1, color, clip, roughness = 0.85, metalness = 0, map, emissive, emissiveIntensity, tilt = 0 }) {
   return (
-    <mesh position={[(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2]} castShadow receiveShadow raycast={() => null}>
+    <mesh position={[(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2]} rotation={[tilt, 0, 0]} castShadow receiveShadow raycast={() => null}>
       <boxGeometry args={[Math.abs(x1 - x0), Math.abs(y1 - y0), Math.abs(z1 - z0)]} />
       <meshStandardMaterial
-        color={color} roughness={roughness} map={map || null}
+        color={color} roughness={roughness} metalness={metalness} map={map || null}
         emissive={emissive || '#000000'} emissiveIntensity={emissiveIntensity || 0}
         clippingPlanes={clip} clipShadows
       />
@@ -63,7 +64,9 @@ function Box({ x0, z0, x1, z1, y0 = 0, y1, color, clip, roughness = 0.85, map, e
 function Item({ item, clip }) {
   const [x0, z0, x1, z1] = item.at;
   const b = { x0, z0, x1, z1 };
-  const wallClip = item.wall ? null : clip;
+  // TV-ene vises hele, også litt over dukkehus-snittet; bilde og høyttalere
+  // høyt på veggen kuttes som veggen (ellers svever de midt i rommet)
+  const wallClip = item.type === 'tv' ? null : clip;
   switch (item.type) {
     case 'rug':
       return <Box {...b} y0={0.005} y1={0.02} color={item.color} clip={clip} roughness={1} />;
@@ -106,18 +109,27 @@ function Item({ item, clip }) {
         </group>
       );
     }
-    case 'massageChair':
-      // Liggende massasjestol: fotdel mot sør, rygg mot nord
+    case 'massageChair': {
+      // Liggende massasjestol i champagne/grå: rygg mot nord, fotdel mot sør (mot TV-en)
+      const cx0 = x0 + 0.08, cx1 = x1 - 0.08, len = z1 - z0;
+      const S = { clip, roughness: 0.35, metalness: 0.15 };
       return (
         <group>
-          <Box x0={x0 + 0.05} x1={x1 - 0.05} z0={z0 + 0.25} z1={z1} y0={0} y1={0.12} color={COLORS.chairDark} clip={clip} />
-          <Box x0={x0} x1={x1} z0={z0 + 0.45} z1={z1 - 0.35} y0={0.12} y1={0.5} color={COLORS.chair} clip={clip} />
-          <Box x0={x0} x1={x1} z0={z0} z1={z0 + 0.5} y0={0.3} y1={1.2} color={COLORS.chair} clip={clip} />
-          <Box x0={x0 + 0.12} x1={x1 - 0.12} z0={z1 - 0.4} z1={z1} y0={0.12} y1={0.45} color={COLORS.chairDark} clip={clip} />
-          <Box x0={x0} x1={x0 + 0.1} z0={z0 + 0.3} z1={z1 - 0.4} y0={0.45} y1={0.75} color={COLORS.chairDark} clip={clip} />
-          <Box x0={x1 - 0.1} x1={x1} z0={z0 + 0.3} z1={z1 - 0.4} y0={0.45} y1={0.75} color={COLORS.chairDark} clip={clip} />
+          <Box x0={cx0 + 0.1} x1={cx1 - 0.1} z0={z0 + 0.35} z1={z1 - 0.2} y0={0} y1={0.1} color={COLORS.chairDark} {...S} />
+          {/* sete og ben-/fotdel */}
+          <Box x0={cx0} x1={cx1} z0={z0 + 0.5} z1={z0 + len * 0.62} y0={0.1} y1={0.5} color={COLORS.chair} {...S} />
+          <Box x0={cx0 + 0.06} x1={cx1 - 0.06} z0={z0 + len * 0.6} z1={z1} y0={0.1} y1={0.38} color={COLORS.chair} {...S} tilt={0.18} />
+          {/* tilbakelent rygg med hette */}
+          <Box x0={cx0} x1={cx1} z0={z0} z1={z0 + 0.55} y0={0.35} y1={1.2} color={COLORS.chairShell} {...S} tilt={-0.35} />
+          <Box x0={cx0 + 0.08} x1={cx1 - 0.08} z0={z0 + 0.12} z1={z0 + 0.5} y0={0.45} y1={1.05} color={COLORS.chairDark} {...S} tilt={-0.35} />
+          {/* armlener (skall) */}
+          <Box x0={x0} x1={x0 + 0.12} z0={z0 + 0.4} z1={z0 + len * 0.62} y0={0.25} y1={0.72} color={COLORS.chairShell} {...S} />
+          <Box x0={x1 - 0.12} x1={x1} z0={z0 + 0.4} z1={z0 + len * 0.62} y0={0.25} y1={0.72} color={COLORS.chairShell} {...S} />
+          {/* liten skjerm på arm */}
+          <Box x0={x1 - 0.1} x1={x1 - 0.02} z0={z0 + len * 0.55} z1={z0 + len * 0.62} y0={0.72} y1={0.95} color={COLORS.black} {...S} />
         </group>
       );
+    }
     case 'sideboard':
       return (
         <group>
@@ -141,15 +153,15 @@ function Item({ item, clip }) {
     case 'picture':
       return (
         <group>
-          <Box {...b} y0={item.y0} y1={item.y1} color="#efe7da" clip={null} />
+          <Box {...b} y0={item.y0} y1={item.y1} color="#efe7da" clip={clip} />
           <mesh position={[(x0 + x1) / 2, (item.y0 + item.y1) / 2, Math.min(z0, z1) - 0.002]} rotation={[0, Math.PI, 0]} raycast={() => null}>
             <planeGeometry args={[Math.abs(x1 - x0) - 0.06, Math.abs(item.y1 - item.y0) - 0.06]} />
-            <meshStandardMaterial color="#9b8a76" roughness={0.9} />
+            <meshStandardMaterial color="#9b8a76" roughness={0.9} clippingPlanes={clip} />
           </mesh>
         </group>
       );
     case 'speaker':
-      return <Box {...b} y0={item.y0} y1={item.y1} color={COLORS.black} clip={null} roughness={0.5} />;
+      return <Box {...b} y0={item.y0} y1={item.y1} color={COLORS.black} clip={clip} roughness={0.5} />;
     default:
       return null;
   }
@@ -186,10 +198,12 @@ export function RoomFurnishings({ floorId, baseY, clipY = null }) {
     [clipY]
   );
   return (
-    <group position={[0, baseY, 0]}>
+    <group position={[0, baseY + FLOOR_TOP, 0]}>
       {Object.entries(ROOM_FURNISHINGS).filter(([, f]) => f.floorId === floorId).map(([roomId, f]) => (
         <group key={roomId}>
-          {f.walls.map((w, i) => <WallFinish key={i} wall={w} bounds={f.bounds} height={2.38} clip={clip} />)}
+          {f.walls.flatMap((w, i) => wallSegments(w, f.doors).map(([from, to], j) => (
+            <WallFinish key={`${i}-${j}`} wall={{ ...w, from, to }} bounds={f.bounds} height={2.26} clip={clip} />
+          )))}
           {f.items.map((it, i) => <Item key={i} item={it} clip={clip} />)}
         </group>
       ))}

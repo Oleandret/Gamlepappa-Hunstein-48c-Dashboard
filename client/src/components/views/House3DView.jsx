@@ -16,7 +16,7 @@ import { DeviceCommandStatus, useDeviceCommand } from '../DeviceCommandStatus.js
 import { SaveButton } from '../SaveButton.jsx';
 import { DeviceMarker3D, RoomLighting, RoomLightVolume, DoorAnimator, isLightDevice, deviceReadout } from './House3DDevices.jsx';
 import { RoomFurnishings } from './House3DFurniture.jsx';
-import { furnishedRoomAt } from '../../lib/house3dFurniture.js';
+import { furnishedRoomAt, ROOM_FURNISHINGS } from '../../lib/house3dFurniture.js';
 import { useDoorMeta, useHouse3dDoors, resolveDoorLinks, isDoorSensor, doorSensorOpen } from '../../lib/house3dDoors.js';
 
 /**
@@ -179,6 +179,9 @@ function floorColorFor(room, stats, overlay) {
     if (stats.open || stats.unlocked) return new THREE.Color(C.amber);
     return new THREE.Color('#123227');
   }
+  // Rom med kjent gulv (f.eks. slipt betong) viser det i vanlig visning og lysvisning
+  const realFloor = ROOM_FURNISHINGS[room.id]?.floor;
+  if (realFloor) return new THREE.Color(realFloor.color).lerp(new THREE.Color(C.amber), stats.glow * (overlay === 'light' ? 0.35 : 0.12));
   if (overlay === 'light') {
     return new THREE.Color(C.floor).lerp(new THREE.Color(C.amber), stats.glow * 0.55);
   }
@@ -279,7 +282,7 @@ function InteriorRoom({ data, overlay, selected, hovered, onSelect, onHover, sho
           color={color}
           emissive={selected ? C.cyan : stats.motion ? C.red : C.cyan}
           emissiveIntensity={0}
-          roughness={room.kind === 'pool' ? 0.15 : 0.8}
+          roughness={room.kind === 'pool' ? 0.15 : ROOM_FURNISHINGS[room.id]?.floor?.roughness ?? 0.8}
           metalness={room.kind === 'pool' ? 0.3 : 0.05}
         />
       </mesh>
@@ -290,7 +293,9 @@ function InteriorRoom({ data, overlay, selected, hovered, onSelect, onHover, sho
           <meshStandardMaterial
             color={room.outdoor ? '#9fd8ff' : '#1f3352'}
             transparent
-            opacity={room.outdoor ? 0.18 : 0.55}
+            // Rom med egen møblering har ekte veggflater og dører; bare omrisset vises
+            opacity={room.outdoor ? 0.18 : ROOM_FURNISHINGS[room.id] ? 0 : 0.55}
+            depthWrite={!ROOM_FURNISHINGS[room.id]}
             roughness={0.4}
           />
           <Edges color={edgeColor} threshold={15} />
