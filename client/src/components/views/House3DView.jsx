@@ -4,8 +4,9 @@ import { OrbitControls, Html, Edges, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import {
   Box, Layers, Lightbulb, Thermometer, ShieldAlert, Home as HomeIcon, Edit2,
-  RotateCw, Power, ChevronRight, X, Move3d, Activity, DoorOpen, Lock, Unlock, Maximize2, Minimize2
+  RotateCw, Power, ChevronRight, X, Move3d, Activity, DoorOpen, Lock, Unlock, Maximize2, Minimize2, Sun, Moon
 } from 'lucide-react';
+import { sunPosition, sunDirection, skyLighting, sunTimes } from '../../lib/sunPosition.js';
 import { FLOORS, ALL_ROOMS, roomPoly, roomCenter, roomArea, planPctToWorld, BIM_MODEL_URL } from '../../lib/house3dModel.js';
 import { capValue, hasCap } from '../../lib/deviceUtils.js';
 import { useHouse3dRooms } from '../../lib/useHouse3dRooms.js';
@@ -728,6 +729,64 @@ function Ground({ mode }) {
   );
 }
 
+// ─── Sol og døgnrytme ───────────────────────────────────────────────────
+
+const minutesOf = (d) => d.getHours() * 60 + d.getMinutes();
+
+/** Live klokke (oppdateres hvert minutt) eller et valgt klokkeslett i dag. */
+function useSunState() {
+  const [now, setNow] = useState(() => new Date());
+  const [manual, setManual] = useState(null);   // minutter fra midnatt, eller null = live
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(id);
+  }, []);
+  const date = useMemo(() => {
+    if (manual == null) return now;
+    const d = new Date(now); d.setHours(0, manual, 0, 0); return d;
+  }, [now, manual]);
+  const day = now.toDateString();
+  const times = useMemo(() => sunTimes(new Date(day)), [day]);
+  return useMemo(() => {
+    const pos = sunPosition(date);
+    const [dx, dy, dz] = sunDirection(pos);
+    // Under horisonten: hold lyset over bakken så skyggekameraet ikke snur
+    const y = Math.max(dy, 0.08);
+    return {
+      date, pos, times, live: manual == null, minutes: minutesOf(date),
+      sky: skyLighting(pos.elevation),
+      lightPos: [CENTER[0] + dx * 45, y * 45, CENTER[2] + dz * 45],
+      setMinutes: setManual,
+      reset: () => setManual(null)
+    };
+  }, [date, times, manual]);
+}
+
+function SunControl({ sun }) {
+  const night = sun.sky.isNight;
+  const Icon = night ? Moon : Sun;
+  const clock = sun.date.toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' });
+  return (
+    <div className="pointer-events-auto flex items-center gap-2 rounded border border-nx-line/70 bg-nx-bg/70 px-2 py-1 backdrop-blur">
+      <Icon size={12} className={night ? 'text-nx-purple' : 'text-nx-amber'} aria-hidden="true" />
+      <span className="font-mono text-[10px] tabular-nums text-nx-text w-9">{clock}</span>
+      <input
+        type="range" min={0} max={1439} step={5} value={sun.minutes}
+        onChange={(e) => sun.setMinutes(Number(e.target.value))}
+        className="w-28 accent-nx-amber"
+        aria-label="Klokkeslett for sol og skygger"
+        title={`Sol ${sun.pos.elevation.toFixed(0)}° over horisonten · ↑ ${sun.times.sunrise || '—'} · ↓ ${sun.times.sunset || '—'}`}
+      />
+      <button
+        onClick={sun.reset}
+        aria-pressed={sun.live}
+        className={['rounded px-1.5 font-mono text-[10px] uppercase tracking-[0.14em]', sun.live ? 'bg-nx-amber/15 text-nx-amber' : 'text-nx-mute hover:text-nx-amber'].join(' ')}
+      >Nå</button>
+      <span className="hidden sm:inline font-mono text-[9px] text-nx-mute">↑{sun.times.sunrise || '—'} ↓{sun.times.sunset || '—'}</span>
+    </div>
+  );
+}
+
 // ─── Hovedvisning ───────────────────────────────────────────────────────
 
 export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapability, floorPlanPins }) {
@@ -769,6 +828,7 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
     try { await request.call(el); } catch { setOverlayFs(true); }
   }
   const [flyTo, setFlyTo] = useState(null);
+  const sun = useSunState();
   const [bimOn, setBimOn] = useState(true);
   const [bimFailed, setBimFailed] = useState(false);
   const bim = bimOn && !bimFailed;
@@ -989,14 +1049,16 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
             camera={{ position: PRESETS.iso.pos, fov: 40, near: 0.1, far: 400 }}
             onPointerMissed={() => { setSelectedRoomId(null); setSelectedMarkerId(null); setSelectedDoorId(null); }}
           >
-            <color attach="background" args={[C.bg]} />
-            <fog attach="fog" args={[C.bg, 45, 120]} />
-            <ambientLight intensity={mode === 'exterior' ? 0.45 : 0.55} />
-            <hemisphereLight args={['#8fdcff', '#05070d', 0.35]} />
+            <color attach="background" args={[mode === 'exterior' ? sun.sky.background : C.bg]} />
+            <fog attach="fog" args={[mode === 'exterior' ? sun.sky.background : C.bg, 45, 120]} />
+            <ambientLight intensity={mode === 'exterior' ? sun.sky.ambient : 0.55} />
+            <hemisphereLight args={[mode === 'exterior' ? sun.sky.hemiSky : '#8fdcff', '#05070d', 0.35]} />
+            {/* Sola står der den faktisk står over Hundvåg nå (eller på valgt klokkeslett) */}
             <directionalLight
-              position={[18, 30, 14]}
-              intensity={mode === 'exterior' ? 1.4 : 0.9}
-              castShadow
+              position={sun.lightPos}
+              intensity={mode === 'exterior' ? sun.sky.sunIntensity : 0.45 + sun.sky.sunIntensity * 0.35}
+              color={sun.sky.sunColor}
+              castShadow={sun.sky.sunIntensity > 0}
               shadow-mapSize={[2048, 2048]}
               shadow-camera-left={-30}
               shadow-camera-right={30}
@@ -1004,6 +1066,7 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
               shadow-camera-bottom={-30}
             />
             <directionalLight position={[-20, 12, -10]} intensity={0.25} color="#7d5cff" />
+            {sun.sky.moonIntensity > 0 && <directionalLight position={[-14, 26, 18]} intensity={sun.sky.moonIntensity} color="#9db8ff" />}
 
             <Suspense fallback={null}>
               {!(bim && mode === 'exterior') && <Ground mode={mode} />}
@@ -1129,6 +1192,8 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                 ].join(' ')}
               >{fullscreen ? <Minimize2 size={10} /> : <Maximize2 size={10} />} {fullscreen ? 'Lukk fullskjerm' : 'Fullskjerm'}</button>
             </div>
+            <div className="flex flex-col items-end gap-1">
+            <SunControl sun={sun} />
             {mode === 'interior' && (
               <label className="pointer-events-auto flex items-center gap-2 rounded border border-nx-line/70 bg-nx-bg/70 px-2 py-1 backdrop-blur">
                 <Move3d size={12} className="text-nx-mute" aria-hidden="true" />
@@ -1141,6 +1206,7 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                 />
               </label>
             )}
+            </div>
           </div>
 
           {overlay === 'temp' && <TempLegend />}
