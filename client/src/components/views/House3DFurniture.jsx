@@ -222,15 +222,17 @@ function Item({ item, clip }) {
         </group>
       );
     case 'car': {
-      // Enkel SUV-form: karosseri, kupé med mørke ruter og fire hjul (langs x)
-      const len = x1 - x0, w = z1 - z0, c = item.color;
+      // Enkel SUV-form langs x: karosseri, kupé med mørke ruter, fire hjul.
+      // Model X er høyere og lengre enn Model Y (fotavtrykket gis av `at`).
+      const len = x1 - x0, c = item.color, isX = item.model !== 'Y';
+      const top = isX ? 1.68 : 1.6, belt = isX ? 0.98 : 0.92;
       const S = { clip, roughness: 0.3, metalness: 0.55 };
-      const wheels = [[x0 + len * 0.17, z0], [x1 - len * 0.2, z0], [x0 + len * 0.17, z1 - 0.25], [x1 - len * 0.2, z1 - 0.25]];
+      const wheels = [[x0 + len * 0.15, z0], [x1 - len * 0.17 - 0.72, z0], [x0 + len * 0.15, z1 - 0.25], [x1 - len * 0.17 - 0.72, z1 - 0.25]];
       return (
         <group>
-          <Box x0={x0} x1={x1} z0={z0 + 0.05} z1={z1 - 0.05} y0={0.28} y1={0.95} color={c} {...S} />
-          <Box x0={x0 + len * 0.22} x1={x1 - len * 0.18} z0={z0 + 0.15} z1={z1 - 0.15} y0={0.95} y1={1.62} color="#1d2228" {...S} />
-          <Box x0={x0 + len * 0.26} x1={x1 - len * 0.22} z0={z0 + 0.18} z1={z1 - 0.18} y0={1.62} y1={1.66} color={c} {...S} />
+          <Box x0={x0} x1={x1} z0={z0 + 0.05} z1={z1 - 0.05} y0={0.28} y1={belt} color={c} {...S} />
+          <Box x0={x0 + len * 0.2} x1={x1 - len * (isX ? 0.16 : 0.2)} z0={z0 + 0.15} z1={z1 - 0.15} y0={belt} y1={top - 0.04} color="#1d2228" {...S} />
+          <Box x0={x0 + len * 0.24} x1={x1 - len * (isX ? 0.2 : 0.26)} z0={z0 + 0.18} z1={z1 - 0.18} y0={top - 0.04} y1={top} color={c} {...S} />
           {wheels.map(([wx, wz], i) => (
             <Box key={i} x0={wx} x1={wx + 0.72} z0={wz} z1={wz + 0.25} y0={0} y1={0.72} color="#111111" clip={clip} roughness={0.9} />
           ))}
@@ -275,7 +277,11 @@ function Item({ item, clip }) {
       return (
         <group>
           <Box {...b} y0={0} y1={0.85} color="#f4f4f4" clip={clip} roughness={0.4} />
-          <mesh position={[(x0 + x1) / 2, 0.48, z1 + 0.003]} raycast={() => null}>
+          <mesh
+            position={item.face === 'w' ? [x0 - 0.003, 0.48, (z0 + z1) / 2] : [(x0 + x1) / 2, 0.48, z1 + 0.003]}
+            rotation={[0, item.face === 'w' ? -Math.PI / 2 : 0, 0]}
+            raycast={() => null}
+          >
             <circleGeometry args={[Math.min(x1 - x0, 0.6) * 0.32, 24]} />
             <meshStandardMaterial color="#2b3440" roughness={0.2} clippingPlanes={clip} />
           </mesh>
@@ -299,6 +305,37 @@ function Item({ item, clip }) {
           ))}
         </group>
       );
+    case 'outdoorKitchen':
+      // Benk av betongblokk med trepaneler og granittplate
+      return (
+        <group>
+          <Box {...b} y0={0} y1={0.9} color="#7a6450" clip={clip} />
+          <Box x0={x0 - 0.03} x1={x1 + 0.03} z0={z0 - 0.03} z1={z1 + 0.03} y0={0.9} y1={0.96} color="#a3a6a8" clip={clip} roughness={0.35} />
+          {Array.from({ length: Math.max(2, Math.round((z1 - z0) / 0.7)) + 1 }).map((_, i, arr) => {
+            const z = z0 + (z1 - z0) * i / (arr.length - 1);
+            return <Box key={i} x0={x0 - 0.01} x1={x1 + 0.01} z0={Math.min(z, z1 - 0.18)} z1={Math.min(z + 0.18, z1)} y0={0} y1={0.9} color="#a9a8a2" clip={clip} />;
+          })}
+        </group>
+      );
+    case 'pergola': {
+      // Stolper, bjelker i mørkt tre og tak av herdet glass
+      const h = item.y1 ?? 2.55, n = Math.max(3, Math.round((x1 - x0) / 0.8));
+      return (
+        <group>
+          {[[x0, z1 - 0.12], [x1 - 0.12, z1 - 0.12], [x0, z0], [x1 - 0.12, z0]].map(([px, pz], i) => (
+            <Box key={i} x0={px} x1={px + 0.12} z0={pz} z1={pz + 0.12} y0={0} y1={h} color="#3b3029" clip={clip} />
+          ))}
+          {Array.from({ length: n + 1 }).map((_, i) => {
+            const x = x0 + (x1 - x0 - 0.07) * i / n;
+            return <Box key={`b${i}`} x0={x} x1={x + 0.07} z0={z0} z1={z1} y0={h - 0.2} y1={h} color="#3b3029" clip={clip} />;
+          })}
+          <mesh position={[(x0 + x1) / 2, h + 0.01, (z0 + z1) / 2]} raycast={() => null}>
+            <boxGeometry args={[x1 - x0, 0.02, z1 - z0]} />
+            <meshStandardMaterial color="#9fd8ff" transparent opacity={0.3} roughness={0.05} depthWrite={false} clippingPlanes={clip} />
+          </mesh>
+        </group>
+      );
+    }
     case 'foldingChair':
       return (
         <group>
