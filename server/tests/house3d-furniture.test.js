@@ -75,3 +75,10 @@ test('garasjen har bare to biler, og vaskerommet står mot walk-in-veggen', () =
     assert.ok(!(x1 > 0.5 && z0 > -1.55 && z1 < -0.45), 'hylle foran skyvedøra');
   }
 });
+
+test('møblerte uteområder får ikke generiske glassrekkverk tvers gjennom seg', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../../client/src/components/views/House3DView.jsx', import.meta.url), 'utf8');
+  assert.ok(src.includes('!(room.outdoor && ROOM_FURNISHINGS[room.id]) && walls.map'));
+  assert.ok(ROOM_FURNISHINGS['f1-uteplass'] && ROOM_FURNISHINGS['f1-terrasse'] && ROOM_FURNISHINGS['f1-ballbane']);
+});
