@@ -36,7 +36,7 @@ export async function chat({ system, user, model = DEFAULT_MODEL, json = true, t
       'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
     },
     body: JSON.stringify(body)
-  });
+  }, { timeoutMs: 90_000 }); // lange svar tar mer enn standardens 15 s
 
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error('OpenAI response had no content');

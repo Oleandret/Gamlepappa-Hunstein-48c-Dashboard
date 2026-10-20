@@ -44,7 +44,9 @@ export function createAvvikRoutes({ read = () => getNamespace(NS), update = fn =
 
   r.post('/', async (req, res) => {
     let item;
-    try { item = parseAvvik(req.body, clock()); }
+    // En innlogget beboer registrerer alltid i eget navn, uansett hva klienten sender.
+    const body = req.user?.method === 'beboer' ? { ...req.body, registrertAv: req.user.navn } : req.body;
+    try { item = parseAvvik(body, clock()); }
     catch (err) { return res.status(400).json({ error: err.message }); }
     try {
       const items = await update(prev => {

@@ -70,7 +70,8 @@ app.use('/auth/myuplink', myuplinkOAuth.callback);
 app.use('/api', (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); }, accessControl);
 app.use('/api/experience', experienceRoutes);
 app.get('/api/session', (req,res) => res.json(req.user));
-app.post('/api/logout', async (req,res) => { if (req.user?.method === 'beboer') { await residents.logout(req,res); return res.set('Cache-Control','no-store').json({ok:true}); } return googleAuth.logout(req,res); });
+// Express 4 fanger ikke avviste promiser; uten try/catch tok en lagringsfeil ned prosessen.
+app.post('/api/logout', async (req,res) => { try { if (req.user?.method === 'beboer') { await residents.logout(req,res); return res.set('Cache-Control','no-store').json({ok:true}); } return await googleAuth.logout(req,res); } catch (error) { console.error('[logout]', error.message); if (!res.headersSent) res.status(503).json({error:'Utlogging feilet. Prøv igjen.'}); } });
 // API routes
 app.use('/api/system', systemRoutes);
 app.use('/api/homey', homeyRoutes);

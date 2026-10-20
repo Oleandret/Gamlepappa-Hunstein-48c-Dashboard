@@ -1,5 +1,20 @@
 import { useMemo, useState } from 'react';
 import { Lightbulb, ChevronDown, ChevronRight } from 'lucide-react';
+import { capValue, hasCap } from '../lib/deviceUtils.js';
+import { CommitSlider } from './CommitSlider.jsx';
+
+// Ekte Homey-data har capabilities som liste og verdiene i capabilitiesObj;
+// demo-data har dem som kart. capValue/hasCap håndterer begge.
+const isOn = d => capValue(d, 'onoff') === true;
+
+// Én kommando om gangen, slik at Homey ikke får N samtidige kall pluss N
+// samtidige oppdateringer av enhetslisten.
+async function setSequential(lights, on, onSet) {
+  for (const l of lights) {
+    if (isOn(l) === on) continue;
+    try { await onSet(l.id, 'onoff', on); } catch { /* feilen logges av onSet */ }
+  }
+}
 
 /**
  * Belysning gruppert per rom med toggle og dim-slider per lampe.
@@ -10,7 +25,7 @@ export function Lighting({ devices, zones, onSet }) {
 
   const groups = useMemo(() => {
     const all = Object.values(devices || {});
-    const lights = all.filter(d => d.class === 'light' || d.capabilities?.dim != null);
+    const lights = all.filter(d => d.class === 'light' || hasCap(d, 'dim'));
     const byZone = new Map();
     for (const l of lights) {
       const zone = zones?.[l.zone];
@@ -24,17 +39,17 @@ export function Lighting({ devices, zones, onSet }) {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [devices, zones]);
 
-  const totalOn = groups.reduce((s, g) => s + g.lights.filter(l => l.capabilities?.onoff).length, 0);
+  const totalOn = groups.reduce((s, g) => s + g.lights.filter(isOn).length, 0);
   const totalLights = groups.reduce((s, g) => s + g.lights.length, 0);
 
   function toggleAll(on) {
-    groups.forEach(g => g.lights.forEach(l => onSet(l.id, 'onoff', on)));
+    setSequential(groups.flatMap(g => g.lights), on, onSet);
   }
 
   function toggleZone(zoneId, on) {
     const g = groups.find(g => g.id === zoneId);
     if (!g) return;
-    g.lights.forEach(l => onSet(l.id, 'onoff', on));
+    setSequential(g.lights, on, onSet);
   }
 
   function toggleCollapsed(id) {
@@ -68,7 +83,7 @@ export function Lighting({ devices, zones, onSet }) {
 
       <div className="mt-2 space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
         {groups.map(g => {
-          const onCount = g.lights.filter(l => l.capabilities?.onoff).length;
+          const onCount = g.lights.filter(isOn).length;
           const isCollapsed = collapsed.has(g.id);
           const allOn = onCount === g.lights.length;
           return (
@@ -120,9 +135,9 @@ export function Lighting({ devices, zones, onSet }) {
 }
 
 function LightRow({ light, onSet }) {
-  const on = !!light.capabilities?.onoff;
-  const dim = light.capabilities?.dim ?? 0;
-  const supportsDim = light.capabilities?.dim != null || light.capabilitiesObj?.dim != null;
+  const on = isOn(light);
+  const dim = Number(capValue(light, 'dim')) || 0;
+  const supportsDim = hasCap(light, 'dim');
 
   return (
     <li className="flex items-center gap-2 px-2 py-1.5">
@@ -138,29 +153,17 @@ function LightRow({ light, onSet }) {
         <Lightbulb size={11} aria-hidden="true" />
       </button>
       <span className="text-xs flex-1 truncate" title={light.name}>{light.name}</span>
-      {supportsDim ? (
-        <input
-          type="range"
-          min={0}
-          max={100}
-          step={1}
+      {supportsDim && on ? (
+        // CommitSlider sender én kommando når brukeren slipper, ikke én per tikk.
+        <CommitSlider
+          key={`${light.id}:dim`}
           value={Math.round(dim * 100)}
-          onChange={(e) => {
-            const v = Number(e.target.value) / 100;
-            // Slå på lyset automatisk hvis det er av og brukeren drar opp
-            if (!on && v > 0) onSet(light.id, 'onoff', true);
-            onSet(light.id, 'dim', v);
-          }}
-          aria-label={`${light.name} dim-nivå`}
-          className="w-20 accent-nx-cyan"
-          disabled={!on}
+          label={`${light.name} dim-nivå`}
+          onCommit={percent => onSet(light.id, 'dim', percent / 100)}
         />
       ) : (
-        <div className="w-20" />
+        <span className="w-8 text-right text-[10px] font-mono text-nx-mute tabular-nums">{on ? 'PÅ' : '–'}</span>
       )}
-      <span className="w-8 text-right text-[10px] font-mono text-nx-mute tabular-nums">
-        {supportsDim && on ? `${Math.round(dim * 100)}%` : on ? 'PÅ' : '–'}
-      </span>
     </li>
   );
 }

@@ -13,7 +13,9 @@ export function AuthGate({ children }) {
       const response = await apiFetch('/api/session');
       if (!response.ok) {
         setReady(false); setCsrfToken('');
-        if (showError) setError('Tilgangsnøkkelen ble ikke godkjent.');
+        // En avvist nøkkel må ikke bli liggende: den sendes ellers med hvert kall
+        // og gjør at serveren hopper over beboer- og Google-cookien.
+        if (showError) { sessionStorage.removeItem('dashboard.session'); setError('Tilgangsnøkkelen ble ikke godkjent.'); }
         return;
       }
       const session = await response.json();
@@ -50,7 +52,7 @@ export function AuthGate({ children }) {
   if (ready) return <><button className="btn fixed bottom-2 left-2 z-50 text-xs" onClick={logout}>Logg ut{session?.navn ? ` (${session.navn})` : ''}</button>{error && <p role="alert" className="fixed bottom-12 left-2 z-50 panel p-2">{error}</p>}{typeof children === 'function' ? children(session) : children}</>;
   return <main className="min-h-screen grid place-items-center bg-nx-bg text-nx-text p-4"><section className="panel p-6 sm:p-8 w-full max-w-md">
     <h1 className="text-xl mb-4">Logg inn</h1>
-    <ResidentLogin onLoggedIn={() => check()} />
+    <ResidentLogin onLoggedIn={() => { sessionStorage.removeItem('dashboard.session'); check(); }} />
     <hr className="my-6 border-nx-line" />
     {googleEnabled && <><p className="my-3 text-sm">Eier: logg inn med Google-kontoen.</p><button className="btn w-full" onClick={() => { sessionStorage.removeItem('dashboard.session'); setCsrfToken(''); sessionStorage.setItem('dashboard.returnTo', window.location.pathname); window.location.assign(`/auth/google?origin=${encodeURIComponent(window.location.origin)}`); }}>Fortsett med Google</button></>}
     <details className="mt-4" open={!googleEnabled}><summary>Administratortilgang</summary><form onSubmit={e => {

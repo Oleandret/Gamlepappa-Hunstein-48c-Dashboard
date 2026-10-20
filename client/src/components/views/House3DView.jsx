@@ -879,7 +879,10 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
   const controlsRef = useRef();
 
   const roomData = useRoomData(devices, zones, roomsCfg.config, floorPlanPins);
-  useEffect(()=>{if(!initialHomeyZoneId)return;const matches=Object.values(roomData.byRoom).filter(r=>r.zoneIds.includes(initialHomeyZoneId));setSelectedRoomId(matches.length===1?matches[0].room.id:null);},[initialHomeyZoneId,roomsCfg.config, zones]);
+  // Fokuser rommet én gang per initialHomeyZoneId. zones byttes ut ved hver
+  // polling, og uten denne vakta ble brukerens eget romvalg overstyrt hvert 12. sekund.
+  const appliedZoneRef = useRef(null);
+  useEffect(()=>{if(!initialHomeyZoneId||appliedZoneRef.current===initialHomeyZoneId)return;const matches=Object.values(roomData.byRoom).filter(r=>r.zoneIds.includes(initialHomeyZoneId));if(!matches.length)return;appliedZoneRef.current=initialHomeyZoneId;setSelectedRoomId(matches.length===1?matches[0].room.id:null);},[initialHomeyZoneId,roomsCfg.config, zones]);
   const doorMeta = useDoorMeta();
   const doorsCfg = useHouse3dDoors();
   const doorIndex = useMemo(() => new Map(doorMeta.map(d => [d.id, d])), [doorMeta]);

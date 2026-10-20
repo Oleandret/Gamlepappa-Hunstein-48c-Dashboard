@@ -61,7 +61,7 @@ async function homeyFetch(pathPart, opts = {}) {
 
 const teslaSnapshots = createTeslaSnapshots({load:()=>getNamespace('_teslaSnapshots'),save:value=>setNamespace('_teslaSnapshots',value)});
 export const motionHistory=createMotionHistory({load:()=>getNamespace('_motionHistory'),save:v=>setNamespace('_motionHistory',v)});
-const devicesReader = cachedReader(async () => { const devices=await homeyFetch('/manager/devices/device'); await motionHistory.observe(devices).catch(()=>console.warn('[motion-history] storage unavailable')); return teslaSnapshots.project(devices); }, 60_000);
+const devicesReader = cachedReader(async () => { const devices=await homeyFetch('/manager/devices/device'); await motionHistory.observe(devices).catch(()=>console.warn('[motion-history] storage unavailable')); return teslaSnapshots.project(devices).catch(()=>{console.warn('[tesla-snapshots] storage unavailable');return devices;}); }, 60_000);
 const zonesReader = cachedReader(() => homeyFetch('/manager/zones/zone'), 60000);
 const liveEnergyReader = cachedReader(() => homeyFetch('/manager/energy/live'), 60_000);
 let energyDate, dayEnergyReader;

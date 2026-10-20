@@ -11,7 +11,8 @@ const MAX_ITEMS = 1000, MAX_HISTORY = 200, MAX_TEXT = 500;
 const list = v => Array.isArray(v) ? v : [];
 const text = v => typeof v === 'string' ? v.trim().replace(/\s+/g, ' ') : '';
 const bad = message => Object.assign(new Error(message), { status: 400 });
-const isDate = v => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`));
+// Rundtur gjennom toISOString: Date.parse godtar 2026-02-31 og ruller til 3. mars.
+const isDate = v => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`)) && new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v;
 export const osloToday = (now = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Oslo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
 
 function addDays(date, days) { const d = new Date(`${date}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); }
@@ -76,12 +77,15 @@ export function createHusetRoutes({ rules = rulesStore, tasks = tasksStore, cloc
   }
   const add = (store, item) => store.update(prev => { if (list(prev).length >= MAX_ITEMS) throw bad('Listen er full'); return [item, ...list(prev)]; });
 
+  // En innlogget beboer handler alltid i eget navn, uansett hva klienten sender.
+  const asSelf = req => req.user?.method === 'beboer' ? { ...req.body, av: req.user.navn } : req.body;
+
   r.get('/', handle(async (_req, res) => {
     const [rl, tl] = await Promise.all([rules.read(), tasks.read()]);
     res.json({ ...meta, today: osloToday(clock()), rules: list(rl), tasks: list(tl) });
   }));
 
-  r.post('/regler', handle(async (req, res) => res.status(201).json({ rules: await add(rules, parseRule(req.body, clock())) })));
+  r.post('/regler', handle(async (req, res) => res.status(201).json({ rules: await add(rules, parseRule(asSelf(req), clock())) })));
   r.patch('/regler/:id', handle(async (req, res) => {
     const patch = {};
     if (req.body?.status !== undefined) { if (!RULE_STATUS.includes(req.body.status)) throw bad('Ugyldig status'); patch.status = req.body.status; }
@@ -90,9 +94,9 @@ export function createHusetRoutes({ rules = rulesStore, tasks = tasksStore, cloc
   }));
   r.delete('/regler/:id', handle(async (req, res) => res.json({ rules: await remove(rules, req.params.id) })));
 
-  r.post('/gjoremal', handle(async (req, res) => res.status(201).json({ tasks: await add(tasks, parseTask(req.body, clock())) })));
+  r.post('/gjoremal', handle(async (req, res) => res.status(201).json({ tasks: await add(tasks, parseTask(asSelf(req), clock())) })));
   r.post('/gjoremal/:id/fullfor', handle(async (req, res) => {
-    const av = text(req.body?.av);
+    const av = text(asSelf(req)?.av);
     if (!RESIDENTS.includes(av)) throw bad('Velg hvem som gjorde det');
     const now = clock(), today = osloToday(now);
     res.json({ tasks: await edit(tasks, req.params.id, t => {
