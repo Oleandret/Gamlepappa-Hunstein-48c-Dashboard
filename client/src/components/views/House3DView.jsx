@@ -287,7 +287,9 @@ function InteriorRoom({ data, overlay, selected, hovered, onSelect, onHover, sho
         />
       </mesh>
 
-      {walls.map((w, i) => (
+      {/* Uteområder møblert etter bilder har ekte rekkverk/nett; de generiske
+          glassrekkverkene rundt hele området ville gått tvers gjennom dem */}
+      {!(room.outdoor && ROOM_FURNISHINGS[room.id]) && walls.map((w, i) => (
         <mesh key={i} position={[w.mx, 0.12 + wallH / 2, w.mz]} rotation={[0, w.rot, 0]} raycast={() => null}>
           <boxGeometry args={[w.len, wallH, room.outdoor ? 0.04 : 0.1]} />
           <meshStandardMaterial
