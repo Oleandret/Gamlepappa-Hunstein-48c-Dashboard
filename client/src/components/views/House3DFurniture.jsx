@@ -142,8 +142,12 @@ function Item({ item, clip }) {
       return (
         <group>
           <Box {...b} y0={item.y0} y1={item.y1} color={COLORS.black} clip={wallClip} roughness={0.3} />
-          {/* skjermflaten vender inn i rommet (mot nord) */}
-          <mesh position={[(x0 + x1) / 2, (item.y0 + item.y1) / 2, Math.min(z0, z1) - 0.002]} rotation={[0, Math.PI, 0]} raycast={() => null}>
+          {/* skjermflaten vender inn i rommet (mot nord, eller mot sør med screenTo: 's') */}
+          <mesh
+            position={[(x0 + x1) / 2, (item.y0 + item.y1) / 2, item.screenTo === 's' ? Math.max(z0, z1) + 0.002 : Math.min(z0, z1) - 0.002]}
+            rotation={[0, item.screenTo === 's' ? 0 : Math.PI, 0]}
+            raycast={() => null}
+          >
             <planeGeometry args={[Math.abs(x1 - x0) - 0.04, Math.abs(item.y1 - item.y0) - 0.04]} />
             <meshStandardMaterial color={COLORS.screen} emissive="#3b6cff" emissiveIntensity={0.35} roughness={0.2} clippingPlanes={wallClip} />
           </mesh>
@@ -162,6 +166,146 @@ function Item({ item, clip }) {
       );
     case 'speaker':
       return <Box {...b} y0={item.y0} y1={item.y1} color={COLORS.black} clip={clip} roughness={0.5} />;
+    case 'box':
+      return <Box {...b} y0={item.y0 ?? 0} y1={item.y1} color={item.color} clip={item.wall ? clip : clip} roughness={item.roughness ?? 0.85} metalness={item.metalness ?? 0} />;
+    case 'sofa': case 'armchair': {
+      // Sete, rygg på `back`-siden og armlener på endene
+      const c = item.color, h = item.type === 'armchair' ? 0.85 : 0.82, t = 0.22;
+      const back = { n: { z1: z0 + t }, s: { z0: z1 - t }, e: { x0: x1 - t }, w: { x1: x0 + t } }[item.back || 's'];
+      const alongX = item.back === 'n' || item.back === 's' || !item.back;
+      return (
+        <group>
+          <Box {...b} y0={0} y1={0.44} color={c} clip={clip} />
+          <Box {...b} {...back} y0={0.44} y1={h} color={c} clip={clip} />
+          {alongX
+            ? [[x0, x0 + 0.18], [x1 - 0.18, x1]].map(([a, d], i) => <Box key={i} x0={a} x1={d} z0={z0} z1={z1} y0={0.44} y1={0.62} color={c} clip={clip} />)
+            : [[z0, z0 + 0.18], [z1 - 0.18, z1]].map(([a, d], i) => <Box key={i} x0={x0} x1={x1} z0={a} z1={d} y0={0.44} y1={0.62} color={c} clip={clip} />)}
+        </group>
+      );
+    }
+    case 'table': {
+      const top = item.y1 ?? 0.75, legs = item.legs || COLORS.black;
+      return (
+        <group>
+          <Box {...b} y0={top - 0.04} y1={top} color={item.color} clip={clip} roughness={item.glass ? 0.05 : 0.6} metalness={item.glass ? 0.2 : 0} />
+          {[[x0 + 0.05, z0 + 0.05], [x1 - 0.09, z0 + 0.05], [x0 + 0.05, z1 - 0.09], [x1 - 0.09, z1 - 0.09]].map(([lx, lz], i) => (
+            <Box key={i} x0={lx} x1={lx + 0.04} z0={lz} z1={lz + 0.04} y0={0} y1={top - 0.04} color={legs} clip={clip} metalness={0.4} />
+          ))}
+        </group>
+      );
+    }
+    case 'chair': {
+      const c = item.color, t = 0.06;
+      const back = { n: { z1: z0 + t }, s: { z0: z1 - t }, e: { x0: x1 - t }, w: { x1: x0 + t } }[item.back || 'n'];
+      return (
+        <group>
+          <Box {...b} y0={0.42} y1={0.48} color={c} clip={clip} />
+          <Box {...b} {...back} y0={0.48} y1={0.88} color={c} clip={clip} />
+          {[[x0 + 0.04, z0 + 0.04], [x1 - 0.07, z0 + 0.04], [x0 + 0.04, z1 - 0.07], [x1 - 0.07, z1 - 0.07]].map(([lx, lz], i) => (
+            <Box key={i} x0={lx} x1={lx + 0.03} z0={lz} z1={lz + 0.03} y0={0} y1={0.42} color={COLORS.black} clip={clip} />
+          ))}
+        </group>
+      );
+    }
+    case 'stool':
+      return (
+        <group>
+          <Box {...b} y0={0.7} y1={0.76} color="#f2f2f0" clip={clip} />
+          <Box x0={(x0 + x1) / 2 - 0.025} x1={(x0 + x1) / 2 + 0.025} z0={(z0 + z1) / 2 - 0.025} z1={(z0 + z1) / 2 + 0.025} y0={0} y1={0.7} color="#c0c0c0" clip={clip} metalness={0.6} />
+        </group>
+      );
+    case 'glassCabinet':
+      return (
+        <group>
+          <Box {...b} y0={0} y1={1.9} color="#a7c3cc" clip={clip} roughness={0.05} metalness={0.2} />
+          <Box x0={x0} x1={x1} z0={z0} z1={z0 + 0.03} y0={0} y1={1.9} color={COLORS.black} clip={clip} />
+        </group>
+      );
+    case 'car': {
+      // Enkel SUV-form: karosseri, kupé med mørke ruter og fire hjul (langs x)
+      const len = x1 - x0, w = z1 - z0, c = item.color;
+      const S = { clip, roughness: 0.3, metalness: 0.55 };
+      const wheels = [[x0 + len * 0.17, z0], [x1 - len * 0.2, z0], [x0 + len * 0.17, z1 - 0.25], [x1 - len * 0.2, z1 - 0.25]];
+      return (
+        <group>
+          <Box x0={x0} x1={x1} z0={z0 + 0.05} z1={z1 - 0.05} y0={0.28} y1={0.95} color={c} {...S} />
+          <Box x0={x0 + len * 0.22} x1={x1 - len * 0.18} z0={z0 + 0.15} z1={z1 - 0.15} y0={0.95} y1={1.62} color="#1d2228" {...S} />
+          <Box x0={x0 + len * 0.26} x1={x1 - len * 0.22} z0={z0 + 0.18} z1={z1 - 0.18} y0={1.62} y1={1.66} color={c} {...S} />
+          {wheels.map(([wx, wz], i) => (
+            <Box key={i} x0={wx} x1={wx + 0.72} z0={wz} z1={wz + 0.25} y0={0} y1={0.72} color="#111111" clip={clip} roughness={0.9} />
+          ))}
+        </group>
+      );
+    }
+    case 'moped':
+      return (
+        <group>
+          <Box x0={x0 + 0.1} x1={x1 - 0.1} z0={z0 + 0.15} z1={z1 - 0.15} y0={0.25} y1={0.75} color="#1c1c1c" clip={clip} />
+          <Box x0={x0 + 0.5} x1={x1 - 0.2} z0={z0 + 0.12} z1={z1 - 0.12} y0={0.75} y1={0.85} color="#e8e2d6" clip={clip} />
+          <Box x0={x1 - 0.18} x1={x1 - 0.12} z0={z0} z1={z1} y0={0.3} y1={1.15} color="#d4a017" clip={clip} metalness={0.6} />
+          {[x0, x1 - 0.5].map((wx, i) => <Box key={i} x0={wx} x1={wx + 0.5} z0={z0 + 0.2} z1={z1 - 0.2} y0={0} y1={0.5} color="#111111" clip={clip} />)}
+        </group>
+      );
+    case 'slats': {
+      const n = Math.max(3, Math.round((x1 - x0) / 0.09)), w = (x1 - x0) / n;
+      return (
+        <group>
+          {Array.from({ length: n }).map((_, i) => (
+            <Box key={i} x0={x0 + i * w} x1={x0 + i * w + w * 0.55} z0={z0} z1={z1} y0={0} y1={item.y1} color={item.color} clip={clip} />
+          ))}
+        </group>
+      );
+    }
+    case 'vanity':
+      return (
+        <group>
+          <Box {...b} y0={0.12} y1={0.82} color={item.color} clip={clip} />
+          <Box x0={x0 - 0.02} x1={x1 + 0.02} z0={z0} z1={z1 + 0.03} y0={0.82} y1={0.88} color="#f6f6f4" clip={clip} roughness={0.2} />
+        </group>
+      );
+    case 'shower':
+      return (
+        <group>
+          <Box {...b} y0={0} y1={0.03} color="#b8ab98" clip={clip} />
+          <Box x0={x0} x1={x1} z0={z1 - 0.02} z1={z1} y0={0} y1={2.0} color="#d6eef5" clip={clip} roughness={0.05} />
+          <Box x0={x1 - 0.02} x1={x1} z0={z0} z1={z1} y0={0} y1={2.0} color="#d6eef5" clip={clip} roughness={0.05} />
+        </group>
+      );
+    case 'washer':
+      return (
+        <group>
+          <Box {...b} y0={0} y1={0.85} color="#f4f4f4" clip={clip} roughness={0.4} />
+          <mesh position={[(x0 + x1) / 2, 0.48, z1 + 0.003]} raycast={() => null}>
+            <circleGeometry args={[Math.min(x1 - x0, 0.6) * 0.32, 24]} />
+            <meshStandardMaterial color="#2b3440" roughness={0.2} clippingPlanes={clip} />
+          </mesh>
+        </group>
+      );
+    case 'wardrobe':
+      return (
+        <group>
+          <Box {...b} y0={0} y1={2.2} color="#e3d2b8" clip={clip} />
+          <Box x0={x0 + 0.05} x1={x1 - 0.05} z0={z0 + 0.05} z1={z1 - 0.05} y0={0.9} y1={1.7} color="#8d8478" clip={clip} />
+        </group>
+      );
+    case 'lounger':
+      return (
+        <group>
+          <Box {...b} y0={0.2} y1={0.32} color="#9c7650" clip={clip} />
+          <Box x0={x0 + 0.04} x1={x1 - 0.04} z0={z0 + 0.5} z1={z1 - 0.04} y0={0.32} y1={0.4} color="#ece7dc" clip={clip} />
+          <Box x0={x0 + 0.04} x1={x1 - 0.04} z0={z0} z1={z0 + 0.55} y0={0.32} y1={0.75} color="#ece7dc" clip={clip} tilt={-0.6} />
+          {[[x0, z0 + 0.1], [x1 - 0.05, z0 + 0.1], [x0, z1 - 0.15], [x1 - 0.05, z1 - 0.15]].map(([lx, lz], i) => (
+            <Box key={i} x0={lx} x1={lx + 0.05} z0={lz} z1={lz + 0.05} y0={0} y1={0.2} color="#9c7650" clip={clip} />
+          ))}
+        </group>
+      );
+    case 'foldingChair':
+      return (
+        <group>
+          <Box {...b} y0={0.25} y1={0.3} color={item.color} clip={clip} tilt={0.25} />
+          <Box x0={x0} x1={x1} z0={z0} z1={z0 + 0.06} y0={0.3} y1={0.75} color={item.color} clip={clip} tilt={-0.35} />
+        </group>
+      );
     default:
       return null;
   }
@@ -171,7 +315,7 @@ function Item({ item, clip }) {
 function WallFinish({ wall, bounds, height, clip }) {
   const [bx0, bz0, bx1, bz1] = bounds;
   const map = wall.finish === 'forest' ? forestTexture() : null;
-  const color = wall.finish === 'forest' ? '#ffffff' : COLORS.green;
+  const color = wall.finish === 'forest' ? '#ffffff' : wall.finish === 'plywood' ? '#c99a62' : COLORS.green;
   const len = wall.to - wall.from, mid = (wall.from + wall.to) / 2, inset = 0.012;
   const place = {
     north: { pos: [mid, height / 2, bz0 + inset], rot: 0 },
@@ -201,7 +345,7 @@ export function RoomFurnishings({ floorId, baseY, clipY = null }) {
     <group position={[0, baseY + FLOOR_TOP, 0]}>
       {Object.entries(ROOM_FURNISHINGS).filter(([, f]) => f.floorId === floorId).map(([roomId, f]) => (
         <group key={roomId}>
-          {f.walls.flatMap((w, i) => wallSegments(w, f.doors).map(([from, to], j) => (
+          {(f.walls || []).flatMap((w, i) => wallSegments(w, f.doors).map(([from, to], j) => (
             <WallFinish key={`${i}-${j}`} wall={{ ...w, from, to }} bounds={f.bounds} height={2.26} clip={clip} />
           )))}
           {f.items.map((it, i) => <Item key={i} item={it} clip={clip} />)}

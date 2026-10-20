@@ -1,7 +1,8 @@
 /**
  * Faktisk møblering per rom, målt ut fra bilder av rommet. Rom som står her
  * får arkitektens møbler fra BIM-modellen (IfcFurnishingElement) skjult og
- * disse tegnet i stedet.
+ * disse tegnet i stedet. `keepBim` (regex på BIM-navnet) beholder BIM-møbler
+ * som stemmer med virkeligheten, f.eks. kjøkkeninnredningen.
  *
  * Koordinater i meter i samme system som house3dModel.js (x øst, z sør),
  * y = høyde over gulvflaten i rommet (oppå romplata, FLOOR_TOP). Bokser er { at: [x0, z0, x1, z1], y0, y1 }.
@@ -52,10 +53,181 @@ export const ROOM_FURNISHINGS = {
       { type: 'speaker', at: [3.0, -0.3, 3.55, -0.1], y0: 2.2, y1: 2.38, wall: true },
       { type: 'speaker', at: [5.05, -0.3, 5.28, -0.1], y0: 2.05, y1: 2.38, wall: true }
     ]
+  },
+
+  // ── Øvrige rom i 1. etg — bilder 20.10.2026 (IMG_2187–2218) ──────────────
+  // Kjøkkenbenk, øy, kjøleskap og oppvaskmaskin fra BIM stemmer med bildene
+  // og beholdes (keepBim); sofa og spisebord står annerledes i virkeligheten.
+  'f1-kjokken': {
+    floorId: 'floor1',
+    bounds: [-4.9, 0.21, 6.2, 5.05],
+    floor: { color: '#a3a29e', roughness: 0.35 },
+    keepBim: /Kjøkken|Kjøleskap|Oppvask/i,
+    items: [
+      // Stue mot øst: L-sofa med sjeselong foran terrassedøra, rygg mot vinduene
+      { type: 'rug', at: [3.0, 2.2, 5.3, 4.3], color: '#8f8b84' },
+      { type: 'sofa', at: [5.2, 2.35, 6.1, 5.0], back: 'e', color: '#d9cdb8' },
+      { type: 'sofa', at: [2.6, 4.2, 5.2, 5.0], back: 's', color: '#d9cdb8' },
+      { type: 'box', at: [5.2, 1.5, 6.1, 2.35], y0: 0, y1: 0.42, color: '#d9cdb8' },
+      { type: 'table', at: [3.6, 2.9, 4.9, 3.8], y1: 0.42, color: '#bcd8e0', glass: true, legs: '#b8b8b8' },
+      { type: 'armchair', at: [2.25, 2.2, 3.05, 3.0], back: 'w', color: '#d9cdb8' },
+      // TV-veggen mot soverommet (dør til soverommet står vest for den)
+      { type: 'box', at: [2.7, 0.21, 4.6, 0.6], y0: 0.25, y1: 0.6, color: '#c9ab84' },
+      { type: 'tv', at: [2.85, 0.21, 4.45, 0.27], y0: 1.0, y1: 1.9, wall: true, screenTo: 's' },
+      { type: 'glassCabinet', at: [1.6, 4.6, 2.45, 5.0] },
+      // Kjøkken: barkrakk ved øya
+      { type: 'stool', at: [-2.6, 3.2, -2.25, 3.55] },
+      // Spisebord i vest ved skyvedøra, hvit duk og seks grå stoler
+      { type: 'table', at: [-4.5, 3.3, -2.5, 4.3], y1: 0.75, color: '#f3f1ec', legs: '#2a2a2a' },
+      { type: 'chair', at: [-4.35, 2.8, -3.85, 3.3], back: 'n', color: '#9a9590' },
+      { type: 'chair', at: [-3.75, 2.8, -3.25, 3.3], back: 'n', color: '#9a9590' },
+      { type: 'chair', at: [-3.15, 2.8, -2.65, 3.3], back: 'n', color: '#9a9590' },
+      { type: 'chair', at: [-4.35, 4.3, -3.85, 4.8], back: 's', color: '#9a9590' },
+      { type: 'chair', at: [-3.75, 4.3, -3.25, 4.8], back: 's', color: '#9a9590' },
+      { type: 'chair', at: [-3.15, 4.3, -2.65, 4.8], back: 's', color: '#9a9590' }
+    ]
+  },
+
+  'f1-garasje': {
+    floorId: 'floor1',
+    bounds: [-13.55, -4.0, -8.05, 2.1],
+    floor: { color: '#b4b2ad', roughness: 0.8 },
+    // Kryssfinér på langveggen (ingen dører der)
+    walls: [{ side: 'north', from: -13.55, to: -8.05, finish: 'plywood' }],
+    items: [
+      // Tesla Model X, ryggete inn med nesen mot bakveggen
+      { type: 'car', at: [-13.2, -0.15, -8.25, 1.85], color: '#3b3e44' },
+      { type: 'moped', at: [-12.6, -3.3, -11.0, -2.75] },
+      // Arbeidsbenk med verktøytavle på bakveggen (nordre del)
+      { type: 'box', at: [-8.7, -3.95, -8.05, -2.0], y0: 0, y1: 0.9, color: '#c9a46e' },
+      { type: 'box', at: [-8.12, -3.9, -8.05, -2.05], y0: 0.95, y1: 1.9, color: '#8a8f96', wall: true },
+      // Hvite overskap langs langveggen
+      { type: 'box', at: [-12.9, -4.0, -9.0, -3.6], y0: 1.75, y1: 2.3, color: '#f2f2f0', wall: true },
+      { type: 'box', at: [-13.5, -1.4, -13.1, 0.2], y0: 0, y1: 1.2, color: '#f2f2f0' }
+    ]
+  },
+
+  'f1-gang': {
+    floorId: 'floor1',
+    bounds: [-6.6, -2.35, -3.55, -0.05],
+    floor: { color: '#a8a7a3', roughness: 0.35 },
+    items: [
+      // Skjerm av eikespiler med speil
+      { type: 'slats', at: [-6.1, -0.32, -4.5, -0.22], y1: 2.2, color: '#c9a77c' },
+      { type: 'box', at: [-5.6, -0.36, -5.0, -0.32], y0: 0.3, y1: 1.9, color: '#c6d4dc', metalness: 0.6, roughness: 0.1 },
+      // Skohylle i furu og knaggrekke med jakker
+      { type: 'box', at: [-6.55, -2.3, -6.15, -1.55], y0: 0, y1: 2.0, color: '#d8b88a' },
+      { type: 'box', at: [-6.55, -1.45, -6.25, -0.45], y0: 0.7, y1: 1.7, color: '#6d5a66' },
+      { type: 'box', at: [-4.25, -0.6, -3.65, -0.2], y0: 0, y1: 0.42, color: '#c9a46e' }
+    ]
+  },
+
+  'f1-wc': {
+    floorId: 'floor1',
+    bounds: [-5.15, -3.9, -3.55, -2.35],
+    floor: { color: '#a8a7a3', roughness: 0.35 },
+    items: [
+      { type: 'vanity', at: [-5.1, -3.88, -4.35, -3.43], color: '#2e211c' },
+      { type: 'box', at: [-5.0, -3.9, -4.45, -3.87], y0: 1.05, y1: 1.7, color: '#1a1a1a', wall: true },
+      // Flislagt kasse i beige marmor bak det vegghengte toalettet (toalettet er fra BIM)
+      { type: 'box', at: [-4.3, -3.9, -3.6, -3.68], y0: 0, y1: 1.1, color: '#e3d6c0', roughness: 0.4 }
+    ]
+  },
+
+  'f1-bad': {
+    floorId: 'floor1',
+    bounds: [-3.45, -3.9, 0.93, -2.35],
+    floor: { color: '#e0d4c0', roughness: 0.5 },
+    items: [
+      { type: 'shower', at: [-3.4, -3.88, -2.5, -2.98] },
+      { type: 'vanity', at: [-2.2, -3.88, -1.0, -3.43], color: '#2b2b2b' },
+      { type: 'box', at: [-2.1, -3.9, -1.1, -3.78], y0: 1.1, y1: 1.85, color: '#cfd8dc', metalness: 0.5, roughness: 0.15, wall: true },
+      { type: 'box', at: [-0.7, -2.85, -0.1, -2.4], y0: 0, y1: 0.9, color: '#f4f4f2' }
+    ]
+  },
+
+  'f1-vask': {
+    floorId: 'floor1',
+    bounds: [-3.45, -2.1, -1.6, 0.1],
+    floor: { color: '#a8a7a3', roughness: 0.5 },
+    items: [
+      // Benk med vaskemaskin og tørketrommel under, hyller over
+      { type: 'box', at: [-3.4, -2.05, -1.65, -1.45], y0: 0.86, y1: 0.9, color: '#b9b6b0' },
+      { type: 'washer', at: [-2.9, -2.0, -2.3, -1.45] },
+      { type: 'washer', at: [-2.25, -2.0, -1.68, -1.45] },
+      { type: 'box', at: [-3.4, -2.05, -2.95, -1.5], y0: 0, y1: 0.6, color: '#eceae6' },
+      { type: 'box', at: [-3.4, -2.08, -1.65, -1.75], y0: 1.25, y1: 1.3, color: '#f2f2f0', wall: true },
+      { type: 'box', at: [-3.4, -2.08, -1.65, -1.7], y0: 1.7, y1: 2.3, color: '#ebe7df', wall: true },
+      { type: 'box', at: [-3.35, -0.5, -3.1, -0.25], y0: 0, y1: 0.55, color: '#f6f6f6' }
+    ]
+  },
+
+  'f1-walkin': {
+    floorId: 'floor1',
+    bounds: [-1.5, -2.1, 0.6, 0.1],
+    floor: { color: '#c9c1b2', roughness: 1 },
+    items: [
+      { type: 'wardrobe', at: [-1.48, -2.08, -0.98, -0.2] },
+      { type: 'wardrobe', at: [-0.95, -2.08, 0.05, -1.58] },
+      { type: 'wardrobe', at: [0.08, -2.08, 0.58, -0.2] }
+    ]
+  },
+
+  'f1-sluse': {
+    floorId: 'floor1',
+    bounds: [-7.95, -0.9, -6.65, 2.13],
+    // BIM-loungesofaen ute på dekket har senter her, men står utenfor boden
+    keepBim: /Lounge/i,
+    floor: { color: '#a8a7a3', roughness: 0.6 },
+    items: [
+      // Nettverksskap og hyller på veggen, støvsuger og bøtte på gulvet
+      { type: 'box', at: [-7.95, 0.2, -7.82, 0.85], y0: 0.9, y1: 1.6, color: '#f4f4f4', wall: true },
+      { type: 'box', at: [-6.95, -0.5, -6.68, 1.6], y0: 0.5, y1: 0.53, color: '#f4f4f4' },
+      { type: 'box', at: [-6.95, -0.5, -6.68, 1.6], y0: 1.1, y1: 1.13, color: '#f4f4f4' },
+      { type: 'box', at: [-7.55, 1.0, -7.2, 1.4], y0: 0, y1: 0.3, color: '#222222' },
+      { type: 'box', at: [-7.15, 1.5, -6.85, 1.8], y0: 0, y1: 0.6, color: '#c8c8c8', metalness: 0.5 }
+    ]
+  },
+
+  // Ballbane på dekket over bassenget: nett, kurv, mål, utekjøkken, grill og
+  // loungesofa finnes i BIM og beholdes; resten er lagt til fra bildene.
+  'f1-ballbane': {
+    floorId: 'floor1',
+    bounds: [-19.25, 2.3, -5.05, 10.25],
+    floor: { color: '#d8c59c', roughness: 0.95 },
+    keepBim: /./,
+    items: [
+      { type: 'lounger', at: [-10.9, 2.7, -10.2, 4.65] },
+      { type: 'lounger', at: [-9.9, 2.7, -9.2, 4.65] },
+      { type: 'table', at: [-6.5, 3.0, -5.4, 3.9], y1: 0.74, color: '#6e6e6e', legs: '#2a2a2a' },
+      { type: 'chair', at: [-6.4, 2.55, -5.95, 3.0], back: 'n', color: '#f1f1f1' },
+      { type: 'chair', at: [-5.9, 2.55, -5.45, 3.0], back: 'n', color: '#f1f1f1' },
+      { type: 'chair', at: [-6.4, 3.9, -5.95, 4.3], back: 's', color: '#f1f1f1' },
+      { type: 'chair', at: [-5.9, 3.9, -5.45, 4.3], back: 's', color: '#f1f1f1' },
+      // Oppbevaringsbenk ved inngangsdøra
+      { type: 'box', at: [-8.9, 2.35, -7.75, 2.8], y0: 0, y1: 0.6, color: '#4b4f55' }
+    ]
+  },
+
+  // Terrasse mot øst/sør: smal gang langs fasaden og et bredere hjørne
+  'f1-terrasse': {
+    floorId: 'floor1',
+    bounds: [6.25, -0.6, 8.55, 6.3],
+    floor: { color: '#8e8b86', roughness: 1 },
+    items: [
+      { type: 'box', at: [7.0, 2.6, 7.4, 3.5], y0: 0, y1: 0.35, color: '#d9d6cf' },
+      { type: 'foldingChair', at: [6.6, 2.2, 7.15, 2.75], color: '#c9dbe6' },
+      { type: 'foldingChair', at: [7.4, 3.5, 7.95, 4.05], color: '#c9dbe6' }
+    ]
   }
 };
 
 /** Er punktet (x, z) inne i et rom som har egen møblering på denne etasjen? */
+export function keepsBimElement(roomId, name = '') {
+  const keep = ROOM_FURNISHINGS[roomId]?.keepBim;
+  return Boolean(keep && keep.test(name));
+}
+
 export function furnishedRoomAt(floorId, x, z) {
   for (const [roomId, f] of Object.entries(ROOM_FURNISHINGS)) {
     if (f.floorId !== floorId) continue;
