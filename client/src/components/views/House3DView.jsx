@@ -16,7 +16,7 @@ import { DeviceCommandStatus, useDeviceCommand } from '../DeviceCommandStatus.js
 import { SaveButton } from '../SaveButton.jsx';
 import { DeviceMarker3D, RoomLighting, RoomLightVolume, DoorAnimator, isLightDevice, deviceReadout } from './House3DDevices.jsx';
 import { RoomFurnishings } from './House3DFurniture.jsx';
-import { furnishedRoomAt, ROOM_FURNISHINGS } from '../../lib/house3dFurniture.js';
+import { furnishedRoomAt, keepsBimElement, ROOM_FURNISHINGS } from '../../lib/house3dFurniture.js';
 import { useDoorMeta, useHouse3dDoors, resolveDoorLinks, isDoorSensor, doorSensorOpen } from '../../lib/house3dDoors.js';
 
 /**
@@ -172,7 +172,7 @@ function tempColor(t) {
 }
 
 function floorColorFor(room, stats, overlay) {
-  if (room.outdoor) return new THREE.Color(C.deck);
+  if (room.outdoor && !ROOM_FURNISHINGS[room.id]?.floor) return new THREE.Color(C.deck);
   if (overlay === 'temp') return tempColor(stats.temp);
   if (overlay === 'security') {
     if (stats.motion) return new THREE.Color(C.red);
@@ -473,7 +473,8 @@ function BimGroup({ items, floorId = null, offsetY = 0, clipY = null, interior, 
       // Rom med faktisk møblering (fra bilder) får arkitektens møbler skjult
       if (type === 'IfcFurnishingElement' && floorId) {
         const c = new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3());
-        if (furnishedRoomAt(floorId, c.x, c.z)) continue;
+        const roomId = furnishedRoomAt(floorId, c.x, c.z);
+        if (roomId && !keepsBimElement(roomId, mesh.name || mesh.parent?.name)) continue;
       }
       const m = mesh.clone();
       m.matrix.copy(mesh.matrixWorld);

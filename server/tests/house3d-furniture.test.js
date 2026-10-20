@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ROOM_FURNISHINGS, furnishedRoomAt, wallSegments } from '../../client/src/lib/house3dFurniture.js';
+import { ROOM_FURNISHINGS, furnishedRoomAt, keepsBimElement, wallSegments } from '../../client/src/lib/house3dFurniture.js';
 import { ALL_ROOMS, roomPoly } from '../../client/src/lib/house3dModel.js';
 
 test('møblering fra bilder ligger inne i riktig rom', () => {
@@ -32,6 +32,22 @@ test('veggflatene har åpninger der dørene står', () => {
 test('Soverom 3 skjuler arkitektens møbler bare inne i rommet', () => {
   assert.equal(furnishedRoomAt('floor1', 2.8, -3.0), 'f1-sov3');   // BIM-sengen
   assert.equal(furnishedRoomAt('floor1', 4.6, -0.6), 'f1-sov3');   // BIM-skrivebordet
-  assert.equal(furnishedRoomAt('floor1', 2.0, 2.0), null);         // kjøkken/stue
+  assert.equal(furnishedRoomAt('floor1', 2.0, 2.0), 'f1-kjokken');
   assert.equal(furnishedRoomAt('floor2', 2.8, -3.0), null);        // annen etasje
+});
+
+test('rom i 1. etg skjuler feil BIM-møbler, men beholder de som stemmer', () => {
+  // Arkitektens sofa og spisebord i stua byttes ut; kjøkkenet beholdes
+  assert.equal(furnishedRoomAt('floor1', 4.2, 3.8), 'f1-kjokken');
+  assert.equal(keepsBimElement('f1-kjokken', 'floor1|IfcFurnishingElement|Sofa 3 + 1 + 1 + Bord|x'), false);
+  assert.equal(keepsBimElement('f1-kjokken', 'floor1|IfcFurnishingElement|Spisebord 6|x'), false);
+  assert.equal(keepsBimElement('f1-kjokken', 'floor1|IfcFurnishingElement|Kjøkkenøy – underskap (mørk eik)|x'), true);
+  assert.equal(keepsBimElement('f1-kjokken', 'floor1|IfcFurnishingElement|Kjøkken Benkskap|x'), true);
+  // Ballbanen beholder alt fra BIM; garasjen beholder ingenting
+  assert.equal(keepsBimElement('f1-ballbane', 'floor1|IfcFurnishingElement|Grill|x'), true);
+  assert.equal(keepsBimElement('f1-garasje', 'floor1|IfcFurnishingElement|Garasjehylle|x'), false);
+  // Alle rom i 1. etg har nå egen møblering, U.etg ikke ennå
+  const f1 = Object.values(ROOM_FURNISHINGS).filter(f => f.floorId === 'floor1').length;
+  assert.equal(f1, 11);
+  assert.equal(furnishedRoomAt('basement', -8, 2), null);
 });
