@@ -55,3 +55,12 @@ Se `verification/final-tests.txt`, `verification/final-build.txt`, `verification
 5. Codex removed unsafe totals from the old Energy screen, integrated the independent tests and repeated build/browser/regression verification.
 
 OpenClaw calls timed out at the connector while work continued. Session history was read before any follow-up; no duplicate write was issued. GitHub/Railway publication is authorized by the user's later instruction. Physical control remains out of scope.
+
+## 3D-hus — 20.–21. oktober 2026
+
+- Sol, skygger og dag/natt følger klokka over Hundvåg (modellen dreid 35° etter situasjonsplanen).
+- Soverom 3 og resten av 1. etasje møblert etter bilder i Google Drive («Hunstein 48c – rombilder»); BIM-møbler som stemmer beholdes per rom (`keepBim`), feilplasserte skjules.
+- Ny uteplass med glasstak utenfor kjøkkenets skyvedør mot sør (målt fra dronebilder); feilplassert BIM-pergola og sørrekkverk skjules. Generiske glassrekkverk tegnes ikke rundt uteområder med egen møblering.
+- Garasje: Tesla Model X og Model Y, ingen møbler.
+- Etasjene kan spres skrått («Skrått»-bryter), så man ser inn i alle samtidig.
+- Egen lesenøkkel for rombilder (`ROOM_PHOTO_READ_TOKEN`), bare GET på `/api/room-photos`.
