@@ -34,6 +34,8 @@ import { useDoorMeta, useHouse3dDoors, resolveDoorLinks, isDoorSensor, doorSenso
  */
 
 const CENTER = [-3.2, 0, 1.8];
+/** Sideforskyvning per etasje (x, z i meter ved full spredning) når etasjene spres skrått. */
+const SLANT_STEP = [-3, -9];
 
 const C = {
   bg: '#05070d',
@@ -464,7 +466,7 @@ function doorIdOf(obj) {
   return null;
 }
 
-function BimGroup({ items, floorId = null, offsetY = 0, clipY = null, interior, onPick, onDoor, dim = 1, doorIndex, registry }) {
+function BimGroup({ items, floorId = null, offsetX = 0, offsetY = 0, offsetZ = 0, clipY = null, interior, onPick, onDoor, dim = 1, doorIndex, registry }) {
   const group = useMemo(() => {
     const g = new THREE.Group();
     const plane = clipY == null ? null : new THREE.Plane(new THREE.Vector3(0, -1, 0), clipY);
@@ -548,11 +550,11 @@ function BimGroup({ items, floorId = null, offsetY = 0, clipY = null, interior, 
     if (doorId && onDoor) { e.stopPropagation(); onDoor(doorId); return; }
     if (onPick) { e.stopPropagation(); onPick(e.point); }
   } : undefined;
-  return <primitive object={group} position={[0, offsetY, 0]} onClick={handle} />;
+  return <primitive object={group} position={[offsetX, offsetY, offsetZ]} onClick={handle} />;
 }
 
 /** Hele bygget/tomta (eksteriør) eller én etasje med snitt (interiør). */
-function BimModel({ mode, visibleFloors, floorY, onPick, onDoor, doorIndex, registry }) {
+function BimModel({ mode, visibleFloors, floorY, floorShift, onPick, onDoor, doorIndex, registry }) {
   const groups = useBimGroups();
   if (mode === 'exterior') {
     return (
@@ -572,9 +574,10 @@ function BimModel({ mode, visibleFloors, floorY, onPick, onDoor, doorIndex, regi
         const items = groups[BIM_GROUP_FLOOR[floor.id]];
         if (!items) return null;
         const y = floorY(floor.id);
+        const [sx, sz] = floorShift(floor.id);
         return (
           <BimGroup
-            key={floor.id} items={items} floorId={floor.id} offsetY={y - floor.level} clipY={y + CLIP_HEIGHT} interior
+            key={floor.id} items={items} floorId={floor.id} offsetX={sx} offsetY={y - floor.level} offsetZ={sz} clipY={y + CLIP_HEIGHT} interior
             onDoor={onDoor} doorIndex={doorIndex} registry={registry}
           />
         );
@@ -614,10 +617,10 @@ function ExteriorGlow({ roomData }) {
 
 // ─── Etasje ─────────────────────────────────────────────────────────────
 
-function Floor({ floor, index, mode, explode, roomData, overlay, selectedRoomId, hoveredRoomId, onSelect, onHover, isolated, dimmed, bim }) {
+function Floor({ floor, index, mode, explode, shift = [0, 0], roomData, overlay, selectedRoomId, hoveredRoomId, onSelect, onHover, isolated, dimmed, bim }) {
   const y = floor.level + (mode === 'interior' ? explode * index * 3.2 : 0);
   return (
-    <group position={[0, y, 0]}>
+    <group position={[shift[0], y, shift[1]]}>
       {floor.rooms.map(room => {
         const data = roomData.byRoom[room.id];
         if (mode === 'exterior' && bim) return null;
@@ -813,6 +816,9 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
   const [floorFilter, setFloorFilter] = useState('all');
   const [overlay, setOverlay] = useState('all');
   const [explode, setExplode] = useState(0.6);
+  // Skrå spredning: etasjene forskyves også sidelengs (som en trapp), så man ser inn i alle samtidig
+  const [slant, setSlant] = useState(() => { try { return localStorage.getItem('nexora.house3d.slant') !== '0'; } catch { return true; } });
+  useEffect(() => { try { localStorage.setItem('nexora.house3d.slant', slant ? '1' : '0'); } catch {} }, [slant]);
   const [selectedRoomId, setSelectedRoomId] = useState(null);
   const [hoveredRoomId, setHoveredRoomId] = useState(null);
   const [selectedMarkerId, setSelectedMarkerId] = useState(null);
@@ -940,6 +946,27 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
     const i = FLOORS.findIndex(f => f.id === floorId);
     return FLOORS[i].level + (mode === 'interior' ? explode * i * 3.2 : 0);
   };
+  /**
+   * Kameravinkler: når etasjene er spredt (særlig skrått) siktes det mot midten
+   * av «trappen», og kameraet trekkes lenger ut så alle etasjene kommer med.
+   */
+  const flyToPreset = (id) => {
+    const pr = PRESETS[id];
+    if (mode !== 'interior' || floorFilter !== 'all') return setFlyTo({ ...pr, key: Date.now() });
+    const mid = FLOORS.findIndex(f => f.id === 'floor1');
+    const [sx, sz] = floorShift('floor1');
+    const sy = explode * mid * 3.2;
+    const target = [pr.target[0] + sx, pr.target[1] + sy, pr.target[2] + sz];
+    const zoom = 1 + explode * (slant ? 0.55 : 0.25);
+    const pos = pr.pos.map((v, k) => target[k] + (v - pr.target[k]) * zoom);
+    setFlyTo({ pos, target, key: Date.now() });
+  };
+  /** Sideforskyvning [x, z] for en etasje ved skrå spredning (bare i interiør). */
+  const floorShift = (floorId) => {
+    const i = FLOORS.findIndex(f => f.id === floorId);
+    if (mode !== 'interior' || !slant) return [0, 0];
+    return [SLANT_STEP[0] * explode * i, SLANT_STEP[1] * explode * i];
+  };
 
   const selectRoom = (roomId) => {
     setSelectedRoomId(roomId);
@@ -947,7 +974,8 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
     setSelectedDoorId(null);
     if (!roomId) return;
     const room = ALL_ROOMS.find(r => r.id === roomId);
-    const [x, z] = roomCenter(room);
+    const [sx, sz] = floorShift(room.floorId);
+    const [x, z] = roomCenter(room).map((v, k) => v + (k ? sz : sx));
     const y = floorY(room.floorId);
     setFlyTo({ pos: [x + 7, y + 9, z + 10], target: [x, y + 0.8, z], key: Date.now() });
   };
@@ -972,7 +1000,9 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
     setMode('interior');
     setFloorFilter(door.floor);
     const y = FLOORS[i].level + explode * i * 3.2;
-    setFlyTo({ pos: [door.center[0] + nx * 5.5, y + 9, door.center[2] + nz * 5.5 + 2.5], target: [door.center[0], y + 0.6, door.center[2]], key: Date.now() });
+    const [sx, sz] = slant ? [SLANT_STEP[0] * explode * i, SLANT_STEP[1] * explode * i] : [0, 0];
+    const dcx = door.center[0] + sx, dcz = door.center[2] + sz;
+    setFlyTo({ pos: [dcx + nx * 5.5, y + 9, dcz + nz * 5.5 + 2.5], target: [dcx, y + 0.6, dcz], key: Date.now() });
   };
 
   // Klikk på BIM-geometri → finn rommet under punktet
@@ -991,7 +1021,8 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
       setMode('interior');
       const i = FLOORS.findIndex(f => f.id === id);
       const y = FLOORS[i].level + explode * i * 3.2;
-      setFlyTo({ pos: [CENTER[0] + 6, y + 22, CENTER[2] + 16], target: [CENTER[0], y, CENTER[2]], key: Date.now() });
+      const [sx, sz] = slant ? [SLANT_STEP[0] * explode * i, SLANT_STEP[1] * explode * i] : [0, 0];
+      setFlyTo({ pos: [CENTER[0] + sx + 6, y + 22, CENTER[2] + sz + 16], target: [CENTER[0] + sx, y, CENTER[2] + sz], key: Date.now() });
     }
   };
 
@@ -1091,7 +1122,7 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                 <BimBoundary onFail={() => setBimFailed(true)}>
                   <Suspense fallback={null}>
                     <BimModel
-                      mode={mode} visibleFloors={visibleFloors} floorY={floorY} onPick={pickPoint}
+                      mode={mode} visibleFloors={visibleFloors} floorY={floorY} floorShift={floorShift} onPick={pickPoint}
                       onDoor={selectDoor} doorIndex={doorIndex} registry={doorRegistry}
                     />
                   </Suspense>
@@ -1103,6 +1134,8 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                   key={`furn-${floor.id}`}
                   floorId={floor.id}
                   baseY={floorY(floor.id)}
+                  baseX={floorShift(floor.id)[0]}
+                  baseZ={floorShift(floor.id)[1]}
                   clipY={mode === 'interior' ? floorY(floor.id) + CLIP_HEIGHT : null}
                 />
               ))}
@@ -1111,14 +1144,14 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                 <RoomLighting
                   lights={lightSources
                     .filter(l => mode === 'exterior' || visibleFloors.some(f => f.id === l.floorId))
-                    .map(l => ({ ...l, y: floorY(l.floorId) + (mode === 'interior' ? Math.min(l.ceiling - 0.1, CLIP_HEIGHT + 0.6) : l.ceiling - 0.1) }))}
+                    .map(l => ({ ...l, x: l.x + floorShift(l.floorId)[0], z: l.z + floorShift(l.floorId)[1], y: floorY(l.floorId) + (mode === 'interior' ? Math.min(l.ceiling - 0.1, CLIP_HEIGHT + 0.6) : l.ceiling - 0.1) }))}
                 />
               )}
               {mode === 'interior' && overlay !== 'temp' && overlay !== 'security' && visibleFloors.flatMap(floor =>
                 floor.rooms.filter(r => !r.outdoor).map(room => {
                   const st = roomData.byRoom[room.id].stats;
                   return st.lightsOn > 0 ? (
-                    <group key={`vol-${room.id}`} position={[0, floorY(floor.id), 0]}>
+                    <group key={`vol-${room.id}`} position={[floorShift(floor.id)[0], floorY(floor.id), floorShift(floor.id)[1]]}>
                       <RoomLightVolume poly={roomPoly(room)} height={CLIP_HEIGHT - 0.15} level={st.glow} />
                     </group>
                   ) : null;
@@ -1132,6 +1165,7 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                     index={i}
                     mode={mode}
                     explode={explode}
+                    shift={floorShift(floor.id)}
                     roomData={roomData}
                     overlay={overlay}
                     selectedRoomId={selectedRoomId}
@@ -1154,9 +1188,10 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                 .map(m => {
                   const floor = FLOORS.find(f => f.id === m.floorId);
                   const door = doorByDevice[m.device.id];
+                  const [msx, msz] = floorShift(m.floorId);
                   return (
+                    <group key={m.id} position={[msx, 0, msz]}>
                     <DeviceMarker3D
-                      key={m.id}
                       marker={m}
                       baseY={floorY(m.floorId)}
                       ceiling={floor.height}
@@ -1165,6 +1200,7 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                       showValue={overlay !== 'all' || floorFilter !== 'all'}
                       onSelect={(mk) => { setSelectedMarkerId(mk.id); setSelectedRoomId(mk.roomId); setSelectedDoorId(null); }}
                     />
+                    </group>
                   );
                 })}
             </Suspense>
@@ -1190,7 +1226,7 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
               {[['iso', 'ISO'], ['top', 'Topp'], ['south', 'Sør'], ['west', 'Vest'], ['sea', 'Sjø']].map(([id, label]) => (
                 <button
                   key={id}
-                  onClick={() => setFlyTo({ ...PRESETS[id], key: Date.now() })}
+                  onClick={() => flyToPreset(id)}
                   className="rounded border border-nx-line/70 bg-nx-bg/70 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-nx-mute backdrop-blur hover:border-nx-cyan/50 hover:text-nx-cyan"
                 >{label}</button>
               ))}
@@ -1229,6 +1265,16 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                   className="w-24 accent-nx-cyan"
                   aria-label="Spre etasjer"
                 />
+                <button
+                  type="button"
+                  onClick={() => setSlant(v => !v)}
+                  aria-pressed={slant}
+                  title="Forskyv etasjene skrått, som en trapp, så du ser inn i alle samtidig"
+                  className={[
+                    'rounded px-1.5 font-mono text-[10px] uppercase tracking-[0.14em]',
+                    slant ? 'bg-nx-cyan/15 text-nx-cyan' : 'text-nx-mute hover:text-nx-cyan'
+                  ].join(' ')}
+                >Skrått</button>
               </label>
             )}
             </div>
