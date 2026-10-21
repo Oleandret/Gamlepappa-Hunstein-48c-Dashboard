@@ -82,3 +82,19 @@ test('møblerte uteområder får ikke generiske glassrekkverk tvers gjennom seg'
   assert.ok(src.includes('!(room.outdoor && ROOM_FURNISHINGS[room.id]) && walls.map'));
   assert.ok(ROOM_FURNISHINGS['f1-uteplass'] && ROOM_FURNISHINGS['f1-terrasse'] && ROOM_FURNISHINGS['f1-ballbane']);
 });
+
+test('etasjene kan spres skrått, og alt i en etasje følger samme forskyvning', async () => {
+  const { readFileSync } = await import('node:fs');
+  const view = readFileSync(new URL('../../client/src/components/views/House3DView.jsx', import.meta.url), 'utf8');
+  const furn = readFileSync(new URL('../../client/src/components/views/House3DFurniture.jsx', import.meta.url), 'utf8');
+  // Én kilde til forskyvningen, brukt av BIM, rom, møbler, lys og enhetsmarkører
+  assert.match(view, /const SLANT_STEP = \[/);
+  assert.match(view, /const floorShift = \(floorId\) =>/);
+  for (const use of ['floorShift={floorShift}', 'shift={floorShift(floor.id)}', 'baseX={floorShift(floor.id)[0]}', 'x: l.x + floorShift(l.floorId)[0]', 'floorShift(m.floorId)']) {
+    assert.ok(view.includes(use), `mangler ${use}`);
+  }
+  assert.ok(view.includes('offsetX={sx} offsetY={y - floor.level} offsetZ={sz}'));
+  assert.ok(furn.includes('position={[baseX, baseY + FLOOR_TOP, baseZ]}'));
+  // Bryteren huskes per enhet
+  assert.ok(view.includes("localStorage.setItem('nexora.house3d.slant'"));
+});

@@ -373,13 +373,13 @@ function WallFinish({ wall, bounds, height, clip }) {
  * @param {number}   baseY    gulvhøyde i scenen (inkl. spredning av etasjer)
  * @param {number|null} clipY snitthøyde i scenen (interiør), eller null
  */
-export function RoomFurnishings({ floorId, baseY, clipY = null }) {
+export function RoomFurnishings({ floorId, baseX = 0, baseY, baseZ = 0, clipY = null }) {
   const clip = useMemo(
     () => (clipY == null ? null : [new THREE.Plane(new THREE.Vector3(0, -1, 0), clipY)]),
     [clipY]
   );
   return (
-    <group position={[0, baseY + FLOOR_TOP, 0]}>
+    <group position={[baseX, baseY + FLOOR_TOP, baseZ]}>
       {Object.entries(ROOM_FURNISHINGS).filter(([, f]) => f.floorId === floorId).map(([roomId, f]) => (
         <group key={roomId}>
           {(f.walls || []).flatMap((w, i) => wallSegments(w, f.doors).map(([from, to], j) => (
