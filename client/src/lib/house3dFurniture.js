@@ -245,6 +245,36 @@ export const ROOM_FURNISHINGS = {
     ]
   },
 
+  // ── 2. etasje — Airbnb-bilder 2021 (mappa «Hunstein 48c/Airbnb film») ───
+  // Takterrassen vest over garasjen: biljardbord, hjørnesofa i rotting og
+  // granittbord fra BIM stemmer med bildene og beholdes; to hvite skalstoler med
+  // et lite bord mot brystningen i sør, og et bålfat på dekket.
+  'f2-vinterhage': {
+    floorId: 'floor2',
+    bounds: [-13.7, -2.35, -5.0, 2.27],
+    floor: { color: '#8d8174', roughness: 0.9 },
+    keepBim: /Biljard|Utesofa|Salongbord/i,
+    items: [
+      { type: 'eggChair', at: [-7.25, 1.45, -6.65, 2.05], back: 's' },
+      { type: 'eggChair', at: [-6.45, 1.45, -5.85, 2.05], back: 's' },
+      { type: 'box', at: [-7.05, 0.85, -6.05, 1.3], y0: 0, y1: 0.42, color: '#e9e7e2', roughness: 0.4 },
+      { type: 'firePit', at: [-12.25, -0.35, -11.55, 0.35] }
+    ]
+  },
+
+  // Bad 2. etg: toalett, dusj og servant fra BIM står riktig; speilskap med
+  // lyslist over den hvite servanten (Airbnb-bilde 2021)
+  'f2-bad': {
+    floorId: 'floor2',
+    bounds: [-4.83, 2.1, -2.54, 5.0],
+    floor: { color: '#bdb8b0', roughness: 0.5 },
+    keepBim: /Dusj|Underskap|Servant/i,
+    items: [
+      { type: 'box', at: [-3.6, 4.85, -2.56, 4.98], y0: 1.1, y1: 1.8, color: '#e8eaea', metalness: 0.4, roughness: 0.2, wall: true },
+      { type: 'box', at: [-3.6, 4.8, -2.56, 4.98], y0: 1.85, y1: 1.9, color: '#f6f6f0', wall: true }
+    ]
+  },
+
   // ── U.etasje — bilder 21.10.2026 (IMG_2227–2252) ─────────────────────────
   // Kino: hvilestoler på podium, kiste og AV-rack fra BIM stemmer og beholdes.
   // Teknisk rom bak kinoen ble aldri bygget: vestveggen er kinoens TV-vegg,
@@ -528,7 +558,11 @@ export const STRUCTURE = {
     { at: [-6.69, 0.0, -6.61, 0.04], y0: 0, y1: 1.98, color: '#bdb8ae' },
     { at: [-6.69, 0.86, -6.61, 0.9], y0: 0, y1: 1.98, color: '#bdb8ae' },
     // Terrassedekket der uteplassen går ut over BIM-dekket mot sør
-    { at: [-4.9, 7.83, 2.0, 10.25], y0: -0.3, y1: -0.02, color: '#8e8b86' }
+    { at: [-4.9, 7.83, 2.0, 10.25], y0: -0.3, y1: -0.02, color: '#8e8b86' },
+    // Glassrekkverk langs terrassen mot sør og øst (dronebilder 2021); BIM-rekkverket
+    // sto 1,3 m for langt ut og er skjult
+    { at: [2.0, 6.26, 8.55, 6.3], y0: 0, y1: 1.0, glass: true },
+    { at: [8.51, -0.6, 8.55, 6.3], y0: 0, y1: 1.0, glass: true }
   ]
 };
 

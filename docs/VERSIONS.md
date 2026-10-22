@@ -90,3 +90,8 @@ OpenClaw calls timed out at the connector while work continued. Session history 
 ## Flytt og fjern i 3D-huset — 23. oktober 2026
 
 - «Pek og endre» har fått **Flytt/fjern**: inventar, lyspunkter og BIM-elementer kan flyttes med piler (5/10/50 cm), inventar kan snus, og alt kan fjernes eller tilbakestilles. Lagres på serveren (`house3dEdits`) og vises med en gang for alle; valgt inventar får en ramme. Flyttet inventar finnes igjen der det står når man trykker. Modellnøkkelen kan lese og tømme listen, så «lag ny modell» bygger flyttingene inn i koden.
+
+## Korreksjoner fra «Hunstein 48c»-mappa — 23. oktober 2026
+
+- Gått gjennom iCloud-mappa «Hunstein 48c» (BIM-kilden, Otovo, etakst, Airbnb-bilder og -dronebilder 2021, hagestue-tegninger, dørbestilling). Takterrassen vest har fått skalstoler med bord og bålfat (biljardbord, sofa og granittbord fra BIM stemmer); speilskap over servanten på badet i 2. etg; glassrekkverk langs terrassen i 1. etg mot sør og øst (BIM-rekkverket sto 1,3 m for langt ut).
+- Kontrollert uten endring: 22 solcellepaneler LONGi LR5-54HTB-430M (Otovo-overlevering 2024; kontrakten nevnte 18 × 420 W), bassenget 3 × 6 m (51 m³ i energiberegningen passer ikke med karet), hagestue-tegningen fra 2019 (mindre enn det som ble bygget).

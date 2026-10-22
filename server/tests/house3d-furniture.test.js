@@ -51,7 +51,7 @@ test('rom i 1. etg skjuler feil BIM-møbler, men beholder de som stemmer', () =>
   assert.equal(f1, 12);
   assert.equal(furnishedRoomAt('basement', -8, 2), 'u-basseng');
   assert.equal(furnishedRoomAt('basement', -9, -2), 'u-kino');
-  assert.equal(furnishedRoomAt('floor2', -8, 2), null);
+  assert.equal(furnishedRoomAt('floor2', 3.5, 1), null);         // terrassen sjøside er ikke møblert
 });
 
 test('pergola med glasstak og sørrekkverket fra BIM tegnes på nytt ved kjøkkenet', () => {
@@ -193,4 +193,21 @@ test('endringsønsker 22.10.2026 er gjort i modellen', () => {
   // Uteplassen og glasstaket går helt ut til ballbanens sørkant
   assert.deepEqual(ROOM_FURNISHINGS['f1-uteplass'].bounds, [-4.9, 5.1, 2.0, 10.25]);
   assert.ok(items('f1-uteplass').find(i => i.type === 'pergola').at[3] > 10);
+});
+
+test('korreksjoner fra Hunstein 48c-mappa: takterrasse, bad 2. etg og terrasserekkverk', () => {
+  // Takterrassen beholder biljardbord, sofa og bord fra BIM og får skalstoler og bålfat
+  assert.equal(furnishedRoomAt('floor2', -9, 0), 'f2-vinterhage');
+  assert.equal(keepsBimElement('f2-vinterhage', 'floor2|IfcFurnishingElement|Biljardbord|3L6egXydT94QpoMAmMITo2|0'), true);
+  assert.equal(keepsBimElement('f2-vinterhage', 'floor2|IfcFurnishingElement|Utesofa_(hjørne,_del_2)|2npdGsQSv2$BxfxXBWPHev|0'), true);
+  const roof = ROOM_FURNISHINGS['f2-vinterhage'].items;
+  assert.equal(roof.filter(i => i.type === 'eggChair').length, 2);
+  assert.equal(roof.filter(i => i.type === 'firePit').length, 1);
+  // Bad 2. etg: BIM-dusj og servant står; speilskap over servanten
+  assert.equal(keepsBimElement('f2-bad', 'floor2|IfcFurnishingElement|Bad_Underskap_2_Dør_-_Servant|3O8sV$RC52GueMrvwSktBE|1'), true);
+  assert.equal(keepsBimElement('f2-bad', 'floor2|IfcFurnishingElement|Dusj_kvadratisk_900x900|2AZ2OdqVf4Ahg1UIHDmUuq|0'), true);
+  // Terrassen i 1. etg har glassrekkverk langs kanten der BIM-rekkverket sto feil
+  const glass = STRUCTURE.floor1.filter(p => p.glass);
+  assert.ok(glass.some(p => p.at[1] > 6.2 && p.at[3] <= 6.3 && p.at[2] >= 8.5));
+  assert.ok(glass.some(p => p.at[0] >= 8.5 && p.at[1] <= -0.5));
 });

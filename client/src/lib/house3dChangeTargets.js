@@ -18,7 +18,7 @@ const FURNITURE_LABEL = {
   stool: 'Krakk', stairs: 'Trapp', smartDisplay: 'Skjerm', sideboard: 'Skjenk', pool: 'Basseng', picture: 'Bilde',
   pergola: 'Pergola', outdoorKitchen: 'Utekjøkken', nightstand: 'Nattbord', massageChair: 'Massasjestol',
   glassCabinet: 'Glasskap', crib: 'Sprinkelseng', bench: 'Benk', beanbag: 'Sittesekk', armchair: 'Lenestol',
-  box: 'Innredning'
+  box: 'Innredning', eggChair: 'Skalstol', firePit: 'Bålfat'
 };
 const FIXTURE_LABEL = { spot: 'Spot', ceiling: 'Lampepunkt', tube: 'LED-armatur', strip: 'LED-list', outdoor: 'Utelys' };
 const IFC_LABEL = {
