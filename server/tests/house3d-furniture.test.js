@@ -46,10 +46,12 @@ test('rom i 1. etg skjuler feil BIM-møbler, men beholder de som stemmer', () =>
   // Feilplasserte BIM-møbler på ballbanen og i garasjen beholdes ikke
   assert.equal(keepsBimElement('f1-ballbane', 'floor1|IfcFurnishingElement|Grill|x'), false);
   assert.equal(keepsBimElement('f1-garasje', 'floor1|IfcFurnishingElement|Garasjehylle|x'), false);
-  // Alle rom i 1. etg (inkl. uteplassen med glasstak) har egen møblering, U.etg ikke ennå
+  // Alle rom i 1. etg (inkl. uteplassen med glasstak) har egen møblering
   const f1 = Object.values(ROOM_FURNISHINGS).filter(f => f.floorId === 'floor1').length;
   assert.equal(f1, 12);
-  assert.equal(furnishedRoomAt('basement', -8, 2), null);
+  assert.equal(furnishedRoomAt('basement', -8, 2), 'u-basseng');
+  assert.equal(furnishedRoomAt('basement', -9, -2), 'u-kino');
+  assert.equal(furnishedRoomAt('floor2', -8, 2), null);
 });
 
 test('pergola med glasstak og sørrekkverket fra BIM tegnes på nytt ved kjøkkenet', () => {
@@ -97,4 +99,24 @@ test('etasjene kan spres skrått, og alt i en etasje følger samme forskyvning',
   assert.ok(furn.includes('position={[baseX, baseY + FLOOR_TOP, baseZ]}'));
   // Bryteren huskes per enhet
   assert.ok(view.includes("localStorage.setItem('nexora.house3d.slant'"));
+});
+
+test('U.etasje fra bildene: kinoen beholder BIM-møblene som stemmer, bassengboden er delt', () => {
+  const kino = ROOM_FURNISHINGS['u-kino'];
+  for (const name of ['Hjørnesofa hvit (sjeselong)', 'Hvilestol skinn rad 2 #1', 'Kiste (salongbord)', 'Kinolerret (vegg)', 'Minibar – disk m/ bokstavtavle', 'Spilevegg sort/tre (dekor)']) {
+    assert.ok(keepsBimElement('u-kino', `basement|IfcFurnishingElement|${name}|x`), name);
+  }
+  assert.equal(keepsBimElement('u-bad', 'basement|IfcFurnishingElement|Bad Underskap 2 Dør - Servant|x'), false);
+  assert.ok(kino.items.some(i => i.type === 'sofa'));
+  // Bassenget har vannflate innenfor rommet, og naturstein på veggene
+  const basseng = ROOM_FURNISHINGS['u-basseng'];
+  assert.ok(basseng.items.some(i => i.type === 'pool'));
+  assert.ok(basseng.walls.every(w => w.finish === 'stone'));
+  // Skilleveggen i bassengboden har døråpning, solariet står øst for den og teknikken vest
+  const bod = ROOM_FURNISHINGS['u-bassbod'].items;
+  const wall = bod.filter(i => i.type === 'box' && i.at[0] === -11.25 && i.y0 === 0);
+  assert.equal(wall.length, 2);
+  assert.ok(wall[0].at[3] < wall[1].at[1], 'døråpning i skilleveggen');
+  assert.ok(bod.find(i => i.type === 'sunbed').at[0] > -11.15);
+  assert.ok(bod.find(i => i.type === 'treadmill').at[0] > -11.15);
 });

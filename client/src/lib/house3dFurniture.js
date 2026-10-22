@@ -233,6 +233,126 @@ export const ROOM_FURNISHINGS = {
       { type: 'foldingChair', at: [6.6, 2.2, 7.15, 2.75], color: '#c9dbe6' },
       { type: 'foldingChair', at: [7.4, 3.5, 7.95, 4.05], color: '#c9dbe6' }
     ]
+  },
+
+  // ── U.etasje — bilder 21.10.2026 (IMG_2227–2252) ─────────────────────────
+  // Kino: sofa, hvilestoler på podium, kiste, lerret, minibar under trappa og
+  // spileveggen fra BIM stemmer med bildene og beholdes.
+  'u-kino': {
+    floorId: 'basement',
+    bounds: [-12.8, -3.9, -5.0, 0.2],
+    floor: { color: '#b9b8b3', roughness: 0.3 },
+    keepBim: /Hjørnesofa|Hvilestol|Podium|Kiste|Kinolerret|AV-rack|Minibar|Spilevegg|Dartskive|Projektor/i,
+    doors: [{ side: 'west', from: -0.55, to: 0.2, name: 'Teknisk rom' }],
+    walls: [
+      { side: 'north', from: -12.8, to: -7.35, finish: 'grey' },
+      { side: 'west', from: -3.9, to: 0.2, finish: 'grey' }
+    ],
+    items: [
+      // Rødt forheng ved lerretet, mot glassveggen til bassenget
+      { type: 'box', at: [-12.78, -0.75, -12.62, 0.15], y0: 0, y1: 2.26, color: '#9b1419' },
+      // Filmplakater (Alien, Terminator, Gladiator, Pulp Fiction) over den hvite sofaen
+      { type: 'box', at: [-11.0, -3.9, -10.4, -3.87], y0: 1.3, y1: 2.15, color: '#1d1d1f', wall: true },
+      { type: 'box', at: [-10.2, -3.9, -9.6, -3.87], y0: 1.3, y1: 2.15, color: '#1d1d1f', wall: true },
+      { type: 'box', at: [-9.4, -3.9, -8.8, -3.87], y0: 1.3, y1: 2.15, color: '#1d1d1f', wall: true },
+      { type: 'box', at: [-8.6, -3.9, -8.0, -3.87], y0: 1.3, y1: 2.15, color: '#1d1d1f', wall: true },
+      { type: 'speaker', at: [-12.78, -3.6, -12.6, -3.35], y0: 1.95, y1: 2.25, wall: true },
+      { type: 'speaker', at: [-12.78, -0.65, -12.6, -0.4], y0: 1.95, y1: 2.25, wall: true },
+      // Kuskinn foran lerretet og ved glassveggen
+      { type: 'rug', at: [-11.9, -1.2, -10.4, 0.05], color: '#1e1c1b' },
+      { type: 'rug', at: [-10.2, -1.3, -9.35, -0.2], color: '#2a2726' },
+      // Mørkegrå sofa bak hvilestolene, med lydabsorbenter på veggen bak
+      { type: 'box', at: [-6.08, -1.75, -5.98, -0.5], y0: 0, y1: 2.26, color: '#8e9398' },
+      { type: 'sofa', at: [-7.0, -1.7, -6.1, 0.1], back: 'e', color: '#4a4846' },
+      { type: 'box', at: [-5.98, -1.65, -5.94, -1.2], y0: 1.25, y1: 1.75, color: '#1b1b1b', wall: true },
+      { type: 'box', at: [-5.98, -1.1, -5.94, -0.65], y0: 1.25, y1: 1.75, color: '#1b1b1b', wall: true }
+    ]
+  },
+
+  // Svømmebassenget (bildene ligger i Drive-mappa «Bassengbad»): naturstein på
+  // veggene, flis rundt bassenget, sittesekk foran badstua og palmer
+  'u-basseng': {
+    floorId: 'basement',
+    bounds: [-12.8, 0.27, -5.05, 4.85],
+    floor: { color: '#9a8a78', roughness: 0.55 },
+    doors: [
+      { side: 'south', from: -10.35, to: -9.54, name: 'Bassengbod' },
+      { side: 'south', from: -6.51, to: -5.7, name: 'Bad' },
+      { side: 'east', from: 0.64, to: 1.45, name: 'Tek' },
+      { side: 'east', from: 2.22, to: 3.03, name: 'Badstu' }
+    ],
+    walls: [
+      { side: 'west', from: 0.27, to: 4.85, finish: 'stone' },
+      { side: 'south', from: -12.8, to: -5.05, finish: 'stone' },
+      { side: 'east', from: 0.27, to: 4.85, finish: 'stone' }
+    ],
+    items: [
+      { type: 'pool', at: [-12.76, 1.17, -6.24, 4.24] },
+      { type: 'beanbag', at: [-6.15, 2.0, -5.12, 3.25], color: '#d8cdb8' },
+      { type: 'plant', at: [-12.75, 0.35, -12.35, 0.75], y1: 1.3 },
+      { type: 'plant', at: [-12.75, 4.4, -12.35, 4.8], y1: 1.2 },
+      { type: 'plant', at: [-5.5, 0.35, -5.1, 0.75], y1: 1.2 }
+    ]
+  },
+
+  // Bad U.etg: beige marmorflis, dusjhjørne i glass og mørk servant med speilskap
+  'u-bad': {
+    floorId: 'basement',
+    bounds: [-3.5, 0.3, -1.7, 1.54],
+    floor: { color: '#d8cbb6', roughness: 0.4 },
+    walls: [
+      { side: 'north', from: -3.5, to: -1.7, finish: 'beige' },
+      { side: 'west', from: 0.3, to: 1.54, finish: 'beige' },
+      { side: 'east', from: 0.3, to: 1.54, finish: 'beige' }
+    ],
+    items: [
+      { type: 'shower', at: [-3.48, 0.32, -2.6, 1.2] },
+      { type: 'vanity', at: [-2.5, 0.32, -1.75, 0.77], color: '#2e211c' },
+      { type: 'box', at: [-2.48, 0.3, -1.77, 0.45], y0: 1.1, y1: 1.85, color: '#2e211c', wall: true }
+    ]
+  },
+
+  // Bod: eikehyller langs den ene langveggen, hvit kommode med overskap på den
+  // andre, spilevegg med speil i enden
+  'u-bod': {
+    floorId: 'basement',
+    bounds: [-1.35, -0.3, 1.7, 1.0],
+    floor: { color: '#a9a8a4', roughness: 0.6 },
+    walls: [{ side: 'west', from: -0.3, to: 1.0, finish: 'slats' }],
+    items: [
+      { type: 'box', at: [-1.3, 0.62, 0.45, 0.98], y0: 0, y1: 2.0, color: '#c4934f' },
+      { type: 'box', at: [-0.95, -0.28, 0.4, 0.15], y0: 0, y1: 0.95, color: '#f2f1ee' },
+      { type: 'box', at: [-0.95, -0.28, 0.4, 0.05], y0: 1.55, y1: 2.15, color: '#f2f1ee', wall: true },
+      { type: 'box', at: [-1.33, 0.0, -1.3, 0.45], y0: 0.3, y1: 1.85, color: '#c6d4dc', metalness: 0.6, roughness: 0.1 },
+      { type: 'box', at: [-0.4, 0.25, 0.1, 0.55], y0: 0, y1: 0.7, color: '#e7a59a' },
+      { type: 'box', at: [-0.95, 0.25, -0.5, 0.55], y0: 0, y1: 0.75, color: '#1d1d1f' }
+    ]
+  },
+
+  // Bassengboden er delt med en ny vegg (rød strek på plantegningen):
+  // treningsrom med solarium og tredemølle mot bassenget i øst, bassengteknikk
+  // (sandfilter, pumper og UV fra BIM) i vest. Bildene ligger i mappa «Tek».
+  'u-bassbod': {
+    floorId: 'basement',
+    bounds: [-14.9, 5.3, -8.5, 7.4],
+    floor: { color: '#9e9e9a', roughness: 0.6 },
+    walls: [{ side: 'south', from: -14.9, to: -11.25, finish: 'plywood' }],
+    items: [
+      // Ny skillevegg med dør mellom teknikk og treningsrom
+      { type: 'box', at: [-11.25, 5.3, -11.15, 6.1], y0: 0, y1: 2.26, color: '#eeece7' },
+      { type: 'box', at: [-11.25, 6.95, -11.15, 7.4], y0: 0, y1: 2.26, color: '#eeece7' },
+      { type: 'box', at: [-11.25, 6.1, -11.15, 6.95], y0: 2.1, y1: 2.26, color: '#eeece7' },
+      // Treningsrom: solarium langs østveggen, tredemølle langs skilleveggen, hylle i enden
+      { type: 'sunbed', at: [-9.45, 5.35, -8.55, 7.35] },
+      { type: 'treadmill', at: [-11.1, 5.6, -10.35, 7.35], front: 's' },
+      { type: 'box', at: [-10.25, 7.0, -9.5, 7.38], y0: 0, y1: 0.77, color: '#f4f4f2' },
+      // Teknikk: varmtvannsbereder, kanner med bassengkjemikalier, slangetrommel og overskap
+      { type: 'box', at: [-12.05, 6.75, -11.45, 7.35], y0: 0, y1: 1.85, color: '#f2f2f0' },
+      { type: 'box', at: [-11.47, 6.95, -11.3, 7.3], y0: 0.9, y1: 1.3, color: '#2f8f6e' },
+      { type: 'box', at: [-13.05, 6.95, -12.75, 7.35], y0: 0, y1: 0.45, color: '#1f5fc4' },
+      { type: 'box', at: [-12.7, 6.95, -12.4, 7.35], y0: 0, y1: 0.45, color: '#1f5fc4' },
+      { type: 'box', at: [-13.7, 7.1, -13.0, 7.38], y0: 1.5, y1: 2.0, color: '#f4f4f2', wall: true }
+    ]
   }
 };
 

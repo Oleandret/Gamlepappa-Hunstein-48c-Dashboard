@@ -48,6 +48,49 @@ function forestTexture() {
   return _forest;
 }
 
+let _stone = null;
+/** Natursteinsforblending i grått (bassengrommet). */
+function stoneTexture() {
+  if (_stone) return _stone;
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#3d4044'; g.fillRect(0, 0, 512, 256);
+  let seed = 11;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  for (let y = 0; y < 256; y += 16) {
+    for (let x = -rnd() * 60; x < 512; ) {
+      const w = 30 + rnd() * 70, v = 95 + rnd() * 70;
+      g.fillStyle = `rgb(${v},${v + 3},${v + 6})`;
+      g.fillRect(x + 1.5, y + 1.5, w - 3, 13);
+      x += w;
+    }
+  }
+  _stone = new THREE.CanvasTexture(c);
+  _stone.colorSpace = THREE.SRGBColorSpace;
+  _stone.wrapS = _stone.wrapT = THREE.RepeatWrapping;
+  return _stone;
+}
+
+let _slats = null;
+/** Spilevegg: lyse eikespiler på svart filt. */
+function slatTexture() {
+  if (_slats) return _slats;
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 16;
+  const g = c.getContext('2d');
+  g.fillStyle = '#151515'; g.fillRect(0, 0, 256, 16);
+  g.fillStyle = '#c9a77c';
+  for (let x = 0; x < 256; x += 32) g.fillRect(x + 4, 0, 14, 16);
+  _slats = new THREE.CanvasTexture(c);
+  _slats.colorSpace = THREE.SRGBColorSpace;
+  _slats.wrapS = _slats.wrapT = THREE.RepeatWrapping;
+  return _slats;
+}
+
+/** Ensfargede veggflater (malt / flislagt). */
+const FINISH_COLORS = { green: COLORS.green, plywood: '#c99a62', grey: '#8e9398', beige: '#d9ccb8', white: '#eeece7' };
+
 function Box({ x0, z0, x1, z1, y0 = 0, y1, color, clip, roughness = 0.85, metalness = 0, map, emissive, emissiveIntensity, tilt = 0 }) {
   return (
     <mesh position={[(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2]} rotation={[tilt, 0, 0]} castShadow receiveShadow raycast={() => null}>
@@ -336,6 +379,55 @@ function Item({ item, clip }) {
         </group>
       );
     }
+    case 'pool':
+      // Vannflaten i bassenget, opplyst nedenfra, med lys flis i kanten
+      return (
+        <group>
+          <Box x0={x0 - 0.12} x1={x1 + 0.12} z0={z0 - 0.12} z1={z1 + 0.12} y0={0} y1={0.012} color="#e9e6df" clip={clip} roughness={0.4} />
+          <Box {...b} y0={0.012} y1={0.03} color="#2fc4e4" clip={clip} roughness={0.05} metalness={0.1} emissive="#0e9fd0" emissiveIntensity={0.55} />
+        </group>
+      );
+    case 'plant':
+      return (
+        <group>
+          <Box x0={x0 + 0.06} x1={x1 - 0.06} z0={z0 + 0.06} z1={z1 - 0.06} y0={0} y1={0.35} color="#e8e6e1" clip={clip} roughness={0.5} />
+          <mesh position={[(x0 + x1) / 2, (item.y1 ?? 1.2) * 0.7, (z0 + z1) / 2]} castShadow raycast={() => null}>
+            <sphereGeometry args={[Math.max(x1 - x0, z1 - z0) * 0.62, 10, 8]} />
+            <meshStandardMaterial color="#3f7a3a" roughness={0.9} clippingPlanes={clip} />
+          </mesh>
+        </group>
+      );
+    case 'beanbag':
+      return (
+        <mesh position={[(x0 + x1) / 2, 0.26, (z0 + z1) / 2]} scale={[(x1 - x0) / 2, 0.3, (z1 - z0) / 2]} castShadow receiveShadow raycast={() => null}>
+          <sphereGeometry args={[1, 18, 12]} />
+          <meshStandardMaterial color={item.color} roughness={0.95} clippingPlanes={clip} />
+        </mesh>
+      );
+    case 'sunbed': {
+      // Solarium (Global 5300): benk med rør og lokk med oransje lys
+      const along = (z1 - z0) >= (x1 - x0);
+      const half = along ? { x0: x1 - (x1 - x0) * 0.35 } : { z0: z1 - (z1 - z0) * 0.35 };
+      return (
+        <group>
+          <Box {...b} y0={0} y1={0.55} color="#f1f1ef" clip={clip} roughness={0.4} />
+          <Box x0={x0 + 0.06} x1={x1 - 0.06} z0={z0 + 0.06} z1={z1 - 0.06} y0={0.55} y1={0.58} color="#ffb35c" clip={clip} emissive="#ff8a1e" emissiveIntensity={0.8} />
+          <Box {...b} {...half} y0={0.95} y1={1.45} color="#e4e4e2" clip={clip} roughness={0.4} />
+        </group>
+      );
+    }
+    case 'treadmill': {
+      // Tredemølle (Titan) med konsoll i enden mot `front`
+      const f = item.front || 's';
+      const post = { s: { z0: z1 - 0.12 }, n: { z1: z0 + 0.12 }, e: { x0: x1 - 0.12 }, w: { x1: x0 + 0.12 } }[f];
+      return (
+        <group>
+          <Box {...b} y0={0} y1={0.22} color="#1c1c1c" clip={clip} />
+          <Box {...b} {...post} y0={0.22} y1={1.25} color="#2a2a2a" clip={clip} />
+          <Box {...b} {...post} y0={1.2} y1={1.35} color="#3a3a3a" clip={clip} />
+        </group>
+      );
+    }
     case 'foldingChair':
       return (
         <group>
@@ -351,9 +443,19 @@ function Item({ item, clip }) {
 /** Maling og tapet på innsiden av veggene. */
 function WallFinish({ wall, bounds, height, clip }) {
   const [bx0, bz0, bx1, bz1] = bounds;
-  const map = wall.finish === 'forest' ? forestTexture() : null;
-  const color = wall.finish === 'forest' ? '#ffffff' : wall.finish === 'plywood' ? '#c99a62' : COLORS.green;
   const len = wall.to - wall.from, mid = (wall.from + wall.to) / 2, inset = 0.012;
+  const textured = { forest: forestTexture, stone: stoneTexture, slats: slatTexture }[wall.finish];
+  const map = useMemo(() => {
+    if (!textured) return null;
+    const t = textured();
+    if (wall.finish === 'forest') return t;
+    // Gjentatt mønster i fast målestokk, uavhengig av veggens lengde
+    const m = t.clone();
+    m.repeat.set(len / (wall.finish === 'stone' ? 2.4 : 0.8), wall.finish === 'stone' ? height / 1.2 : 1);
+    m.needsUpdate = true;
+    return m;
+  }, [textured, wall.finish, len, height]);
+  const color = textured ? '#ffffff' : FINISH_COLORS[wall.finish] ?? COLORS.green;
   const place = {
     north: { pos: [mid, height / 2, bz0 + inset], rot: 0 },
     south: { pos: [mid, height / 2, bz1 - inset], rot: Math.PI },
