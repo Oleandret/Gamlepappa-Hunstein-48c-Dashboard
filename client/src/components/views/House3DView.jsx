@@ -11,6 +11,8 @@ import { FLOORS, ALL_ROOMS, roomPoly, roomCenter, roomArea, planPctToWorld, worl
 import { changeCandidates, localizePoint, parseBimName } from '../../lib/house3dChangeTargets.js';
 import { useHouse3dChanges } from '../../lib/useHouse3dChanges.js';
 import { ChangePanel, ChangeMarkers3D } from './House3DChanges.jsx';
+import { useHouse3dEdits } from '../../lib/useHouse3dEdits.js';
+import { editKey, editFor } from '../../lib/house3dEdits.js';
 import { capValue, hasCap } from '../../lib/deviceUtils.js';
 import { useHouse3dRooms } from '../../lib/useHouse3dRooms.js';
 import { DeviceControls } from '../FloorPlanPin.jsx';
@@ -470,7 +472,7 @@ function doorIdOf(obj) {
   return null;
 }
 
-function BimGroup({ items, floorId = null, offsetX = 0, offsetY = 0, offsetZ = 0, clipY = null, interior, onPick, onDoor, dim = 1, doorIndex, registry }) {
+function BimGroup({ items, floorId = null, offsetX = 0, offsetY = 0, offsetZ = 0, clipY = null, interior, onPick, onDoor, dim = 1, doorIndex, registry, edits = {} }) {
   const group = useMemo(() => {
     const g = new THREE.Group();
     const plane = clipY == null ? null : new THREE.Plane(new THREE.Vector3(0, -1, 0), clipY);
@@ -480,6 +482,9 @@ function BimGroup({ items, floorId = null, offsetX = 0, offsetY = 0, offsetZ = 0
       if (interior && (type === 'IfcSlab' || type === 'IfcRoof' || type === 'IfcCovering')) continue;
       // BIM-elementer som står feil i virkeligheten (tegnes på nytt i møbleringen)
       if (hiddenBimElement(mesh.name || mesh.parent?.name)) continue;
+      // Flyttet eller fjernet i 3D-visningen («Pek og endre» → Flytt/fjern)
+      const ed = gid ? edits[`bim:${gid}`] : null;
+      if (ed?.removed) continue;
       const c = floorId ? new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3()) : null;
       // Deler av tegningen som aldri ble bygget
       if (c && hiddenBimArea(floorId, c.x, c.z)) continue;
@@ -491,6 +496,7 @@ function BimGroup({ items, floorId = null, offsetX = 0, offsetY = 0, offsetZ = 0
       const m = mesh.clone();
       m.matrix.copy(mesh.matrixWorld);
       m.matrix.decompose(m.position, m.quaternion, m.scale);
+      if (ed && type !== 'IfcDoor') { m.position.x += ed.dx; m.position.z += ed.dz; }
       const src = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
       const mat = src.clone();
       if (dim !== 1 && mat.color) mat.color.multiplyScalar(dim);
@@ -532,7 +538,7 @@ function BimGroup({ items, floorId = null, offsetX = 0, offsetY = 0, offsetZ = 0
     }
     g.userData.doorPivots = pivots;
     return g;
-  }, [items, floorId, clipY, interior, dim, doorIndex]);
+  }, [items, floorId, clipY, interior, dim, doorIndex, edits]);
 
   useEffect(() => {
     if (!registry) return undefined;
@@ -561,14 +567,14 @@ function BimGroup({ items, floorId = null, offsetX = 0, offsetY = 0, offsetZ = 0
 }
 
 /** Hele bygget/tomta (eksteriør) eller én etasje med snitt (interiør). */
-function BimModel({ mode, visibleFloors, floorY, floorShift, onPick, onDoor, doorIndex, registry }) {
+function BimModel({ mode, visibleFloors, floorY, floorShift, onPick, onDoor, doorIndex, registry, edits }) {
   const groups = useBimGroups();
   if (mode === 'exterior') {
     return (
       <group>
         {['site', 'basement', 'floor1', 'floor2', 'roof'].map(k => groups[k] && (
           <BimGroup
-            key={k} items={groups[k]} floorId={k} onPick={k === 'site' ? undefined : onPick} onDoor={onDoor}
+            key={k} items={groups[k]} floorId={k} onPick={k === 'site' ? undefined : onPick} onDoor={onDoor} edits={edits}
             dim={k === 'site' ? 0.42 : 0.9} doorIndex={doorIndex} registry={registry}
           />
         ))}
@@ -584,7 +590,7 @@ function BimModel({ mode, visibleFloors, floorY, floorShift, onPick, onDoor, doo
         const [sx, sz] = floorShift(floor.id);
         return (
           <BimGroup
-            key={floor.id} items={items} floorId={floor.id} offsetX={sx} offsetY={y - floor.level} offsetZ={sz} clipY={y + CLIP_HEIGHT} interior
+            key={floor.id} items={items} floorId={floor.id} offsetX={sx} offsetY={y - floor.level} offsetZ={sz} clipY={y + CLIP_HEIGHT} interior edits={edits}
             onDoor={onDoor} doorIndex={doorIndex} registry={registry}
           />
         );
@@ -833,7 +839,11 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
   // «Pek»: trykk på noe for å ønske en endring eller koble en Homey-enhet dit
   const [pointing, setPointing] = useState(false);
   const [changePick, setChangePick] = useState(null);
+  const [pickChoice, setPickChoice] = useState(0);
   const changes = useHouse3dChanges();
+  const modelEdits = useHouse3dEdits();
+  const edits = modelEdits.edits;
+  const selectedEditKey = pointing && changePick ? editKey(changePick.candidates[pickChoice]) : null;
   // Rotasjon og fart huskes per enhet, så fullskjerm på f.eks. et nettbrett kan stå og rotere.
   const [autoRotate, setAutoRotate] = useState(() => { try { return localStorage.getItem('nexora.house3d.rotate') === '1'; } catch { return false; } });
   const [rotateSpeed, setRotateSpeed] = useState(() => { try { return Number(localStorage.getItem('nexora.house3d.rotateSpeed')) || 0.6; } catch { return 0.6; } });
@@ -915,7 +925,13 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
       for (const room of floor.rooms) {
         const data = roomData.byRoom[room.id];
         const lights = data.devices.filter(isLightDevice);
-        const roomFixtures = FIXTURES_BY_ROOM[room.id] || [];
+        // Lyspunkter flyttet eller fjernet i 3D-visningen
+        const roomFixtures = (FIXTURES_BY_ROOM[room.id] || []).flatMap(f => {
+          const e = editFor(edits, `fixture:${f.id}`);
+          if (e.removed) return [];
+          if (!e.dx && !e.dz) return [f];
+          return [{ ...f, x: f.x + e.dx, z: f.z + e.dz, path: f.path?.map(([x, z]) => [x + e.dx, z + e.dz]) }];
+        });
         if (roomFixtures.length) {
           // Hver armatur følger nærmeste lampe med pin, ellers den sterkeste lampen i rommet
           const levels = lights.map(d => ({ level: deviceReadout(d).level || 0, pin: pinPos.get(d.id) }));
@@ -955,7 +971,7 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
       }
     }
     return { lightSources: out, fixtures };
-  }, [roomData]);
+  }, [roomData, edits]);
 
   // Pins som ligger i et annet rom enn Homey-sonen tilsier
   const placementIssues = useMemo(() => {
@@ -1050,7 +1066,8 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
     if (!loc) return;
     const bimName = object?.userData?.bimName || null;
     const gid = bimName ? parseBimName(bimName)?.globalId : null;
-    setChangePick({ ...loc, world: [p.x, p.y, p.z], candidates: changeCandidates({ ...loc, bimName, doorLabel: gid ? doorIndex.get(gid)?.label : null }) });
+    setPickChoice(0);
+    setChangePick({ ...loc, world: [p.x, p.y, p.z], candidates: changeCandidates({ ...loc, bimName, doorLabel: gid ? doorIndex.get(gid)?.label : null, edits }) });
   };
   const toWorld = (floorId, [x, y, z]) => {
     const [sx, sz] = floorShift(floorId);
@@ -1202,7 +1219,7 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                   <Suspense fallback={null}>
                     <BimModel
                       mode={mode} visibleFloors={visibleFloors} floorY={floorY} floorShift={floorShift} onPick={pointing ? pointAt : pickPoint}
-                      onDoor={pointing ? undefined : selectDoor} doorIndex={doorIndex} registry={doorRegistry}
+                      onDoor={pointing ? undefined : selectDoor} doorIndex={doorIndex} registry={doorRegistry} edits={edits}
                     />
                   </Suspense>
                 </BimBoundary>
@@ -1216,6 +1233,7 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                   baseX={floorShift(floor.id)[0]}
                   baseZ={floorShift(floor.id)[1]}
                   clipY={mode === 'interior' ? floorY(floor.id) + CLIP_HEIGHT : null}
+                  edits={edits} selectedKey={selectedEditKey}
                 />
               ))}
               {bim && mode === 'exterior' && <ExteriorGlow roomData={roomData} />}
@@ -1390,6 +1408,7 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
               pick={changePick} changes={changes} onClear={() => setChangePick(null)} onShow={showChange}
               floorLabel={(id) => FLOORS.find(f => f.id === id)?.label || ''}
               devices={devicesWithZone} onLinkDevice={linkDevice} linkedTo={linkedTo}
+              choice={pickChoice} onChoice={setPickChoice} modelEdits={modelEdits}
             />
           ) : selectedDoor ? (
             <DoorPanel

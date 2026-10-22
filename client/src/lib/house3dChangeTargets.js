@@ -1,6 +1,7 @@
 import { FLOORS, roomPoly } from './house3dModel.js';
 import { ROOM_FURNISHINGS } from './house3dFurniture.js';
 import { FIXTURES_BY_ROOM } from './house3dFixtures.js';
+import { editFor, movedBox } from './house3dEdits.js';
 
 /**
  * Hva kan et klikk i 3D-modellen gjelde? Ut fra punktet (i etasjens egne
@@ -64,7 +65,7 @@ export function localizePoint(worldPoint, offsets) {
 
 const round = v => Math.round(v * 100) / 100;
 
-export function changeCandidates({ floorId, local, bimName = null, doorLabel = null }) {
+export function changeCandidates({ floorId, local, bimName = null, doorLabel = null, edits = {} }) {
   const floor = FLOORS.find(f => f.id === floorId);
   if (!floor) return [];
   const [x, y, z] = local;
@@ -84,7 +85,10 @@ export function changeCandidates({ floorId, local, bimName = null, doorLabel = n
   for (const [roomId, f] of Object.entries(ROOM_FURNISHINGS)) {
     if (f.floorId !== floorId) continue;
     f.items.forEach((it, i) => {
-      const [x0, z0, x1, z1] = it.at;
+      // Der møbelet står nå (flyttet/snudd i 3D-visningen); fjernede hoppes over
+      const e = editFor(edits, `furniture:${roomId}:items:${i}`);
+      if (e.removed) return;
+      const [x0, z0, x1, z1] = movedBox(it.at, e);
       const pad = 0.25;
       if (x >= x0 - pad && x <= x1 + pad && z >= z0 - pad && z <= z1 + pad) {
         const r = floor.rooms.find(rr => rr.id === roomId);
@@ -95,7 +99,10 @@ export function changeCandidates({ floorId, local, bimName = null, doorLabel = n
   furniture.sort((a, b) => a.area - b.area).slice(0, 4).forEach(f => out.push(f.c));
 
   // Lyspunkter innen 0,8 m, nærmeste først
-  const fixtures = floor.rooms.flatMap(r => (FIXTURES_BY_ROOM[r.id] || []).map(f => ({ f, r, d: Math.hypot(f.x - x, f.z - z) })))
+  const fixtures = floor.rooms.flatMap(r => (FIXTURES_BY_ROOM[r.id] || [])
+    .map(f => ({ f, e: editFor(edits, `fixture:${f.id}`) }))
+    .filter(({ e }) => !e.removed)
+    .map(({ f, e }) => ({ f, r, d: Math.hypot(f.x + e.dx - x, f.z + e.dz - z) })))
     .filter(e => e.d < 0.8).sort((a, b) => a.d - b.d).slice(0, 3);
   for (const { f, r } of fixtures) out.push({ ...base, roomId: r.id, roomName: r.name, kind: 'fixture', label: `${FIXTURE_LABEL[f.kind] || f.kind} i ${r.name}`, elementId: f.id });
 

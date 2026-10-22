@@ -86,3 +86,7 @@ OpenClaw calls timed out at the connector while work continued. Session history 
 ## Ny modell etter endringsønsker — 22. oktober 2026
 
 - 15 ønsker fra «Pek og endre»: sittesekk, terrassevarmer, markise og en spot i kinoen fjernet; trappa med rekkverk på takterrassen og trappa sør for uteplassen finnes ikke; glassrekkverket mot sør skjules nå faktisk (GLTFLoader gjør om mellomrom og punktum i nodenavn, så regelen traff aldri – bruker GlobalId); dør fra entréen inn til bod/sluse; hyllene i gangen fjernet; mørk sofa i kinohjørnet ved trappa (IMG_2231–2232) og trappa lukket ned til gulvet; tre lenestoler mot bassenget i badstua; uteplassen og glasstaket går helt ut til ballbanens sørkant med spisebordet nærmere gjerdet; solsengene på tvers i sørøsthjørnet av ballbanen (IMG_2194).
+
+## Flytt og fjern i 3D-huset — 23. oktober 2026
+
+- «Pek og endre» har fått **Flytt/fjern**: inventar, lyspunkter og BIM-elementer kan flyttes med piler (5/10/50 cm), inventar kan snus, og alt kan fjernes eller tilbakestilles. Lagres på serveren (`house3dEdits`) og vises med en gang for alle; valgt inventar får en ramme. Flyttet inventar finnes igjen der det står når man trykker. Modellnøkkelen kan lese og tømme listen, så «lag ny modell» bygger flyttingene inn i koden.

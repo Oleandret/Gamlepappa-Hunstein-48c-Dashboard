@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import { ROOM_FURNISHINGS, STRUCTURE, FLOOR_TOP, wallSegments } from '../../lib/house3dFurniture.js';
+import { editFor, movedBox } from '../../lib/house3dEdits.js';
 
 /**
  * Tegner faktisk møblering (fra bilder) for rom i ROOM_FURNISHINGS.
@@ -513,7 +514,32 @@ function WallFinish({ wall, bounds, height, clip }) {
  * @param {number}   baseY    gulvhøyde i scenen (inkl. spredning av etasjer)
  * @param {number|null} clipY snitthøyde i scenen (interiør), eller null
  */
-export function RoomFurnishings({ floorId, baseX = 0, baseY, baseZ = 0, clipY = null }) {
+/**
+ * Inventar flyttet/snudd/fjernet i 3D-visningen (house3dEdits) tegnes der det er
+ * flyttet til; `selectedKey` får en ramme rundt seg.
+ */
+function EditedItem({ item, edit, clip }) {
+  if (!edit.dx && !edit.dz && !edit.rot) return <Item item={item} clip={clip} />;
+  const [x0, z0, x1, z1] = item.at;
+  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+  return (
+    <group position={[cx + edit.dx, 0, cz + edit.dz]} rotation={[0, -edit.rot, 0]}>
+      <group position={[-cx, 0, -cz]}><Item item={item} clip={clip} /></group>
+    </group>
+  );
+}
+
+function SelectionFrame({ at, height }) {
+  const [x0, z0, x1, z1] = at;
+  return (
+    <mesh position={[(x0 + x1) / 2, height / 2, (z0 + z1) / 2]} raycast={() => null}>
+      <boxGeometry args={[x1 - x0 + 0.06, height + 0.06, z1 - z0 + 0.06]} />
+      <meshBasicMaterial color="#22e6ff" wireframe transparent opacity={0.9} depthTest={false} />
+    </mesh>
+  );
+}
+
+export function RoomFurnishings({ floorId, baseX = 0, baseY, baseZ = 0, clipY = null, edits = {}, selectedKey = null }) {
   const clip = useMemo(
     () => (clipY == null ? null : [new THREE.Plane(new THREE.Vector3(0, -1, 0), clipY)]),
     [clipY]
@@ -531,7 +557,17 @@ export function RoomFurnishings({ floorId, baseX = 0, baseY, baseZ = 0, clipY = 
           {(f.walls || []).flatMap((w, i) => wallSegments(w, f.doors).map(([from, to], j) => (
             <WallFinish key={`${i}-${j}`} wall={{ ...w, from, to }} bounds={f.bounds} height={2.26} clip={clip} />
           )))}
-          {f.items.map((it, i) => <Item key={i} item={it} clip={clip} />)}
+          {f.items.map((it, i) => {
+            const key = `furniture:${roomId}:items:${i}`;
+            const e = editFor(edits, key);
+            if (e.removed) return null;
+            return (
+              <group key={i}>
+                <EditedItem item={it} edit={e} clip={clip} />
+                {selectedKey === key && <SelectionFrame at={movedBox(it.at, e)} height={Math.min(2.3, it.y1 ?? 1.0)} />}
+              </group>
+            );
+          })}
         </group>
       ))}
     </group>

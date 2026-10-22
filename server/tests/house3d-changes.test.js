@@ -41,6 +41,10 @@ test('modellnøkkelen gir bare lesing av listen og PATCH av ett ønske', () => {
   assert.equal(changesWorker(req('GET', '/house3d/changes'), token), true);
   assert.equal(changesWorker(req('PATCH', '/house3d/changes/0f3c-12ab'), token), true);
   assert.equal(changesWorker(req('POST', '/house3d/changes'), token), false);
+  assert.equal(changesWorker(req('GET', '/config/house3dEdits'), token), true);
+  assert.equal(changesWorker(req('PUT', '/config/house3dEdits'), token), true);
+  assert.equal(changesWorker(req('PUT', '/config/house3dDoors'), token), false);
+  assert.equal(changesWorker(req('GET', '/config'), token), false);
   assert.equal(changesWorker(req('DELETE', '/house3d/changes/abc'), token), false);
   assert.equal(changesWorker(req('GET', '/homey/devices'), token), false);
   assert.equal(changesWorker(req('GET', '/house3d/changes', 'Bearer feil'), token), false);

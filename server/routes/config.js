@@ -17,6 +17,7 @@ const ALLOWED_NS = new Set([
   'floorPlanFlows',     // favoritt-flows per plantegning
   'house3dRooms',       // kobling rom i 3D-modellen ↔ Homey-soner
   'house3dDoors',       // kobling dører i 3D-modellen ↔ dør-/portsensorer
+  'house3dEdits',       // flyttet/snudd/fjernet inventar, lyspunkter og BIM-elementer i 3D-modellen
   'flowsSidebarFlows',  // brukervalgte flows i høyre-sidebar (kommer senere)
   'frontSpecials',      // hvilke spesial-kort (Tesla/Tibber/Støvsuger) som vises på Oversikt
   'scenes',
