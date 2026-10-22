@@ -74,9 +74,10 @@ export const FLOORS = [
       },
       {
         // Uteplass med glasstak rett ut fra skyvedøra i kjøkkenet (sør). Større enn
-        // på tegningene; målt fra dronebilder 20.10.2026.
+        // på tegningene; målt fra dronebilder 20.10.2026, og går helt ut til
+        // ballbanens sørkant (endringsønske 22.10.2026).
         id: 'f1-uteplass', name: 'Uteplass (glasstak)', match: /uteplass|glasstak/i, kind: 'outdoor', outdoor: true,
-        poly: [[-4.9, 5.1], [2.0, 5.1], [2.0, 8.9], [-4.9, 8.9]]
+        poly: [[-4.9, 5.1], [2.0, 5.1], [2.0, 10.25], [-4.9, 10.25]]
       },
       {
         id: 'f1-terrasse', name: 'Terrasse', match: /terr?asse/i, kind: 'outdoor', outdoor: true,

@@ -57,7 +57,9 @@ test('rom i 1. etg skjuler feil BIM-møbler, men beholder de som stemmer', () =>
 test('pergola med glasstak og sørrekkverket fra BIM tegnes på nytt ved kjøkkenet', () => {
   assert.equal(hiddenBimElement('floor1|IfcPlate|Pergola – glasstak (herdet glass)|x'), true);
   assert.equal(hiddenBimElement('floor1|IfcColumn|Pergola – stolpe #1|x'), true);
-  assert.equal(hiddenBimElement('floor1|IfcRailing|Terrasse 1.etg – glassrekkverk sør|x'), true);
+  // Nodenavn slik GLTFLoader gir dem (mellomrom → _, punktum fjernet)
+  assert.equal(hiddenBimElement('floor1|IfcRailing|Terrasse_1etg_–_glassrekkverk_sør|1kj5eO39H0keroGaeYWm$6|0'), true);
+  assert.equal(hiddenBimElement('floor2|IfcRailing|Terrasse_øst_–_glassrekkverk_sør|3ttfkU6bvE6OvjNNMxRGjX|0'), false);
   assert.equal(hiddenBimElement('floor1|IfcMember|Ballbane – stolpe 98x98|x'), false);
   const pergola = ROOM_FURNISHINGS['f1-uteplass'].items.find(i => i.type === 'pergola');
   const [x0, , x1] = pergola.at;
@@ -152,4 +154,43 @@ test('U.etasje: teknisk rom bak kinoen finnes ikke, glass mot badstua og svarte 
   const wall = parts.filter(p => p.at[0] === -11.25 && p.y0 === 0);
   assert.equal(wall.length, 2);
   assert.ok(wall[0].at[3] < wall[1].at[1], 'døråpning i skilleveggen');
+});
+
+test('endringsønsker 22.10.2026 er gjort i modellen', () => {
+  const items = id => ROOM_FURNISHINGS[id].items;
+  // Skjult fra BIM: terrassevarmer, markise, trappa med rekkverk på takterrassen, trappa sør for uteplassen, veggen i sluse
+  for (const name of [
+    'floor2|IfcBuildingElementProxy|Terrassevarmer|2DzGQc2ujE8fAS1pGiA1$I|0',
+    'floor2|IfcBuildingElementProxy|Markise_(motorisert)|31UXbzxoDBTebqYG3PqbkR|0',
+    'floor2|IfcStairFlight|Assembled_Stair|17f930AKz8uwxTR9XcYaOM|0',
+    'floor2|IfcMember|Assembled_Stair|17f930AKz8uwxTR9XcYaOw|0',
+    'basement|IfcStairFlight|Cast-In-Place_Stair|1UbdneFcj9Vga6TPPXISX9|0',
+    'floor1|IfcWallStandardCase|Basic_Wall|1hpf7cvIzBUutLyEBy3uZO|0'
+  ]) assert.equal(hiddenBimElement(name), true, name);
+  // Trappa opp til takterrassen fra bakken (nord for garasjen) finnes og står
+  assert.equal(hiddenBimElement('floor1|IfcStairFlight|Assembled_Stair|0Eyvp8hPnDHhm0IGWdcI2R|0'), false);
+  // Selve dekket i 1. etg skjules ikke
+  assert.equal(hiddenBimElement('floor1|IfcSlab|Floor|0Thnxxox56gfKzaDcDaJtj|0'), false);
+  // Sittesekken er borte; badstua har tre lenestoler mot bassenget (vest)
+  assert.ok(!items('u-basseng').some(i => i.type === 'beanbag'));
+  const chairs = items('u-badstu').filter(i => i.type === 'armchair');
+  assert.equal(chairs.length, 3);
+  assert.ok(chairs.every(c => c.back === 'e'));
+  assert.equal(furnishedRoomAt('basement', -3, 2.2), 'u-badstu');
+  // Kino: én mørk sofa, i hjørnet ved trappa og ikke ved glassveggen (z ≈ 0,2); ingen bar under trappa
+  const sofas = items('u-kino').filter(i => i.type === 'sofa' && i.color === '#4a4846');
+  assert.equal(sofas.length, 1);
+  assert.ok(sofas[0].at[3] < -0.4 && sofas[0].at[1] >= -2.4);
+  assert.equal(items('u-kino').find(i => i.type === 'stairs').solid, true);
+  // Gang: ingen hyller på vestveggen
+  assert.ok(!items('f1-gang').some(i => i.at[0] < -6.5));
+  // Sluse: døra fra entréen er fri for hyller
+  assert.ok(items('f1-sluse').every(i => i.at[0] < -6.9 || i.at[1] >= 0.9 || i.at[3] <= 0));
+  // Solsengene står på tvers i sørøsthjørnet av ballbanen
+  const loungers = items('f1-ballbane').filter(i => i.type === 'lounger');
+  assert.equal(loungers.length, 2);
+  assert.ok(loungers.every(l => l.head === 'e' && l.at[1] > 5 && l.at[0] > -8.5));
+  // Uteplassen og glasstaket går helt ut til ballbanens sørkant
+  assert.deepEqual(ROOM_FURNISHINGS['f1-uteplass'].bounds, [-4.9, 5.1, 2.0, 10.25]);
+  assert.ok(items('f1-uteplass').find(i => i.type === 'pergola').at[3] > 10);
 });
