@@ -16,7 +16,7 @@ import { DeviceCommandStatus, useDeviceCommand } from '../DeviceCommandStatus.js
 import { SaveButton } from '../SaveButton.jsx';
 import { DeviceMarker3D, RoomLighting, RoomLightVolume, DoorAnimator, isLightDevice, deviceReadout } from './House3DDevices.jsx';
 import { RoomFurnishings } from './House3DFurniture.jsx';
-import { furnishedRoomAt, keepsBimElement, hiddenBimElement, ROOM_FURNISHINGS } from '../../lib/house3dFurniture.js';
+import { furnishedRoomAt, keepsBimElement, hiddenBimElement, hiddenBimArea, ROOM_FURNISHINGS } from '../../lib/house3dFurniture.js';
 import { useDoorMeta, useHouse3dDoors, resolveDoorLinks, isDoorSensor, doorSensorOpen } from '../../lib/house3dDoors.js';
 
 /**
@@ -476,9 +476,11 @@ function BimGroup({ items, floorId = null, offsetX = 0, offsetY = 0, offsetZ = 0
       if (interior && (type === 'IfcSlab' || type === 'IfcRoof' || type === 'IfcCovering')) continue;
       // BIM-elementer som står feil i virkeligheten (tegnes på nytt i møbleringen)
       if (hiddenBimElement(mesh.name || mesh.parent?.name)) continue;
+      const c = floorId ? new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3()) : null;
+      // Deler av tegningen som aldri ble bygget
+      if (c && hiddenBimArea(floorId, c.x, c.z)) continue;
       // Rom med faktisk møblering (fra bilder) får arkitektens møbler skjult
-      if (type === 'IfcFurnishingElement' && floorId) {
-        const c = new THREE.Box3().setFromObject(mesh).getCenter(new THREE.Vector3());
+      if (type === 'IfcFurnishingElement' && c) {
         const roomId = furnishedRoomAt(floorId, c.x, c.z);
         if (roomId && !keepsBimElement(roomId, mesh.name || mesh.parent?.name)) continue;
       }

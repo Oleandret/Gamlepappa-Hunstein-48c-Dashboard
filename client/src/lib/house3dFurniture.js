@@ -11,6 +11,16 @@
 /** Overkant av gulvplata som rommene tegnes med i interiør (House3DView InteriorRoom). */
 export const FLOOR_TOP = 0.12;
 
+/** Trinn i trappa fra U.etg til 1. etg (x0, z0, x1, z1), nederst først. */
+const STAIR_STEPS = [
+  // Opp mot nord langs vestsiden
+  [-7.33, -2.66, -6.45, -2.4], [-7.33, -2.92, -6.45, -2.66], [-7.33, -3.18, -6.45, -2.92], [-7.33, -3.44, -6.45, -3.18],
+  // Vendetrinn i nordenden
+  [-7.33, -3.88, -6.82, -3.44], [-6.82, -3.88, -6.31, -3.44], [-6.31, -3.88, -5.8, -3.44], [-5.8, -3.88, -5.3, -3.44],
+  // Mot sør langs østsiden, opp til gangen i 1. etg
+  [-6.3, -3.44, -5.3, -3.18], [-6.3, -3.18, -5.3, -2.92], [-6.3, -2.92, -5.3, -2.66], [-6.3, -2.66, -5.3, -2.4]
+];
+
 export const ROOM_FURNISHINGS = {
   // Soverom 3, 1. etg — bilder 20.10.2026 (IMG_2180–2183)
   'f1-sov3': {
@@ -236,36 +246,47 @@ export const ROOM_FURNISHINGS = {
   },
 
   // ── U.etasje — bilder 21.10.2026 (IMG_2227–2252) ─────────────────────────
-  // Kino: sofa, hvilestoler på podium, kiste, lerret, minibar under trappa og
-  // spileveggen fra BIM stemmer med bildene og beholdes.
+  // Kino: hvilestoler på podium, kiste og AV-rack fra BIM stemmer og beholdes.
+  // Teknisk rom bak kinoen ble aldri bygget: vestveggen er kinoens TV-vegg,
+  // og den hvite hjørnesofaen står i hjørnet mellom TV-veggen og nordveggen.
   'u-kino': {
     floorId: 'basement',
-    bounds: [-12.8, -3.9, -5.0, 0.2],
+    bounds: [-12.86, -3.9, -5.0, 0.2],
     floor: { color: '#b9b8b3', roughness: 0.3 },
-    keepBim: /Hjørnesofa|Hvilestol|Podium|Kiste|Kinolerret|AV-rack|Minibar|Spilevegg|Dartskive|Projektor/i,
-    doors: [{ side: 'west', from: -0.55, to: 0.2, name: 'Teknisk rom' }],
+    keepBim: /Hvilestol|Podium|Kiste|AV-rack|Dartskive|Projektor/i,
     walls: [
-      { side: 'north', from: -12.8, to: -7.35, finish: 'grey' },
+      { side: 'north', from: -12.86, to: -7.35, finish: 'grey' },
       { side: 'west', from: -3.9, to: 0.2, finish: 'grey' }
     ],
     items: [
-      // Rødt forheng ved lerretet, mot glassveggen til bassenget
-      { type: 'box', at: [-12.78, -0.75, -12.62, 0.15], y0: 0, y1: 2.26, color: '#9b1419' },
-      // Filmplakater (Alien, Terminator, Gladiator, Pulp Fiction) over den hvite sofaen
-      { type: 'box', at: [-11.0, -3.9, -10.4, -3.87], y0: 1.3, y1: 2.15, color: '#1d1d1f', wall: true },
-      { type: 'box', at: [-10.2, -3.9, -9.6, -3.87], y0: 1.3, y1: 2.15, color: '#1d1d1f', wall: true },
-      { type: 'box', at: [-9.4, -3.9, -8.8, -3.87], y0: 1.3, y1: 2.15, color: '#1d1d1f', wall: true },
-      { type: 'box', at: [-8.6, -3.9, -8.0, -3.87], y0: 1.3, y1: 2.15, color: '#1d1d1f', wall: true },
-      { type: 'speaker', at: [-12.78, -3.6, -12.6, -3.35], y0: 1.95, y1: 2.25, wall: true },
-      { type: 'speaker', at: [-12.78, -0.65, -12.6, -0.4], y0: 1.95, y1: 2.25, wall: true },
-      // Kuskinn foran lerretet og ved glassveggen
-      { type: 'rug', at: [-11.9, -1.2, -10.4, 0.05], color: '#1e1c1b' },
-      { type: 'rug', at: [-10.2, -1.3, -9.35, -0.2], color: '#2a2726' },
+      // Hvit hjørnesofa i nordvesthjørnet
+      { type: 'sofa', at: [-12.84, -3.88, -9.3, -2.98], back: 'n', color: '#efece6' },
+      { type: 'sofa', at: [-12.84, -2.98, -11.94, -2.1], back: 'w', color: '#efece6' },
+      // TV på vestveggen, rødt forheng ved glassveggen til bassenget
+      { type: 'tv', at: [-12.86, -2.05, -12.8, -0.45], y0: 0.85, y1: 1.75, wall: true, screenTo: 'e' },
+      { type: 'speaker', at: [-12.84, -2.0, -12.66, -1.75], y0: 1.95, y1: 2.25, wall: true },
+      { type: 'speaker', at: [-12.84, -0.75, -12.66, -0.5], y0: 1.95, y1: 2.25, wall: true },
+      { type: 'box', at: [-12.84, -0.4, -12.68, 0.18], y0: 0, y1: 2.26, color: '#9b1419' },
+      // Filmplakater (Alien, Terminator, Gladiator, Pulp Fiction) over sofaen
+      { type: 'box', at: [-12.2, -3.9, -11.65, -3.87], y0: 1.3, y1: 2.15, color: '#1d1d1f', wall: true },
+      { type: 'box', at: [-11.47, -3.9, -10.92, -3.87], y0: 1.3, y1: 2.15, color: '#1d1d1f', wall: true },
+      { type: 'box', at: [-10.74, -3.9, -10.19, -3.87], y0: 1.3, y1: 2.15, color: '#1d1d1f', wall: true },
+      { type: 'box', at: [-10.01, -3.9, -9.46, -3.87], y0: 1.3, y1: 2.15, color: '#1d1d1f', wall: true },
+      // Kuskinn foran TV-en
+      { type: 'rug', at: [-11.7, -1.5, -10.4, -0.2], color: '#1e1c1b' },
+      { type: 'rug', at: [-10.2, -1.3, -9.35, -0.4], color: '#2a2726' },
       // Mørkegrå sofa bak hvilestolene, med lydabsorbenter på veggen bak
       { type: 'box', at: [-6.08, -1.75, -5.98, -0.5], y0: 0, y1: 2.26, color: '#8e9398' },
       { type: 'sofa', at: [-7.0, -1.7, -6.1, 0.1], back: 'e', color: '#4a4846' },
       { type: 'box', at: [-5.98, -1.65, -5.94, -1.2], y0: 1.25, y1: 1.75, color: '#1b1b1b', wall: true },
-      { type: 'box', at: [-5.98, -1.1, -5.94, -0.65], y0: 1.25, y1: 1.75, color: '#1b1b1b', wall: true }
+      { type: 'box', at: [-5.98, -1.1, -5.94, -0.65], y0: 1.25, y1: 1.75, color: '#1b1b1b', wall: true },
+      // Trapp opp til 1. etg mellom kinoen og soverommet: opp langs vestsiden,
+      // vendetrinn i nord og ned mot sør til gangen i 1. etg
+      { type: 'stairs', at: [-7.33, -3.88, -5.3, -2.4], rise: 3.14, steps: STAIR_STEPS },
+      // Bar under trappa: skrivebord med skjerm og spilevegg med vinglass
+      { type: 'box', at: [-6.25, -2.95, -5.4, -2.5], y0: 0, y1: 0.75, color: '#2b2522' },
+      { type: 'box', at: [-6.05, -2.95, -5.6, -2.9], y0: 0.8, y1: 1.15, color: '#111111' },
+      { type: 'slats', at: [-5.33, -3.44, -5.3, -1.8], y1: 2.2, color: '#c9a77c', along: 'z' }
     ]
   },
 
@@ -278,13 +299,13 @@ export const ROOM_FURNISHINGS = {
     doors: [
       { side: 'south', from: -10.35, to: -9.54, name: 'Bassengbod' },
       { side: 'south', from: -6.51, to: -5.7, name: 'Bad' },
-      { side: 'east', from: 0.64, to: 1.45, name: 'Tek' },
-      { side: 'east', from: 2.22, to: 3.03, name: 'Badstu' }
+      { side: 'east', from: 0.64, to: 1.45, name: 'Tek' }
     ],
     walls: [
       { side: 'west', from: 0.27, to: 4.85, finish: 'stone' },
       { side: 'south', from: -12.8, to: -5.05, finish: 'stone' },
-      { side: 'east', from: 0.27, to: 4.85, finish: 'stone' }
+      // Østveggen mot badstua er glass (se STRUCTURE); stein bare ved Tek
+      { side: 'east', from: 0.27, to: 1.63, finish: 'stone' }
     ],
     items: [
       { type: 'pool', at: [-12.76, 1.17, -6.24, 4.24] },
@@ -329,26 +350,30 @@ export const ROOM_FURNISHINGS = {
     ]
   },
 
-  // Bassengboden er delt med en ny vegg (rød strek på plantegningen):
-  // treningsrom med solarium og tredemølle mot bassenget i øst, bassengteknikk
-  // (sandfilter, pumper og UV fra BIM) i vest. Bildene ligger i mappa «Tek».
+  // Bassengboden er delt med en ny vegg (rød strek på plantegningen): et lite
+  // treningsrom mot øst (svart glassdør fra bassenget) og teknisk rom vegg i vegg
+  // mot vest med sandfilter, pumper og UV fra BIM. Bildene ligger i mappa «Tek».
   'u-bassbod': {
     floorId: 'basement',
-    bounds: [-14.9, 5.3, -8.5, 7.4],
+    bounds: [-11.2, 5.3, -8.5, 7.4],
+    floor: { color: '#9e9e9a', roughness: 0.6 },
+    items: [
+      // Solarium langs østveggen, tredemølle langs skilleveggen, hylle i enden
+      { type: 'sunbed', at: [-9.45, 5.35, -8.55, 7.35] },
+      { type: 'treadmill', at: [-11.1, 5.6, -10.35, 7.35], front: 's' },
+      { type: 'box', at: [-10.25, 7.0, -9.5, 7.38], y0: 0, y1: 0.77, color: '#f4f4f2' }
+    ]
+  },
+
+  'u-tekrom': {
+    floorId: 'basement',
+    bounds: [-14.9, 5.3, -11.2, 7.4],
     floor: { color: '#9e9e9a', roughness: 0.6 },
     walls: [{ side: 'south', from: -14.9, to: -11.25, finish: 'plywood' }],
     items: [
-      // Ny skillevegg med dør mellom teknikk og treningsrom
-      { type: 'box', at: [-11.25, 5.3, -11.15, 6.1], y0: 0, y1: 2.26, color: '#eeece7' },
-      { type: 'box', at: [-11.25, 6.95, -11.15, 7.4], y0: 0, y1: 2.26, color: '#eeece7' },
-      { type: 'box', at: [-11.25, 6.1, -11.15, 6.95], y0: 2.1, y1: 2.26, color: '#eeece7' },
-      // Treningsrom: solarium langs østveggen, tredemølle langs skilleveggen, hylle i enden
-      { type: 'sunbed', at: [-9.45, 5.35, -8.55, 7.35] },
-      { type: 'treadmill', at: [-11.1, 5.6, -10.35, 7.35], front: 's' },
-      { type: 'box', at: [-10.25, 7.0, -9.5, 7.38], y0: 0, y1: 0.77, color: '#f4f4f2' },
-      // Teknikk: varmtvannsbereder, kanner med bassengkjemikalier, slangetrommel og overskap
+      // Varmtvannsbereder med slangetrommel, kanner med bassengkjemikalier og overskap
       { type: 'box', at: [-12.05, 6.75, -11.45, 7.35], y0: 0, y1: 1.85, color: '#f2f2f0' },
-      { type: 'box', at: [-11.47, 6.95, -11.3, 7.3], y0: 0.9, y1: 1.3, color: '#2f8f6e' },
+      { type: 'box', at: [-11.45, 6.95, -11.28, 7.3], y0: 0.9, y1: 1.3, color: '#2f8f6e' },
       { type: 'box', at: [-13.05, 6.95, -12.75, 7.35], y0: 0, y1: 0.45, color: '#1f5fc4' },
       { type: 'box', at: [-12.7, 6.95, -12.4, 7.35], y0: 0, y1: 0.45, color: '#1f5fc4' },
       { type: 'box', at: [-13.7, 7.1, -13.0, 7.38], y0: 1.5, y1: 2.0, color: '#f4f4f2', wall: true }
@@ -360,7 +385,57 @@ export const ROOM_FURNISHINGS = {
  * BIM-elementer som står feil i virkeligheten og tegnes på nytt her
  * (uansett rom): pergolaen med glasstak og glassrekkverket mot sør.
  */
-export const HIDDEN_BIM = [/Pergola/i, /glassrekkverk sør/i];
+export const HIDDEN_BIM = [
+  /Pergola/i, /glassrekkverk sør/i,
+  // U.etg: lerretet byttes med TV; veggen mellom basseng og badstu er glass;
+  // dørene fra bassenget til bad og treningsrom er svart glass; nordveggen
+  // tegnes på nytt uten stumpen ut mot teknisk rom som aldri ble bygget
+  /Kinolerret/i,
+  /28IhcQfGr6qxmbTpt/, /0L3Y8bLTj6MQqLSZDbzr/, /0yzDU1kgrFmgPaLW/,
+  /3VXswughn4YfrWXMB/, /IfcDoor\|.*3QyoxqihLDShTF5w2/,
+  /3_Vhh1clf63R9voNqw5rKb/
+];
+
+/** Områder der alt fra BIM skjules (elementets midtpunkt), per etasje. */
+export const HIDDEN_BIM_AREAS = [
+  // Teknisk rom vest for kinoen ble aldri bygget
+  { floorId: 'basement', rect: [-15.4, -4.4, -12.9, 1.05] }
+];
+
+export function hiddenBimArea(floorId, x, z) {
+  return HIDDEN_BIM_AREAS.some(a => a.floorId === floorId && x > a.rect[0] && x < a.rect[2] && z > a.rect[1] && z < a.rect[3]);
+}
+
+const WALL = '#d9d6cf', BLACK_GLASS = '#141517';
+/**
+ * Bygningsdeler som tegnes i stedet for skjulte BIM-elementer (ikke knyttet til ett rom).
+ * Bokser { at: [x0, z0, x1, z1], y0, y1 }; `glass` gir gjennomsiktig glass.
+ */
+export const STRUCTURE = {
+  basement: [
+    // Nordveggen (med åpning for vinduet i kjellerstua) og kinoens vestvegg med TV-en
+    { at: [-12.98, -4.27, 3.69, -3.86], y0: 0, y1: 2.81, color: WALL },
+    { at: [5.1, -4.27, 5.46, -3.86], y0: 0, y1: 2.81, color: WALL },
+    { at: [3.69, -4.27, 5.1, -3.86], y0: 2.41, y1: 2.81, color: WALL },
+    { at: [-12.98, -3.86, -12.86, 0.36], y0: 0, y1: 2.8, color: WALL },
+    // Bassengets østvegg: murt ved Tek (med dør), glass hele veien langs badstua
+    { at: [-5.05, 0.56, -4.93, 0.64], y0: 0, y1: 2.8, color: WALL },
+    { at: [-5.05, 1.45, -4.93, 1.63], y0: 0, y1: 2.8, color: WALL },
+    { at: [-5.05, 0.64, -4.93, 1.45], y0: 2.12, y1: 2.8, color: WALL },
+    { at: [-5.0, 0.64, -4.97, 1.45], y0: 0, y1: 2.12, color: '#efefec' },
+    { at: [-5.0, 1.63, -4.97, 4.82], y0: 0, y1: 2.8, glass: true },
+    { at: [-5.02, 1.63, -4.95, 4.82], y0: 2.74, y1: 2.8, color: '#1b1b1b' },
+    { at: [-5.02, 2.2, -4.95, 2.24], y0: 0, y1: 2.8, color: '#1b1b1b' },
+    { at: [-5.02, 3.01, -4.95, 3.05], y0: 0, y1: 2.8, color: '#1b1b1b' },
+    // Svarte glassdører fra bassenget til badet og til treningsrommet
+    { at: [-6.51, 4.96, -5.7, 5.0], y0: 0, y1: 2.12, color: BLACK_GLASS, glass: true, opacity: 0.88 },
+    { at: [-10.35, 4.96, -9.54, 5.0], y0: 0, y1: 2.12, color: BLACK_GLASS, glass: true, opacity: 0.88 },
+    // Ny skillevegg med dør mellom teknisk rom og treningsrommet
+    { at: [-11.25, 5.23, -11.15, 6.1], y0: 0, y1: 2.7, color: WALL },
+    { at: [-11.25, 6.95, -11.15, 7.42], y0: 0, y1: 2.7, color: WALL },
+    { at: [-11.25, 6.1, -11.15, 6.95], y0: 2.1, y1: 2.7, color: WALL }
+  ]
+};
 
 export function hiddenBimElement(name = '') {
   return HIDDEN_BIM.some(re => re.test(name));
