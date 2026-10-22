@@ -167,13 +167,109 @@ export function RoomLighting({ lights, maxLights = 24 }) {
     <group>
       {list.map((l) => (
         <group key={l.key} position={[l.x, l.y, l.z]}>
-          <pointLight color={WARM} intensity={0.8 + l.level * 7} distance={2.5 + l.level * 5} decay={1.6} />
-          <mesh raycast={() => null}>
-            <sphereGeometry args={[0.08 + l.level * 0.08, 12, 10]} />
-            <meshBasicMaterial color={AMBER} />
-          </mesh>
+          <pointLight color={WARM} intensity={(0.8 + l.level * 7) * (l.weight ?? 1)} distance={2.5 + l.level * 5} decay={1.6} />
+          {/* Lyskilder fra el-tegningen har egen armatur (LightFixtures) */}
+          {!l.fixture && (
+            <mesh raycast={() => null}>
+              <sphereGeometry args={[0.08 + l.level * 0.08, 12, 10]} />
+              <meshBasicMaterial color={AMBER} />
+            </mesh>
+          )}
         </group>
       ))}
+    </group>
+  );
+}
+
+// ─── Lyspunkter fra el-tegningene ───────────────────────────────────────
+
+const OFF = new THREE.Color('#5b6a86');
+
+/**
+ * Armaturene der de faktisk sitter (spotter, lampepunkt, LED-armaturer og
+ * LED-lister). Med lyset på gløder de, og spotter kaster en lyskjegle og en
+ * lysflekk på gulvet. Avslått vises de grått, så man ser hvor lysene sitter.
+ */
+export function LightFixtures({ fixtures }) {
+  return (
+    <group>
+      {fixtures.map(f => <Fixture key={f.key} f={f} />)}
+    </group>
+  );
+}
+
+function Fixture({ f }) {
+  const on = f.level > 0;
+  const color = on ? AMBER : OFF;
+  const drop = f.y - f.floorY;   // fra armaturen ned til gulvet
+  if (f.kind === 'strip') {
+    return (
+      <group>
+        {f.path.slice(1).map(([x1, z1], i) => {
+          const [x0, z0] = f.path[i];
+          return (
+            <mesh key={i} position={[(x0 + x1) / 2, f.floorY + f.h, (z0 + z1) / 2]} rotation={[0, -Math.atan2(z1 - z0, x1 - x0), 0]} raycast={() => null}>
+              <boxGeometry args={[Math.hypot(x1 - x0, z1 - z0), 0.025, 0.04]} />
+              <meshBasicMaterial color={color} />
+            </mesh>
+          );
+        })}
+      </group>
+    );
+  }
+  if (f.kind === 'tube') {
+    return (
+      <group position={[f.x, f.y, f.z]}>
+        <mesh raycast={() => null}>
+          <boxGeometry args={[f.len, 0.05, 0.12]} />
+          <meshBasicMaterial color={color} />
+        </mesh>
+        {on && (
+          <mesh position={[0, -drop + 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
+            <planeGeometry args={[f.len + 1.2, 1.4]} />
+            <meshBasicMaterial color={AMBER} transparent opacity={0.08 + f.level * 0.14} depthWrite={false} blending={THREE.AdditiveBlending} />
+          </mesh>
+        )}
+      </group>
+    );
+  }
+  const pendant = f.kind === 'ceiling';
+  const poolR = pendant ? 0.9 : 0.45 + f.level * 0.2;
+  return (
+    <group position={[f.x, f.y, f.z]}>
+      {pendant ? (
+        <>
+          <mesh position={[0, -0.02, 0]} raycast={() => null}>
+            <cylinderGeometry args={[0.07, 0.07, 0.03, 16]} />
+            <meshBasicMaterial color={OFF} />
+          </mesh>
+          <mesh position={[0, -0.22, 0]} raycast={() => null}>
+            <cylinderGeometry args={[0.005, 0.005, 0.38, 4]} />
+            <meshBasicMaterial color={OFF} />
+          </mesh>
+          <mesh position={[0, -0.44, 0]} raycast={() => null}>
+            <sphereGeometry args={[0.09, 16, 12]} />
+            <meshBasicMaterial color={color} />
+          </mesh>
+        </>
+      ) : (
+        <mesh raycast={() => null}>
+          <cylinderGeometry args={[0.06, 0.06, 0.03, 18]} />
+          <meshBasicMaterial color={color} />
+        </mesh>
+      )}
+      {on && !pendant && drop > 0.3 && (
+        <mesh position={[0, -drop / 2, 0]} raycast={() => null}>
+          <cylinderGeometry args={[0.05, poolR, drop, 20, 1, true]} />
+          <meshBasicMaterial color={AMBER} transparent opacity={0.035 + f.level * 0.05} depthWrite={false} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} />
+        </mesh>
+      )}
+      {on && (
+        <mesh position={[0, -drop + 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
+          <circleGeometry args={[poolR, 28]} />
+          <meshBasicMaterial color={AMBER} transparent opacity={0.08 + f.level * 0.18} depthWrite={false} blending={THREE.AdditiveBlending} />
+        </mesh>
+      )}
     </group>
   );
 }

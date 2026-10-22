@@ -71,6 +71,7 @@ OpenClaw calls timed out at the connector while work continued. Session history 
 - Bassengboden er delt med ny vegg (plantegningen): treningsrom med solarium og tredemølle mot øst, bassengteknikk mot vest.
 - Frontenden speiles på Vercel (`client/vercel.json`); `/api` og `/auth` videresendes til Railway. Google-innlogging kan fullføres på Vercel-adressen (`AUTH_EXTRA_ORIGINS`).
 - Rettet etter tilbakemelding: teknisk rom vest for kinoen ble aldri bygget (BIM i området skjules, vestveggen er TV-veggen), hvit hjørnesofa i hjørnet, trapp opp til 1. etg mellom kino og soverom, hele veggen mellom basseng og badstu i glass, svarte glassdører fra bassenget til bad og treningsrom, teknisk rom og treningsrom vegg i vegg i bassengboden.
+- Lyspunkter fra el-tegningene (el-inst U/1./2. etg, 08.–09.10.2018): 83 spotter, lampepunkter, LED-armaturer i garasjen, LED-lister under benkene i badstua og utelys på takterrassene står der de faktisk sitter (`client/src/lib/house3dFixtures.js`). Symbolene er funnet automatisk på tegningene og registrert mot plantegningene (SIFT + RANSAC, < 1 px). Armaturene gløder og kaster lyskjegle/lysflekk etter Homey-lampene i rommet (nærmeste lampe med pin, ellers sterkeste lampe); avslått vises de grått. Rompanelet viser antall lyspunkter.
 
 ## Veiledninger — 22. oktober 2026
 
