@@ -10,6 +10,9 @@ const SESSION_TTL = 7 * 24 * 60 * 60_000;
 const random = () => randomBytes(32).toString('base64url');
 const hash = value => createHash('sha256').update(value).digest('base64url');
 const equal = (a, b) => typeof a === 'string' && typeof b === 'string' && timingSafeEqual(Buffer.from(hash(a)), Buffer.from(hash(b)));
+// Frontend-speilet på Vercel videresender /auth og /api hit, så innloggingen kan fullføres der.
+const VERCEL_ORIGIN = 'https://gamlepappa-hunstein-48c-dashboard.vercel.app';
+const canonicalHttps = value => { try { const u = new URL(value); return u.protocol === 'https:' && u.origin === value ? value : null; } catch { return null; } };
 const cookieOptions = { httpOnly: true, secure: true, sameSite: 'lax', path: '/' };
 function cookie(req, name) {
   const values = (req.headers.cookie || '').split(';').map(v => v.trim()).filter(v => v.startsWith(`${name}=`));
@@ -20,7 +23,9 @@ export function googleConfig(env = process.env) {
   try {
     const origin = new URL(env.AUTH_PUBLIC_ORIGIN);
     if (origin.protocol !== 'https:' || origin.origin !== env.AUTH_PUBLIC_ORIGIN || !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return null;
-    return { origin: origin.origin, clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET, redirectUri: `${origin.origin}/auth/google/callback` };
+    const extra = (env.AUTH_EXTRA_ORIGINS ?? VERCEL_ORIGIN).split(',').map(v => canonicalHttps(v.trim())).filter(Boolean);
+    const origins = [...new Set([origin.origin, ...extra])];
+    return { origin: origin.origin, origins, clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET, redirectUri: `${origin.origin}/auth/google/callback` };
   } catch { return null; }
 }
 const googleKeys = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
@@ -48,10 +53,12 @@ export function createGoogleAuth({ config = () => googleConfig(), fetchImpl = fe
     if (limits.size >= 10_000 || ++limit.count > 10 || logins.size >= 1000 || sessions.size >= 1000) return res.status(429).json({ error: 'Prøv igjen senere' });
     limits.set(req.ip, limit);
     const state = random(), binding = random(), nonce = random(), verifier = random();
-    logins.set(hash(state), { binding: hash(binding), nonce, verifier, expires: now() + LOGIN_TTL });
+    const origin = (cfg.origins || []).includes(req.query.origin) ? req.query.origin : cfg.origin;
+    const redirectUri = `${origin}/auth/google/callback`;
+    logins.set(hash(state), { binding: hash(binding), nonce, verifier, origin, redirectUri, expires: now() + LOGIN_TTL });
     res.cookie(LOGIN_COOKIE, binding, { ...cookieOptions, maxAge: LOGIN_TTL });
     const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    url.search = new URLSearchParams({ client_id: cfg.clientId, redirect_uri: cfg.redirectUri, response_type: 'code', scope: 'openid email', state, nonce, code_challenge: hash(verifier), code_challenge_method: 'S256', login_hint: OWNER_EMAIL, prompt: 'select_account' });
+    url.search = new URLSearchParams({ client_id: cfg.clientId, redirect_uri: redirectUri, response_type: 'code', scope: 'openid email', state, nonce, code_challenge: hash(verifier), code_challenge_method: 'S256', login_hint: OWNER_EMAIL, prompt: 'select_account' });
     res.redirect(url.href);
   });
   router.get('/google/callback', async (req, res) => {
@@ -65,7 +72,7 @@ export function createGoogleAuth({ config = () => googleConfig(), fetchImpl = fe
       const response = await fetchImpl('https://oauth2.googleapis.com/token', {
         method: 'POST', redirect: 'error', signal: AbortSignal.timeout(10_000),
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ grant_type: 'authorization_code', code: req.query.code, client_id: cfg.clientId, client_secret: cfg.clientSecret, redirect_uri: cfg.redirectUri, code_verifier: attempt.verifier }),
+        body: new URLSearchParams({ grant_type: 'authorization_code', code: req.query.code, client_id: cfg.clientId, client_secret: cfg.clientSecret, redirect_uri: attempt.redirectUri, code_verifier: attempt.verifier }),
       });
       if (!response.ok) throw new Error('Exchange failed');
       const tokens = await response.json();
@@ -74,7 +81,7 @@ export function createGoogleAuth({ config = () => googleConfig(), fetchImpl = fe
       if (sessions.size >= 1000) throw new Error('Session limit');
       sessions.delete(hash(cookie(req, SESSION_COOKIE)));
       const id = random();
-      sessions.set(hash(id), { ...identity, role: 'admin', csrfToken: random(), expires: now() + SESSION_TTL });
+      sessions.set(hash(id), { ...identity, origin: attempt.origin, role: 'admin', csrfToken: random(), expires: now() + SESSION_TTL });
       res.cookie(SESSION_COOKIE, id, { ...cookieOptions, maxAge: SESSION_TTL });
       return res.redirect('/');
     } catch {
@@ -88,7 +95,8 @@ export function createGoogleAuth({ config = () => googleConfig(), fetchImpl = fe
     return sessions.get(hash(cookie(req, SESSION_COOKIE))) || null;
   }
   function csrfValid(req, value) {
-    return req.headers.origin === config()?.origin && equal(req.headers['x-csrf-token'], value.csrfToken);
+    const cfg = config();
+    return Boolean(cfg) && req.headers.origin === (value.origin || cfg.origin) && equal(req.headers['x-csrf-token'], value.csrfToken);
   }
   function logout(req, res) {
     sessions.delete(hash(cookie(req, SESSION_COOKIE)));

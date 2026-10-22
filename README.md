@@ -78,7 +78,8 @@ Følg [utrullingsplanen](docs/ROLLOUT.md) og [konfigurasjonslisten](docs/RELEASE
 Vercel-prosjektet bygger React-klienten fra `client/` (rotkatalog `client`, oppsett i `client/vercel.json`). Serveren blir på Railway: Vercel videresender `/api/*` og `/auth/*` til Railway-URL-en, så nettleseren ser alt som samme opprinnelse og ingen hemmeligheter eller miljøvariabler trengs på Vercel. Express-serveren kan ikke flyttes til Vercel som den er, fordi den trenger volumet `/data`, Postgres og bakgrunnsjobbene (poller, prislogger, varmelogger).
 
 - Innlogging med tilgangsnøkkel virker på Vercel-adressen.
-- Google-innlogging og myUplink-kobling er bundet til `AUTH_PUBLIC_ORIGIN` (Railway-adressen) og brukes derfra.
+- Google-innlogging virker også på Vercel-adressen: klienten sender sin egen opprinnelse, og serveren godtar den bare hvis den står i `AUTH_EXTRA_ORIGINS` (kommaseparert; standard er Vercel-adressen). Tilbakekallings-URL-en `https://gamlepappa-hunstein-48c-dashboard.vercel.app/auth/google/callback` må være lagt inn i Google Cloud-klienten.
+- myUplink-koblingen er fortsatt bundet til `AUTH_PUBLIC_ORIGIN` (Railway-adressen).
 - Er Railway nede eller pauset, viser Vercel-siden grensesnittet, men uten data.
 
 Taleassistenten er foreløpig ikke konfigurert. Chat har separat status. Den gamle widgeten lastes ikke inn i dokumentet med øktnøkkelen; se [planen for isolert tale](docs/VOICE-ISOLATION.md).

@@ -52,7 +52,7 @@ export function AuthGate({ children }) {
     <h1 className="text-xl mb-4">Logg inn</h1>
     <ResidentLogin onLoggedIn={() => check()} />
     <hr className="my-6 border-nx-line" />
-    {googleEnabled && <><p className="my-3 text-sm">Eier: logg inn med Google-kontoen.</p><button className="btn w-full" onClick={() => { sessionStorage.removeItem('dashboard.session'); setCsrfToken(''); sessionStorage.setItem('dashboard.returnTo', window.location.pathname); window.location.assign('/auth/google'); }}>Fortsett med Google</button></>}
+    {googleEnabled && <><p className="my-3 text-sm">Eier: logg inn med Google-kontoen.</p><button className="btn w-full" onClick={() => { sessionStorage.removeItem('dashboard.session'); setCsrfToken(''); sessionStorage.setItem('dashboard.returnTo', window.location.pathname); window.location.assign(`/auth/google?origin=${encodeURIComponent(window.location.origin)}`); }}>Fortsett med Google</button></>}
     <details className="mt-4" open={!googleEnabled}><summary>Administratortilgang</summary><form onSubmit={e => {
       e.preventDefault(); sessionStorage.setItem('dashboard.session', token); setToken(''); setError(''); check(true);
     }}><p className="my-3 text-sm">Tilgangsnøkkelen brukes bare i denne nettleserøkten.</p><label>Tilgangsnøkkel<input type="password" required autoComplete="off" value={token} onChange={e => setToken(e.target.value)} className="block w-full bg-nx-bg border p-2 my-2" /></label><button className="btn">Logg inn med nøkkel</button></form></details>
