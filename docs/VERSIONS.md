@@ -64,3 +64,9 @@ OpenClaw calls timed out at the connector while work continued. Session history 
 - Garasje: Tesla Model X og Model Y, ingen møbler.
 - Etasjene kan spres skrått («Skrått»-bryter), så man ser inn i alle samtidig.
 - Egen lesenøkkel for rombilder (`ROOM_PHOTO_READ_TOKEN`), bare GET på `/api/room-photos`.
+
+## 3D-hus — 22. oktober 2026
+
+- U.etasje møblert etter bilder i Drive (IMG_2227–2252): kino (grå vegger, plakater, rødt forheng, mørk sofa med lydabsorbenter; BIM-sofa, hvilestoler, lerret og minibar beholdes), svømmebasseng med naturstein, vannflate, sittesekk og palmer, bad med marmorflis og mørk servant, bod med eikehyller og spilevegg.
+- Bassengboden er delt med ny vegg (plantegningen): treningsrom med solarium og tredemølle mot øst, bassengteknikk mot vest.
+- Frontenden speiles på Vercel (`client/vercel.json`); `/api` og `/auth` videresendes til Railway. Google-innlogging kan fullføres på Vercel-adressen (`AUTH_EXTRA_ORIGINS`).
