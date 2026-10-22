@@ -420,6 +420,70 @@ export const ROOM_FURNISHINGS = {
       { type: 'box', at: [-12.7, 6.95, -12.4, 7.35], y0: 0, y1: 0.45, color: '#1f5fc4' },
       { type: 'box', at: [-13.7, 7.1, -13.0, 7.38], y0: 1.5, y1: 2.0, color: '#f4f4f2', wall: true }
     ]
+  },
+
+  // ── Utleieleiligheten i U.etg — bilder fra utleiekontrakten 2019 (mappa
+  // «13 - NY Bolig Hunstein/Utleie/Kontrakt med Caroline»). Rommappene i Drive er
+  // tomme; kjøkken, bad, seng og garderober fra BIM stemmer med bildene.
+  'u-kjokken': {
+    floorId: 'basement',
+    bounds: [1.8, -0.3, 8.3, 2.6],
+    floor: { color: '#a9a8a4', roughness: 0.35 },
+    // Hvitt kjøkken langs nordveggen med komfyr og kjøleskap; TV-en på nordveggen i BIM finnes ikke
+    keepBim: /Kjøkken|Komfyr|Kjøleskap/i,
+    items: []
+  },
+  'u-stue2': {
+    floorId: 'basement',
+    bounds: [5.4, 2.6, 8.3, 4.9],
+    floor: { color: '#a9a8a4', roughness: 0.35 },
+    items: [
+      // Mørkegrå sofa med sjeselong mot vinduet, vendt mot TV-benken i sør
+      { type: 'rug', at: [5.8, 3.55, 7.8, 4.4], color: '#e6e1d8' },
+      { type: 'sofa', at: [5.6, 2.65, 7.9, 3.5], back: 'n', color: '#4a4a4c' },
+      { type: 'sofa', at: [7.25, 3.5, 7.9, 4.15], back: 'e', color: '#4a4a4c' },
+      // Hvitt kubebord og svart TV-benk med TV
+      { type: 'box', at: [6.35, 3.75, 6.95, 4.25], y0: 0, y1: 0.4, color: '#f4f4f2' },
+      { type: 'box', at: [5.8, 4.45, 7.6, 4.88], y0: 0, y1: 0.5, color: '#2b2b2d' },
+      { type: 'tv', at: [6.15, 4.62, 7.25, 4.7], y0: 0.55, y1: 1.2, stand: true, screenTo: 'n' }
+    ]
+  },
+  'u-sov2': {
+    floorId: 'basement',
+    bounds: [-1.35, 1.0, 1.7, 4.9],
+    floor: { color: '#a9a8a4', roughness: 0.35 },
+    // Dobbeltseng og garderober fra BIM; hvit reol med TV ved fotenden og hvitt nattbord
+    keepBim: /Seng|Garderobe/i,
+    items: [
+      { type: 'box', at: [1.3, 2.65, 1.68, 4.1], y0: 0, y1: 0.77, color: '#f4f4f2' },
+      { type: 'tv', at: [1.4, 3.05, 1.47, 3.75], y0: 0.8, y1: 1.3, stand: true, screenTo: 'w' },
+      { type: 'box', at: [-1.3, 2.1, -0.9, 2.5], y0: 0, y1: 0.5, color: '#f4f4f2' }
+    ]
+  },
+
+  // ── Hybelen i U.etg — ingen bilder; etter plantegningen (756-001) og
+  // el-tegningen (kjøkkenpunkter for kjøl, komfyr og vifte på vestveggen)
+  'u-sov1': {
+    floorId: 'basement',
+    bounds: [-5.0, -3.9, -0.9, -1.75],
+    floor: { color: '#a9a8a4', roughness: 0.35 },
+    items: [
+      { type: 'bed', at: [-3.43, -3.85, -1.84, -1.85] },
+      { type: 'box', at: [-3.9, -3.85, -3.5, -3.45], y0: 0, y1: 0.5, color: '#f4f4f2' },
+      { type: 'box', at: [-1.77, -3.85, -1.37, -3.45], y0: 0, y1: 0.5, color: '#f4f4f2' }
+    ]
+  },
+  'u-kjstue': {
+    floorId: 'basement',
+    bounds: [-0.9, -3.9, 5.6, -0.75],
+    floor: { color: '#a9a8a4', roughness: 0.35 },
+    // Sofagruppen fra BIM beholdes; lite kjøkken langs vestveggen
+    keepBim: /SIDESTILT|Sofa/i,
+    items: [
+      { type: 'box', at: [-0.88, -3.85, -0.28, -2.25], y0: 0, y1: 0.86, color: '#f4f4f2' },
+      { type: 'box', at: [-0.88, -3.85, -0.26, -2.25], y0: 0.86, y1: 0.9, color: '#b9b6b0' },
+      { type: 'box', at: [-0.88, -3.85, -0.53, -2.25], y0: 1.45, y1: 2.15, color: '#f4f4f2', wall: true }
+    ]
   }
 };
 
