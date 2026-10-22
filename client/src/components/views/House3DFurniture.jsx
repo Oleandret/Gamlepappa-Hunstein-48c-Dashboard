@@ -436,6 +436,40 @@ function Item({ item, clip }) {
           </mesh>
         </group>
       );
+    case 'eggChair': {
+      // Hvit skalstol på fot; skallet åpner seg mot `back`-sidens motsatte side
+      const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, r = Math.min(x1 - x0, z1 - z0) / 2;
+      const back = { n: { z1: z0 + 0.12 }, s: { z0: z1 - 0.12 }, e: { x0: x1 - 0.12 }, w: { x1: x0 + 0.12 } }[item.back || 's'];
+      return (
+        <group>
+          <mesh position={[cx, 0.2, cz]} castShadow raycast={() => null}>
+            <cylinderGeometry args={[0.04, 0.22, 0.4, 12]} />
+            <meshStandardMaterial color="#b8b8b8" metalness={0.5} roughness={0.3} clippingPlanes={clip} />
+          </mesh>
+          <mesh position={[cx, 0.48, cz]} castShadow receiveShadow raycast={() => null}>
+            <cylinderGeometry args={[r, r * 0.8, 0.16, 20]} />
+            <meshStandardMaterial color={item.color || '#f2f2f0'} roughness={0.6} clippingPlanes={clip} />
+          </mesh>
+          <Box {...b} {...back} y0={0.5} y1={0.95} color={item.color || '#f2f2f0'} clip={clip} roughness={0.6} />
+        </group>
+      );
+    }
+    case 'firePit': {
+      // Rundt bålfat av stål på bena
+      const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, r = Math.min(x1 - x0, z1 - z0) / 2;
+      return (
+        <group>
+          <mesh position={[cx, 0.22, cz]} castShadow raycast={() => null}>
+            <cylinderGeometry args={[r, r * 0.7, 0.26, 24, 1, true]} />
+            <meshStandardMaterial color="#4a3a30" metalness={0.6} roughness={0.7} side={THREE.DoubleSide} clippingPlanes={clip} />
+          </mesh>
+          <mesh position={[cx, 0.12, cz]} raycast={() => null}>
+            <cylinderGeometry args={[r * 0.7, r * 0.7, 0.02, 24]} />
+            <meshStandardMaterial color="#1c1a19" roughness={1} clippingPlanes={clip} />
+          </mesh>
+        </group>
+      );
+    }
     case 'beanbag':
       return (
         <mesh position={[(x0 + x1) / 2, 0.26, (z0 + z1) / 2]} scale={[(x1 - x0) / 2, 0.3, (z1 - z0) / 2]} castShadow receiveShadow raycast={() => null}>
