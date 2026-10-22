@@ -5,7 +5,8 @@ import express from 'express';
 import { generateKeyPair, SignJWT } from 'jose';
 import { createGoogleAuth, googleConfig, verifyGoogleIdentity, OWNER_EMAIL, googleAuth } from '../lib/googleAuth.js';
 import { accessControl } from '../lib/auth.js';
-const cfg = { origin: 'https://dashboard.example', clientId: 'fixture-client', clientSecret: 'fixture-secret', redirectUri: 'https://dashboard.example/auth/google/callback' };
+const MIRROR = 'https://mirror.example';
+const cfg = { origin: 'https://dashboard.example', origins: ['https://dashboard.example', MIRROR], clientId: 'fixture-client', clientSecret: 'fixture-secret', redirectUri: 'https://dashboard.example/auth/google/callback' };
 const keys = await generateKeyPair('RS256');
 const claims = { iss: 'https://accounts.google.com', aud: cfg.clientId, sub: 'fixture-owner', email: OWNER_EMAIL, email_verified: true, nonce: 'fixture-nonce', iat: Math.floor(Date.now()/1000), exp: Math.floor(Date.now()/1000)+300 };
 const sign = payload => new SignJWT(payload).setProtectedHeader({ alg: 'RS256' }).sign(keys.privateKey);
@@ -16,6 +17,10 @@ test('Google login is off by default and requires a canonical HTTPS origin and c
   assert.equal(googleConfig(env).redirectUri, cfg.redirectUri);
   for (const origin of ['http://dashboard.example', 'https://dashboard.example/', 'https://dashboard.example/path', 'https://user:pass@dashboard.example']) assert.equal(googleConfig({ ...env, AUTH_PUBLIC_ORIGIN: origin }), null);
   assert.equal(googleConfig({ ...env, GOOGLE_CLIENT_SECRET: '' }), null);
+  // Vercel-speilet er tillatt som standard; ugyldige ekstra-opprinnelser ignoreres
+  assert.deepEqual(googleConfig(env).origins, [cfg.origin, 'https://gamlepappa-hunstein-48c-dashboard.vercel.app']);
+  assert.deepEqual(googleConfig({ ...env, AUTH_EXTRA_ORIGINS: 'https://speil.example, http://usikker.example, https://x.example/sti' }).origins, [cfg.origin, 'https://speil.example']);
+  assert.deepEqual(googleConfig({ ...env, AUTH_EXTRA_ORIGINS: '' }).origins, [cfg.origin]);
 });
 test('only verified owner identity with valid signature, issuer, audience, nonce and lifetime is accepted', async () => {
   assert.deepEqual(await verifyGoogleIdentity(await sign(claims), cfg, claims.nonce, keys.publicKey), { sub: claims.sub, email: OWNER_EMAIL });
@@ -40,8 +45,8 @@ async function harness(t, overrides = {}) {
   const server = app.listen(0, '127.0.0.1'); await new Promise(r => server.once('listening', r));
   t.after(() => new Promise(r => { server.close(r); server.closeAllConnections(); }));
   const request = (path, options = {}) => fetch(`http://127.0.0.1:${server.address().port}${path}`, { ...options, redirect: 'manual' });
-  async function start() {
-    const response = await request('/auth/google');
+  async function start(query = '') {
+    const response = await request(`/auth/google${query}`);
     const url = new URL(response.headers.get('location'));
     activeNonce = url.searchParams.get('nonce');
     return { url, cookie: response.headers.get('set-cookie').split(';')[0], response };
@@ -113,4 +118,20 @@ test('all authenticated bearer roles may log out without gaining write permissio
     if (old === undefined) delete process.env.AUTH_TOKENS_JSON; else process.env.AUTH_TOKENS_JSON = old;
     if (demo === undefined) delete process.env.DEMO_MODE; else process.env.DEMO_MODE = demo;
   }
+});
+
+test('innlogging fra et tillatt speil fullføres og låses til speilets opprinnelse', async t => {
+  const h = await harness(t);
+  const evil = await h.start(`?origin=${encodeURIComponent('https://evil.example')}`);
+  assert.equal(evil.url.searchParams.get('redirect_uri'), cfg.redirectUri);
+  const a = await h.start(`?origin=${encodeURIComponent(MIRROR)}`);
+  assert.equal(a.url.searchParams.get('redirect_uri'), `${MIRROR}/auth/google/callback`);
+  const response = await h.finish(a);
+  assert.equal(response.headers.get('location'), '/');
+  assert.equal(h.exchanges[0].body.get('redirect_uri'), `${MIRROR}/auth/google/callback`);
+  const cookie = response.headers.getSetCookie().find(v => v.startsWith('__Host-dashboard-session=')).split(';')[0];
+  const session = await (await h.request('/session', { headers: { cookie } })).json();
+  const write = origin => h.request('/write', { method: 'POST', headers: { cookie, origin, 'x-csrf-token': session.csrfToken } });
+  assert.equal((await write(MIRROR)).status, 200);
+  assert.equal((await write(cfg.origin)).status, 403);
 });
