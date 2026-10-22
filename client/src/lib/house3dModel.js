@@ -137,6 +137,13 @@ export function planPctToWorld(planId, xPct, yPct) {
   return [t.ax * xPct + t.bx, t.az * yPct + t.bz];
 }
 
+/** Omvendt av planPctToWorld: meter i 3D-modellen → prosent på plantegningen. */
+export function worldToPlanPct(planId, x, z) {
+  const t = PLAN_IMAGE_TRANSFORM[planId];
+  if (!t) return null;
+  return [(x - t.bx) / t.ax, (z - t.bz) / t.az];
+}
+
 /** Polygon-punkter for et rom (rektangel → 4 hjørner). */
 const _polyCache = new Map();
 export function roomPoly(room) {

@@ -4,10 +4,13 @@ import { OrbitControls, Html, Edges, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import {
   Box, Layers, Lightbulb, Thermometer, ShieldAlert, Home as HomeIcon, Edit2,
-  RotateCw, Power, ChevronRight, X, Move3d, Activity, DoorOpen, Lock, Unlock, Maximize2, Minimize2, Sun, Moon
+  RotateCw, Power, ChevronRight, X, Move3d, Activity, DoorOpen, Lock, Unlock, Maximize2, Minimize2, Sun, Moon, MousePointerClick
 } from 'lucide-react';
 import { sunPosition, sunDirection, skyLighting, sunTimes } from '../../lib/sunPosition.js';
-import { FLOORS, ALL_ROOMS, roomPoly, roomCenter, roomArea, planPctToWorld, BIM_MODEL_URL } from '../../lib/house3dModel.js';
+import { FLOORS, ALL_ROOMS, roomPoly, roomCenter, roomArea, planPctToWorld, worldToPlanPct, BIM_MODEL_URL } from '../../lib/house3dModel.js';
+import { changeCandidates, localizePoint, parseBimName } from '../../lib/house3dChangeTargets.js';
+import { useHouse3dChanges } from '../../lib/useHouse3dChanges.js';
+import { ChangePanel, ChangeMarkers3D } from './House3DChanges.jsx';
 import { capValue, hasCap } from '../../lib/deviceUtils.js';
 import { useHouse3dRooms } from '../../lib/useHouse3dRooms.js';
 import { DeviceControls } from '../FloorPlanPin.jsx';
@@ -275,7 +278,7 @@ function InteriorRoom({ data, overlay, selected, hovered, onSelect, onHover, sho
     <group>
       <mesh
         geometry={slab}
-        onClick={(e) => { e.stopPropagation(); onSelect(room.id); }}
+        onClick={(e) => { e.stopPropagation(); onSelect(room.id, e.point); }}
         onPointerOver={(e) => { e.stopPropagation(); onHover(room.id); }}
         onPointerOut={() => onHover(null)}
         receiveShadow
@@ -376,7 +379,7 @@ function ExteriorRoom({ data, floor, onSelect, selected, hovered, onHover }) {
   const deck = useSlabGeometry(poly, 0.15);
   const railing = useSlabGeometry(poly, 1.0, -0.02);
 
-  const select = (e) => { e.stopPropagation(); onSelect(room.id); };
+  const select = (e) => { e.stopPropagation(); onSelect(room.id, e.point); };
   const over = (e) => { e.stopPropagation(); onHover(room.id); };
 
   if (room.outdoor) {
@@ -501,6 +504,7 @@ function BimGroup({ items, floorId = null, offsetX = 0, offsetY = 0, offsetZ = 0
       m.castShadow = !mat.transparent;
       m.receiveShadow = true;
       m.userData.ifcType = type;
+      m.userData.bimName = mesh.name || mesh.parent?.name || '';
       if (type === 'IfcDoor' && gid) {
         m.userData.doorId = gid;
         const meta = doorIndex?.get(gid);
@@ -551,7 +555,7 @@ function BimGroup({ items, floorId = null, offsetX = 0, offsetY = 0, offsetZ = 0
   const handle = (onPick || onDoor) ? (e) => {
     const doorId = doorIdOf(e.object);
     if (doorId && onDoor) { e.stopPropagation(); onDoor(doorId); return; }
-    if (onPick) { e.stopPropagation(); onPick(e.point); }
+    if (onPick) { e.stopPropagation(); onPick(e.point, e.object); }
   } : undefined;
   return <primitive object={group} position={[offsetX, offsetY, offsetZ]} onClick={handle} />;
 }
@@ -826,6 +830,10 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
   const [hoveredRoomId, setHoveredRoomId] = useState(null);
   const [selectedMarkerId, setSelectedMarkerId] = useState(null);
   const [editing, setEditing] = useState(false);
+  // «Pek»: trykk på noe for å ønske en endring eller koble en Homey-enhet dit
+  const [pointing, setPointing] = useState(false);
+  const [changePick, setChangePick] = useState(null);
+  const changes = useHouse3dChanges();
   // Rotasjon og fart huskes per enhet, så fullskjerm på f.eks. et nettbrett kan stå og rotere.
   const [autoRotate, setAutoRotate] = useState(() => { try { return localStorage.getItem('nexora.house3d.rotate') === '1'; } catch { return false; } });
   const [rotateSpeed, setRotateSpeed] = useState(() => { try { return Number(localStorage.getItem('nexora.house3d.rotateSpeed')) || 0.6; } catch { return 0.6; } });
@@ -1035,6 +1043,44 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
     setFlyTo({ pos: [dcx + nx * 5.5, y + 9, dcz + nz * 5.5 + 2.5], target: [dcx, y + 0.6, dcz], key: Date.now() });
   };
 
+  // ── Pek-modus: endringsønsker og kobling av enheter ──
+  const floorOffsets = () => Object.fromEntries(visibleFloors.map(f => [f.id, [floorShift(f.id)[0], floorY(f.id), floorShift(f.id)[1]]]));
+  const pointAt = (p, object = null) => {
+    const loc = localizePoint([p.x, p.y, p.z], floorOffsets());
+    if (!loc) return;
+    const bimName = object?.userData?.bimName || null;
+    const gid = bimName ? parseBimName(bimName)?.globalId : null;
+    setChangePick({ ...loc, world: [p.x, p.y, p.z], candidates: changeCandidates({ ...loc, bimName, doorLabel: gid ? doorIndex.get(gid)?.label : null }) });
+  };
+  const toWorld = (floorId, [x, y, z]) => {
+    const [sx, sz] = floorShift(floorId);
+    return [x + sx, floorY(floorId) + y, z + sz];
+  };
+  const showChange = (item) => {
+    const t = item.target || {};
+    if (!t.floorId || !t.point) return;
+    if (floorFilter !== 'all' && floorFilter !== t.floorId) setFloorFilter('all');
+    setMode('interior');
+    const [x, y, z] = toWorld(t.floorId, t.point);
+    setFlyTo({ pos: [x + 5, y + 7, z + 7], target: [x, y, z], key: Date.now() });
+  };
+  const devicesWithZone = useMemo(() => Object.fromEntries(Object.entries(devices || {}).map(([id, d]) => [id, { ...d, zoneName: zones?.[d.zone]?.name }])), [devices, zones]);
+  /** Hva elementet er koblet til nå (dør → sensor). */
+  const linkedTo = (c) => {
+    if (c.kind === 'door' && c.globalId) { const devId = doorLinks.links[c.globalId]; return devId ? devices?.[devId]?.name || devId : null; }
+    return null;
+  };
+  const linkDevice = (c, devId) => {
+    if (c.kind === 'door' && c.globalId) return doorsCfg.link(c.globalId, devId);
+    const floor = FLOORS.find(f => f.id === c.floorId);
+    const pct = worldToPlanPct(floor.planId, c.point[0], c.point[2]);
+    if (!pct || !floorPlanPins) return;
+    // Enheten flyttes hvis den allerede har en pin (på samme eller en annen etasje)
+    for (const f of FLOORS) for (const pin of floorPlanPins.getPins(f.planId)) if (pin.deviceId === devId) floorPlanPins.removePin(f.planId, pin.id);
+    floorPlanPins.addPin(floor.planId, { deviceId: devId, x: pct[0], y: pct[1], label: devices?.[devId]?.name || '' });
+  };
+  const openChanges = changes.items.filter(i => (i.status === 'ny' || i.status === 'pågår') && i.target?.point && visibleFloors.some(f => f.id === i.target.floorId));
+
   // Klikk på BIM-geometri → finn rommet under punktet
   const pickPoint = (p) => {
     const lv = (id) => FLOORS.find(f => f.id === id).level;
@@ -1110,7 +1156,10 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
         ))}
         <div className="ml-auto flex items-center gap-1.5">
           <SaveButton sync={selectedDoor ? doorsCfg.sync : roomsCfg.sync} size="sm" />
-          <ToggleBtn active={editing} onClick={() => setEditing(e => !e)} Icon={Edit2}>{editing ? 'Ferdig' : 'Koble rom/dører'}</ToggleBtn>
+          <ToggleBtn active={pointing} onClick={() => { setPointing(v => !v); setChangePick(null); setEditing(false); }} Icon={MousePointerClick}>
+            {pointing ? 'Ferdig' : `Pek og endre${changes.items.some(i => i.status === 'ny') ? ` (${changes.items.filter(i => i.status === 'ny').length})` : ''}`}
+          </ToggleBtn>
+          <ToggleBtn active={editing} onClick={() => { setEditing(e => !e); setPointing(false); }} Icon={Edit2}>{editing ? 'Ferdig' : 'Koble rom/dører'}</ToggleBtn>
         </div>
       </div>
 
@@ -1152,8 +1201,8 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                 <BimBoundary onFail={() => setBimFailed(true)}>
                   <Suspense fallback={null}>
                     <BimModel
-                      mode={mode} visibleFloors={visibleFloors} floorY={floorY} floorShift={floorShift} onPick={pickPoint}
-                      onDoor={selectDoor} doorIndex={doorIndex} registry={doorRegistry}
+                      mode={mode} visibleFloors={visibleFloors} floorY={floorY} floorShift={floorShift} onPick={pointing ? pointAt : pickPoint}
+                      onDoor={pointing ? undefined : selectDoor} doorIndex={doorIndex} registry={doorRegistry}
                     />
                   </Suspense>
                 </BimBoundary>
@@ -1212,7 +1261,7 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                     overlay={overlay}
                     selectedRoomId={selectedRoomId}
                     hoveredRoomId={hoveredRoomId}
-                    onSelect={selectRoom}
+                    onSelect={pointing ? (_id, p) => p && pointAt(p) : selectRoom}
                     onHover={setHoveredRoomId}
                     isolated={floorFilter === floor.id}
                     dimmed={floorFilter !== 'all' && floorFilter !== floor.id && mode === 'interior'}
@@ -1221,6 +1270,12 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                 );
               })}
               {mode === 'exterior' && !bim && <GarageDoor />}
+              {pointing && (
+                <ChangeMarkers3D
+                  pickWorld={changePick?.world}
+                  items={openChanges.map(i => ({ id: i.id, status: i.status, world: toWorld(i.target.floorId, i.target.point) }))}
+                />
+              )}
               {mode === 'interior' && markers3d
                 .filter(m => visibleFloors.some(f => f.id === m.floorId))
                 .filter(m => overlay === 'all'
@@ -1330,7 +1385,13 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
         </div>
 
         <aside className="xl:w-[360px] shrink-0 panel p-3 overflow-y-auto" style={{ maxHeight: 900 }}>
-          {selectedDoor ? (
+          {pointing ? (
+            <ChangePanel
+              pick={changePick} changes={changes} onClear={() => setChangePick(null)} onShow={showChange}
+              floorLabel={(id) => FLOORS.find(f => f.id === id)?.label || ''}
+              devices={devicesWithZone} onLinkDevice={linkDevice} linkedTo={linkedTo}
+            />
+          ) : selectedDoor ? (
             <DoorPanel
               door={selectedDoor}
               link={doorLinks.links[selectedDoor.id] ?? null}
