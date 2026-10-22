@@ -82,3 +82,7 @@ OpenClaw calls timed out at the connector while work continued. Session history 
 
 - **Pek og endre** i 3D-hus: trykk på en vegg, et møbel, en lampe eller et gulv, velg hva det gjelder (BIM-element, møbel, lyspunkt, rom eller punkt) og skriv et endringsønske, eller koble en Homey-enhet dit (dørsensor → døra, andre enheter → pin på stedet, også på 2D-plantegningen).
 - Ønskene lagres på serveren (`/api/house3d/changes`, namespace `house3dChanges`) og vises som nåler i modellen. Når eieren ber om «ny modell», leser Claude listen med `HOUSE3D_CHANGES_TOKEN`, gjør endringene i én PR og merker ønskene gjort. Se `docs/ENDRINGSONSKER.md`.
+
+## Ny modell etter endringsønsker — 22. oktober 2026
+
+- 15 ønsker fra «Pek og endre»: sittesekk, terrassevarmer, markise og en spot i kinoen fjernet; trappa med rekkverk på takterrassen og trappa sør for uteplassen finnes ikke; glassrekkverket mot sør skjules nå faktisk (GLTFLoader gjør om mellomrom og punktum i nodenavn, så regelen traff aldri – bruker GlobalId); dør fra entréen inn til bod/sluse; hyllene i gangen fjernet; mørk sofa i kinohjørnet ved trappa (IMG_2231–2232) og trappa lukket ned til gulvet; tre lenestoler mot bassenget i badstua; uteplassen og glasstaket går helt ut til ballbanens sørkant med spisebordet nærmere gjerdet; solsengene på tvers i sørøsthjørnet av ballbanen (IMG_2194).

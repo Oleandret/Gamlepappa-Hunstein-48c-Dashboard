@@ -311,13 +311,14 @@ function Item({ item, clip }) {
       );
     }
     case 'stairs': {
-      // Hvite trinnblokker med eiketrinn, ett opptrinn høyere for hvert trinn
+      // Hvite trinnblokker med eiketrinn, ett opptrinn høyere for hvert trinn.
+      // `solid`: trappa er lukket helt ned til gulvet.
       const r = item.rise / (item.steps.length + 1);
       return (
         <group>
           {item.steps.map(([sx0, sz0, sx1, sz1], i) => (
             <group key={i}>
-              <Box x0={sx0} x1={sx1} z0={sz0} z1={sz1} y0={i * r} y1={(i + 1) * r - 0.04} color="#efeeea" clip={clip} />
+              <Box x0={sx0} x1={sx1} z0={sz0} z1={sz1} y0={item.solid ? 0 : i * r} y1={(i + 1) * r - 0.04} color="#efeeea" clip={clip} />
               <Box x0={sx0} x1={sx1} z0={sz0} z1={sz1} y0={(i + 1) * r - 0.04} y1={(i + 1) * r} color="#c9a77c" clip={clip} roughness={0.6} />
             </group>
           ))}
@@ -360,7 +361,20 @@ function Item({ item, clip }) {
           <Box x0={x0 + 0.05} x1={x1 - 0.05} z0={z0 + 0.05} z1={z1 - 0.05} y0={0.9} y1={1.7} color="#8d8478" clip={clip} />
         </group>
       );
-    case 'lounger':
+    case 'lounger': {
+      // Ryggen i `head`-enden (n = nord, standard). Øst/vest/sør tegnes som en
+      // nord-orientert solseng rundt midtpunktet og dreies.
+      const head = item.head || 'n';
+      if (head !== 'n') {
+        const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+        const across = head === 's' ? x1 - x0 : z1 - z0, along = head === 's' ? z1 - z0 : x1 - x0;
+        const rot = { e: -Math.PI / 2, w: Math.PI / 2, s: Math.PI }[head];
+        return (
+          <group position={[cx, 0, cz]} rotation={[0, rot, 0]}>
+            <Item item={{ type: 'lounger', at: [-across / 2, -along / 2, across / 2, along / 2] }} clip={clip} />
+          </group>
+        );
+      }
       return (
         <group>
           <Box {...b} y0={0.2} y1={0.32} color="#9c7650" clip={clip} />
@@ -371,6 +385,7 @@ function Item({ item, clip }) {
           ))}
         </group>
       );
+    }
     case 'outdoorKitchen':
       // Benk av betongblokk med trepaneler og granittplate
       return (

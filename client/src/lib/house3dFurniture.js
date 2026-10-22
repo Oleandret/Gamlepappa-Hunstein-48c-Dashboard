@@ -119,9 +119,6 @@ export const ROOM_FURNISHINGS = {
       // Skjerm av eikespiler med speil
       { type: 'slats', at: [-6.1, -0.32, -4.5, -0.22], y1: 2.2, color: '#c9a77c' },
       { type: 'box', at: [-5.6, -0.36, -5.0, -0.32], y0: 0.3, y1: 1.9, color: '#c6d4dc', metalness: 0.6, roughness: 0.1 },
-      // Skohylle i furu og knaggrekke med jakker
-      { type: 'box', at: [-6.55, -2.3, -6.15, -1.55], y0: 0, y1: 2.0, color: '#d8b88a' },
-      { type: 'box', at: [-6.55, -1.45, -6.25, -0.45], y0: 0.7, y1: 1.7, color: '#6d5a66' },
       { type: 'box', at: [-4.25, -0.6, -3.65, -0.2], y0: 0, y1: 0.42, color: '#c9a46e' }
     ]
   },
@@ -182,11 +179,13 @@ export const ROOM_FURNISHINGS = {
     floorId: 'floor1',
     bounds: [-7.95, -0.9, -6.65, 2.13],
     floor: { color: '#a8a7a3', roughness: 0.6 },
+    // Dør inn fra entréen i østveggen (veggen tegnes på nytt i STRUCTURE)
+    doors: [{ side: 'east', from: 0.0, to: 0.9, name: 'Entré' }],
     items: [
       // Nettverksskap og hyller på veggen, støvsuger og bøtte på gulvet
       { type: 'box', at: [-7.95, 0.2, -7.82, 0.85], y0: 0.9, y1: 1.6, color: '#f4f4f4', wall: true },
-      { type: 'box', at: [-6.95, -0.5, -6.68, 1.6], y0: 0.5, y1: 0.53, color: '#f4f4f4' },
-      { type: 'box', at: [-6.95, -0.5, -6.68, 1.6], y0: 1.1, y1: 1.13, color: '#f4f4f4' },
+      { type: 'box', at: [-6.95, 1.0, -6.78, 2.05], y0: 0.5, y1: 0.53, color: '#f4f4f4' },
+      { type: 'box', at: [-6.95, 1.0, -6.78, 2.05], y0: 1.1, y1: 1.13, color: '#f4f4f4' },
       { type: 'box', at: [-7.55, 1.0, -7.2, 1.4], y0: 0, y1: 0.3, color: '#222222' },
       { type: 'box', at: [-7.15, 1.5, -6.85, 1.8], y0: 0, y1: 0.6, color: '#c8c8c8', metalness: 0.5 }
     ]
@@ -199,9 +198,9 @@ export const ROOM_FURNISHINGS = {
     bounds: [-19.25, 2.3, -5.05, 10.25],
     floor: { color: '#d8c59c', roughness: 0.95 },
     items: [
-      // To solsenger på banen inntil huset
-      { type: 'lounger', at: [-8.3, 2.6, -7.6, 4.55] },
-      { type: 'lounger', at: [-7.4, 2.6, -6.7, 4.55] },
+      // To solsenger i sørøsthjørnet foran utebaren, på tvers med ryggen mot huset (IMG_2194)
+      { type: 'lounger', at: [-7.95, 5.45, -6.0, 6.15], head: 'e' },
+      { type: 'lounger', at: [-7.95, 6.4, -6.0, 7.1], head: 'e' },
       // Oppbevaringsbenk foran det store vinduet på kjøkkenets vestvegg
       { type: 'box', at: [-5.6, 2.9, -5.12, 4.2], y0: 0, y1: 0.6, color: '#4b4f55' },
       // Utekjøkken/bar (betongblokk og tre, granittplate) på langs mot uteplassen
@@ -209,27 +208,28 @@ export const ROOM_FURNISHINGS = {
     ]
   },
 
-  // Uteplass med glasstak utenfor kjøkkenets skyvedør mot sør
+  // Uteplass med glasstak utenfor kjøkkenets skyvedør mot sør. Glasstaket og
+  // terrassen går helt ut til ballbanens sørkant (ønske 22.10.2026; trappa i BIM finnes ikke)
   'f1-uteplass': {
     floorId: 'floor1',
-    bounds: [-4.9, 5.1, 2.0, 8.9],
+    bounds: [-4.9, 5.1, 2.0, 10.25],
     floor: { color: '#8e8b86', roughness: 1 },
     items: [
-      { type: 'pergola', at: [-3.6, 5.15, 1.2, 8.5], y1: 2.55 },
-      // Spisebord med fire hvite stoler
-      { type: 'table', at: [-3.3, 6.3, -2.1, 7.2], y1: 0.74, color: '#6e6e6e', legs: '#2a2a2a' },
-      { type: 'chair', at: [-3.2, 5.85, -2.75, 6.3], back: 'n', color: '#f1f1f1' },
-      { type: 'chair', at: [-2.65, 5.85, -2.2, 6.3], back: 'n', color: '#f1f1f1' },
-      { type: 'chair', at: [-3.2, 7.2, -2.75, 7.6], back: 's', color: '#f1f1f1' },
-      { type: 'chair', at: [-2.65, 7.2, -2.2, 7.6], back: 's', color: '#f1f1f1' },
-      // Loungesofa i rotting (hjørne) med bord, og grill
-      { type: 'sofa', at: [-1.6, 7.65, 0.9, 8.45], back: 's', color: '#5f5a55' },
-      { type: 'sofa', at: [0.1, 6.5, 0.9, 7.65], back: 'e', color: '#5f5a55' },
-      { type: 'box', at: [-1.1, 6.75, -0.2, 7.35], y0: 0, y1: 0.4, color: '#3e3a36' },
-      { type: 'box', at: [1.3, 7.85, 1.9, 8.45], y0: 0, y1: 1.05, color: '#2b2b2b', metalness: 0.5 },
+      { type: 'pergola', at: [-4.85, 5.15, 1.2, 10.1], y1: 2.55 },
+      // Spisebord med fire hvite stoler, flyttet litt mot gjerdet i sør
+      { type: 'table', at: [-3.3, 7.3, -2.1, 8.2], y1: 0.74, color: '#6e6e6e', legs: '#2a2a2a' },
+      { type: 'chair', at: [-3.2, 6.85, -2.75, 7.3], back: 'n', color: '#f1f1f1' },
+      { type: 'chair', at: [-2.65, 6.85, -2.2, 7.3], back: 'n', color: '#f1f1f1' },
+      { type: 'chair', at: [-3.2, 8.2, -2.75, 8.6], back: 's', color: '#f1f1f1' },
+      { type: 'chair', at: [-2.65, 8.2, -2.2, 8.6], back: 's', color: '#f1f1f1' },
+      // Loungesofa i rotting (hjørne) med bord, og grill — inntil gjerdet i sør
+      { type: 'sofa', at: [-1.6, 9.4, 0.9, 10.2], back: 's', color: '#5f5a55' },
+      { type: 'sofa', at: [0.1, 8.25, 0.9, 9.4], back: 'e', color: '#5f5a55' },
+      { type: 'box', at: [-1.1, 8.5, -0.2, 9.1], y0: 0, y1: 0.4, color: '#3e3a36' },
+      { type: 'box', at: [1.3, 9.6, 1.9, 10.2], y0: 0, y1: 1.05, color: '#2b2b2b', metalness: 0.5 },
       { type: 'foldingChair', at: [-4.6, 6.0, -4.1, 6.5], color: '#f1f1f1' },
       // Rekkverk i mørkt tre mot sør (sjøsiden)
-      { type: 'box', at: [-4.9, 8.82, 2.0, 8.9], y0: 0, y1: 1.0, color: '#3b3029' }
+      { type: 'box', at: [-4.9, 10.17, 2.0, 10.25], y0: 0, y1: 1.0, color: '#3b3029' }
     ]
   },
 
@@ -275,17 +275,17 @@ export const ROOM_FURNISHINGS = {
       // Kuskinn foran TV-en
       { type: 'rug', at: [-11.7, -1.5, -10.4, -0.2], color: '#1e1c1b' },
       { type: 'rug', at: [-10.2, -1.3, -9.35, -0.4], color: '#2a2726' },
-      // Mørkegrå sofa bak hvilestolene, med lydabsorbenter på veggen bak
-      { type: 'box', at: [-6.08, -1.75, -5.98, -0.5], y0: 0, y1: 2.26, color: '#8e9398' },
-      { type: 'sofa', at: [-7.0, -1.7, -6.1, 0.1], back: 'e', color: '#4a4846' },
-      { type: 'box', at: [-5.98, -1.65, -5.94, -1.2], y0: 1.25, y1: 1.75, color: '#1b1b1b', wall: true },
-      { type: 'box', at: [-5.98, -1.1, -5.94, -0.65], y0: 1.25, y1: 1.75, color: '#1b1b1b', wall: true },
+      // Mørkegrå sofa i hjørnet bak hvilestolene, inntil trappa — ikke ved glassveggen
+      // (IMG_2231–2232), med tre lydabsorbenter på veggen bak
+      { type: 'box', at: [-6.08, -2.4, -5.98, -0.5], y0: 0, y1: 2.26, color: '#8e9398' },
+      { type: 'sofa', at: [-7.0, -2.38, -6.1, -0.58], back: 'e', color: '#4a4846' },
+      { type: 'box', at: [-5.98, -2.25, -5.94, -1.8], y0: 1.25, y1: 1.75, color: '#1b1b1b', wall: true },
+      { type: 'box', at: [-5.98, -1.7, -5.94, -1.25], y0: 1.25, y1: 1.75, color: '#1b1b1b', wall: true },
+      { type: 'box', at: [-5.98, -1.15, -5.94, -0.7], y0: 1.25, y1: 1.75, color: '#1b1b1b', wall: true },
       // Trapp opp til 1. etg mellom kinoen og soverommet: opp langs vestsiden,
-      // vendetrinn i nord og ned mot sør til gangen i 1. etg
-      { type: 'stairs', at: [-7.33, -3.88, -5.3, -2.4], rise: 3.14, steps: STAIR_STEPS },
-      // Bar under trappa: skrivebord med skjerm og spilevegg med vinglass
-      { type: 'box', at: [-6.25, -2.95, -5.4, -2.5], y0: 0, y1: 0.75, color: '#2b2522' },
-      { type: 'box', at: [-6.05, -2.95, -5.6, -2.9], y0: 0.8, y1: 1.15, color: '#111111' },
+      // vendetrinn i nord og ned mot sør til gangen i 1. etg. Lukket helt ned til
+      // gulvet (ingen bar under trappa)
+      { type: 'stairs', at: [-7.33, -3.88, -5.3, -2.4], rise: 3.14, steps: STAIR_STEPS, solid: true },
       { type: 'slats', at: [-5.33, -3.44, -5.3, -1.8], y1: 2.2, color: '#c9a77c', along: 'z' }
     ]
   },
@@ -309,10 +309,22 @@ export const ROOM_FURNISHINGS = {
     ],
     items: [
       { type: 'pool', at: [-12.76, 1.17, -6.24, 4.24] },
-      { type: 'beanbag', at: [-6.15, 2.0, -5.12, 3.25], color: '#d8cdb8' },
       { type: 'plant', at: [-12.75, 0.35, -12.35, 0.75], y1: 1.3 },
       { type: 'plant', at: [-12.75, 4.4, -12.35, 4.8], y1: 1.2 },
       { type: 'plant', at: [-5.5, 0.35, -5.1, 0.75], y1: 1.2 }
+    ]
+  },
+
+  // Badstua: tre lenestoler vendt mot bassenget gjennom glassveggen i vest
+  // (ønske 22.10.2026). Lavene i BIM skjules; aggregatet står igjen.
+  'u-badstu': {
+    floorId: 'basement',
+    bounds: [-4.9, 1.63, -1.7, 4.85],
+    floor: { color: '#c9a77c', roughness: 0.8 },
+    items: [
+      { type: 'armchair', at: [-3.4, 1.85, -2.6, 2.65], back: 'e', color: '#c49a6c' },
+      { type: 'armchair', at: [-3.4, 2.85, -2.6, 3.65], back: 'e', color: '#c49a6c' },
+      { type: 'armchair', at: [-3.4, 3.85, -2.6, 4.65], back: 'e', color: '#c49a6c' }
     ]
   },
 
@@ -386,7 +398,15 @@ export const ROOM_FURNISHINGS = {
  * (uansett rom): pergolaen med glasstak og glassrekkverket mot sør.
  */
 export const HIDDEN_BIM = [
-  /Pergola/i, /glassrekkverk sør/i,
+  // Pergolaen og glassrekkverket mot sør på 1. etg (GlobalId: GLTFLoader gjør om
+  // mellomrom og punktum i nodenavn, så «glassrekkverk sør» traff aldri)
+  /Pergola/i, /1kj5eO39H0keroGaeYWm\$6/,
+  // Ønsker 22.10.2026: terrassevarmer og markise på takterrassen, trappa med
+  // rekkverk på takterrassen vest, trappa sør for uteplassen og brystningene
+  // som uteplassen nå går forbi, veggen inn til bod/sluse (tegnes med dør)
+  /2DzGQc2ujE8fAS1pGiA1\$I/, /31UXbzxoDBTebqYG3PqbkR/, /17f930AKz8uwxTR9XcYa/,
+  /1UbdneFcj9Vga6TPPXISX9/, /1f\$YNyLqvAAQ5Po\$81F_NL/, /1f\$YNyLqvAAQ5Po\$81F_K\$/, /0Thnxxox56gfKzaDcDaJKG/,
+  /1hpf7cvIzBUutLyEBy3uZO/,
   // U.etg: lerretet byttes med TV; veggen mellom basseng og badstu er glass;
   // dørene fra bassenget til bad og treningsrom er svart glass; nordveggen
   // tegnes på nytt uten stumpen ut mot teknisk rom som aldri ble bygget
@@ -434,6 +454,17 @@ export const STRUCTURE = {
     { at: [-11.25, 5.23, -11.15, 6.1], y0: 0, y1: 2.7, color: WALL },
     { at: [-11.25, 6.95, -11.15, 7.42], y0: 0, y1: 2.7, color: WALL },
     { at: [-11.25, 6.1, -11.15, 6.95], y0: 2.1, y1: 2.7, color: WALL }
+  ],
+  floor1: [
+    // Veggen mellom bod/sluse og entréen, med dør (ønske 22.10.2026)
+    { at: [-6.75, 0.9, -6.55, 2.29], y0: -0.12, y1: 2.28, color: WALL },
+    { at: [-6.75, -0.03, -6.55, 0.0], y0: -0.12, y1: 2.28, color: WALL },
+    { at: [-6.75, 0.0, -6.55, 0.9], y0: 1.98, y1: 2.28, color: WALL },
+    { at: [-6.67, 0.04, -6.63, 0.86], y0: 0, y1: 1.96, color: '#f7f6f2' },
+    { at: [-6.69, 0.0, -6.61, 0.04], y0: 0, y1: 1.98, color: '#bdb8ae' },
+    { at: [-6.69, 0.86, -6.61, 0.9], y0: 0, y1: 1.98, color: '#bdb8ae' },
+    // Terrassedekket der uteplassen går ut over BIM-dekket mot sør
+    { at: [-4.9, 7.83, 2.0, 10.25], y0: -0.3, y1: -0.02, color: '#8e8b86' }
   ]
 };
 

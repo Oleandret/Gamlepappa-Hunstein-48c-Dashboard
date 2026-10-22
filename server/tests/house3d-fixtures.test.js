@@ -24,15 +24,15 @@ test('lyspunktene fra el-tegningene ligger i rommet de hører til', () => {
 
 test('antall spotter og lampepunkter per rom stemmer med el-tegningene', () => {
   const count = (roomId, kind) => (FIXTURES_BY_ROOM[roomId] || []).filter(f => f.kind === kind).length;
-  assert.equal(count('u-kino', 'spot'), 10);
+  assert.equal(count('u-kino', 'spot'), 9);
   assert.equal(count('u-basseng', 'spot'), 8);
   assert.equal(count('f1-kjokken', 'spot'), 12);
   assert.equal(count('f1-sov3', 'spot'), 6);
   assert.equal(count('f1-bad', 'spot'), 4);
   assert.equal(count('f1-garasje', 'tube'), 4);
-  assert.equal(count('u-badstu', 'strip'), 2);
+  assert.equal(count('u-badstu', 'strip'), 0);
   assert.equal(count('f2-gang', 'ceiling'), 2);
-  assert.equal(FIXTURES.length, 83);
+  assert.equal(FIXTURES.length, 80);
   assert.equal(new Set(FIXTURES.map(f => f.id)).size, FIXTURES.length);
 });
 
