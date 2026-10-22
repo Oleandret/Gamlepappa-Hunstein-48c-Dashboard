@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
-import { MessageSquarePlus, X, Trash2, Check, ExternalLink, MapPin, Link2 } from 'lucide-react';
+import { MessageSquarePlus, X, Trash2, Check, ExternalLink, MapPin, Link2, Move, RotateCw, RotateCcw, Undo2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, EyeOff, Eye } from 'lucide-react';
+import { editKey, editFor, canRotate } from '../../lib/house3dEdits.js';
 import { isDoorSensor } from '../../lib/house3dDoors.js';
 
 /**
@@ -18,11 +19,10 @@ const STATUS = {
   avvist: { label: 'Avvist', cls: 'text-nx-mute border-nx-line' }
 };
 
-export function ChangePanel({ pick, changes, onClear, onShow, floorLabel, devices, onLinkDevice, linkedTo }) {
-  const [choice, setChoice] = useState(0);
+export function ChangePanel({ pick, changes, onClear, onShow, floorLabel, devices, onLinkDevice, linkedTo, choice = 0, onChoice, modelEdits }) {
+  const setChoice = onChoice;
   const [text, setText] = useState('');
   const [action, setAction] = useState('change');
-  useEffect(() => { setChoice(0); }, [pick]);
   const candidates = pick?.candidates || [];
   const open = changes.items.filter(i => i.status === 'ny' || i.status === 'pågår');
   const closed = changes.items.filter(i => i.status === 'gjort' || i.status === 'avvist');
@@ -62,7 +62,7 @@ export function ChangePanel({ pick, changes, onClear, onShow, floorLabel, device
             ))}
           </div>
           <div className="flex gap-1" role="group" aria-label="Hva vil du gjøre?">
-            {[['change', 'Ønsk endring', MessageSquarePlus], ['device', 'Koble enhet', Link2]].map(([id, label, Icon]) => (
+            {[['change', 'Ønsk', MessageSquarePlus], ['move', 'Flytt/fjern', Move], ['device', 'Koble enhet', Link2]].map(([id, label, Icon]) => (
               <button key={id} type="button" onClick={() => setAction(id)} aria-pressed={action === id}
                 className={`flex-1 inline-flex items-center justify-center gap-1 rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] ${action === id ? 'border-nx-cyan/60 bg-nx-cyan/15 text-nx-cyan' : 'border-nx-line/60 text-nx-mute hover:text-nx-text'}`}>
                 <Icon size={11} aria-hidden="true" />{label}
@@ -82,6 +82,8 @@ export function ChangePanel({ pick, changes, onClear, onShow, floorLabel, device
                 <MessageSquarePlus size={12} aria-hidden="true" />Legg til ønske
               </button>
             </>
+          ) : action === 'move' ? (
+            <MoveControls target={candidates[choice]} modelEdits={modelEdits} />
           ) : (
             <DeviceLinker target={candidates[choice]} devices={devices} linkedTo={linkedTo} onLink={(devId) => onLinkDevice(candidates[choice], devId)} />
           )}
@@ -91,6 +93,7 @@ export function ChangePanel({ pick, changes, onClear, onShow, floorLabel, device
       {changes.error && <p role="alert" className="text-xs text-nx-amber">{changes.error}</p>}
 
       <ChangeList title={`Åpne ønsker · ${open.length}`} items={open} changes={changes} onShow={onShow} empty="Ingen åpne ønsker." />
+      {modelEdits && <EditList modelEdits={modelEdits} />}
       {closed.length > 0 && <ChangeList title={`Ferdige · ${closed.length}`} items={closed.slice(0, 20)} changes={changes} onShow={onShow} />}
     </div>
   );
@@ -135,6 +138,101 @@ function DeviceLinker({ target, devices, linkedTo, onLink }) {
       </button>
       {done && <p role="status" className="text-[11px] text-nx-green">{done} er koblet. Lagres automatisk.</p>}
     </div>
+  );
+}
+
+const STEPS = [0.05, 0.1, 0.5];
+const fmt = v => `${v >= 0 ? '+' : '−'}${Math.abs(Math.round(v * 100))} cm`;
+
+/**
+ * Flytt valgt inventar, lyspunkt eller BIM-element med piltaster (øst/vest/nord/sør),
+ * snu inventar, eller fjern det. Lagres på serveren med en gang.
+ */
+function MoveControls({ target, modelEdits }) {
+  const [step, setStep] = useState(0.1);
+  const key = editKey(target);
+  if (!key) return <p className="text-[11px] text-nx-mute">Velg et møbel, et lyspunkt eller et BIM-element i listen over for å flytte eller fjerne det. Rom og punkter kan ikke flyttes; skriv heller et ønske.</p>;
+  const e = editFor(modelEdits.edits, key);
+  const door = target.kind === 'door';
+  const move = (dx, dz) => modelEdits.update(key, { dx, dz, label: target.label });
+  const btn = 'inline-flex items-center justify-center rounded-md border border-nx-line/60 p-1.5 text-nx-mute hover:text-nx-cyan hover:border-nx-cyan/50 disabled:opacity-40';
+  return (
+    <div className="space-y-2">
+      <p className="text-[11px] text-nx-mute">
+        {e.removed ? 'Fjernet fra modellen.' : (e.dx || e.dz || e.rot) ? `Flyttet ${fmt(e.dx)} øst, ${fmt(e.dz)} sør${e.rot ? `, snudd ${Math.round(e.rot * 180 / Math.PI)}°` : ''}.` : 'Står der den står i modellen.'}
+        <span className="block">Endringen lagres med en gang og vises for alle.</span>
+      </p>
+      {!e.removed && !door && (
+        <div className="flex items-center gap-3">
+          <div className="grid grid-cols-3 gap-1" role="group" aria-label="Flytt">
+            <span />
+            <button type="button" className={btn} onClick={() => move(0, -step)} title="Nord" aria-label="Flytt mot nord"><ArrowUp size={14} /></button>
+            <span />
+            <button type="button" className={btn} onClick={() => move(-step, 0)} title="Vest" aria-label="Flytt mot vest"><ArrowLeft size={14} /></button>
+            <span className="text-center font-mono text-[9px] text-nx-mute self-center">N↑</span>
+            <button type="button" className={btn} onClick={() => move(step, 0)} title="Øst" aria-label="Flytt mot øst"><ArrowRight size={14} /></button>
+            <span />
+            <button type="button" className={btn} onClick={() => move(0, step)} title="Sør" aria-label="Flytt mot sør"><ArrowDown size={14} /></button>
+            <span />
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex gap-1" role="group" aria-label="Steg">
+              {STEPS.map(s => (
+                <button key={s} type="button" onClick={() => setStep(s)} aria-pressed={step === s}
+                  className={`rounded px-1.5 py-0.5 font-mono text-[10px] ${step === s ? 'bg-nx-cyan/15 text-nx-cyan' : 'text-nx-mute hover:text-nx-text'}`}>{Math.round(s * 100)} cm</button>
+              ))}
+            </div>
+            {canRotate(key) && (
+              <div className="flex gap-1">
+                <button type="button" className={btn} onClick={() => modelEdits.update(key, { rot: -Math.PI / 12, label: target.label })} title="Snu 15° mot klokka" aria-label="Snu mot klokka"><RotateCcw size={14} /></button>
+                <button type="button" className={btn} onClick={() => modelEdits.update(key, { rot: Math.PI / 12, label: target.label })} title="Snu 15° med klokka" aria-label="Snu med klokka"><RotateCw size={14} /></button>
+                <button type="button" className={`${btn} px-2 font-mono text-[10px]`} onClick={() => modelEdits.update(key, { rot: Math.PI / 2, label: target.label })} title="Snu 90°">90°</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {door && !e.removed && <p className="text-[11px] text-nx-mute">Dører kan fjernes, men ikke flyttes her. Skriv et ønske hvis døra står feil.</p>}
+      <div className="flex flex-wrap gap-1.5">
+        {e.removed ? (
+          <button type="button" className={`${btn} gap-1 px-2 text-[11px]`} onClick={() => modelEdits.update(key, { removed: false })}><Eye size={12} />Vis igjen</button>
+        ) : (
+          <button type="button" className={`${btn} gap-1 px-2 text-[11px] hover:text-nx-red hover:border-nx-red/50`}
+            onClick={() => { if (window.confirm(`Fjerne «${target.label}» fra modellen?`)) modelEdits.update(key, { removed: true, label: target.label }); }}>
+            <EyeOff size={12} />Fjern
+          </button>
+        )}
+        {(e.dx || e.dz || e.rot || e.removed) ? (
+          <button type="button" className={`${btn} gap-1 px-2 text-[11px]`} onClick={() => modelEdits.reset(key)}><Undo2 size={12} />Tilbakestill</button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/** Alt som er flyttet eller fjernet direkte i modellen, med angre per element. */
+function EditList({ modelEdits }) {
+  const list = Object.entries(modelEdits.edits);
+  if (!list.length) return null;
+  return (
+    <section>
+      <div className="flex items-center justify-between">
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-nx-mute">Flyttet/fjernet i modellen · {list.length}</p>
+        <button type="button" onClick={() => { if (window.confirm('Tilbakestille alle flyttinger og fjerninger?')) modelEdits.resetAll(); }} className="font-mono text-[10px] text-nx-mute hover:text-nx-amber">Tilbakestill alle</button>
+      </div>
+      <ul className="mt-1 divide-y divide-nx-line/40">
+        {list.map(([key, e]) => (
+          <li key={key} className="py-1.5 flex gap-2 items-start text-xs">
+            <span className="flex-1 min-w-0 break-words">
+              {e.label || key}
+              <span className="block text-[11px] text-nx-mute">{e.removed ? 'Fjernet' : `${fmt(e.dx)} øst, ${fmt(e.dz)} sør${e.rot ? `, ${Math.round(e.rot * 180 / Math.PI)}°` : ''}`}</span>
+            </span>
+            <button type="button" onClick={() => modelEdits.reset(key)} title="Angre" aria-label={`Angre ${e.label || key}`} className="p-1 text-nx-mute hover:text-nx-cyan"><Undo2 size={13} /></button>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1 text-[11px] text-nx-mute">Si «lag ny modell» til Claude for å bygge dette inn i modellen for godt.</p>
+    </section>
   );
 }
 
