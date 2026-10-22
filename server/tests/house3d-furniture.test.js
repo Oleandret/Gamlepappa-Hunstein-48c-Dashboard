@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ROOM_FURNISHINGS, furnishedRoomAt, keepsBimElement, hiddenBimElement, wallSegments } from '../../client/src/lib/house3dFurniture.js';
+import { ROOM_FURNISHINGS, STRUCTURE, furnishedRoomAt, keepsBimElement, hiddenBimElement, hiddenBimArea, wallSegments } from '../../client/src/lib/house3dFurniture.js';
 import { ALL_ROOMS, roomPoly } from '../../client/src/lib/house3dModel.js';
 
 test('møblering fra bilder ligger inne i riktig rom', () => {
@@ -101,22 +101,55 @@ test('etasjene kan spres skrått, og alt i en etasje følger samme forskyvning',
   assert.ok(view.includes("localStorage.setItem('nexora.house3d.slant'"));
 });
 
-test('U.etasje fra bildene: kinoen beholder BIM-møblene som stemmer, bassengboden er delt', () => {
+test('U.etasje fra bildene: TV-vegg og hjørnesofa i kinoen, trapp opp til 1. etg', () => {
   const kino = ROOM_FURNISHINGS['u-kino'];
-  for (const name of ['Hjørnesofa hvit (sjeselong)', 'Hvilestol skinn rad 2 #1', 'Kiste (salongbord)', 'Kinolerret (vegg)', 'Minibar – disk m/ bokstavtavle', 'Spilevegg sort/tre (dekor)']) {
+  for (const name of ['Hvilestol skinn rad 2 #1', 'Kiste (salongbord)', 'AV-rack']) {
     assert.ok(keepsBimElement('u-kino', `basement|IfcFurnishingElement|${name}|x`), name);
   }
+  // Arkitektens sofa, lerret og minibar står feil og tegnes på nytt
+  for (const name of ['Hjørnesofa hvit (sjeselong)', 'Minibar – bakbenk og glasshyller', 'Spilevegg sort/tre (dekor)']) {
+    assert.equal(keepsBimElement('u-kino', `basement|IfcFurnishingElement|${name}|x`), false, name);
+  }
+  assert.ok(hiddenBimElement('basement|IfcFurnishingElement|Kinolerret (vegg)|x'));
+  const tv = kino.items.find(i => i.type === 'tv');
+  assert.equal(tv.screenTo, 'e');
+  assert.ok(tv.at[0] <= -12.8, 'TV-en henger på vestveggen');
+  // Hjørnesofaen står i hjørnet mellom TV-veggen og nordveggen
+  const sofas = kino.items.filter(i => i.type === 'sofa' && i.color === '#efece6');
+  assert.ok(sofas.every(s => s.at[0] <= -12.8) && sofas.some(s => s.at[1] <= -3.85));
+  // Trappa: tolv trinn i trapperommet mellom kinoen og soverommet, opp til 1. etg
+  const stairs = kino.items.find(i => i.type === 'stairs');
+  assert.equal(stairs.rise, 3.14);
+  assert.equal(stairs.steps.length, 12);
+  for (const [x0, z0, x1, z1] of stairs.steps) assert.ok(x0 >= -7.35 && x1 <= -5.25 && z0 >= -3.9 && z1 <= -2.35);
+  assert.equal(furnishedRoomAt('basement', -9, -2), 'u-kino');
   assert.equal(keepsBimElement('u-bad', 'basement|IfcFurnishingElement|Bad Underskap 2 Dør - Servant|x'), false);
-  assert.ok(kino.items.some(i => i.type === 'sofa'));
-  // Bassenget har vannflate innenfor rommet, og naturstein på veggene
-  const basseng = ROOM_FURNISHINGS['u-basseng'];
-  assert.ok(basseng.items.some(i => i.type === 'pool'));
-  assert.ok(basseng.walls.every(w => w.finish === 'stone'));
-  // Skilleveggen i bassengboden har døråpning, solariet står øst for den og teknikken vest
-  const bod = ROOM_FURNISHINGS['u-bassbod'].items;
-  const wall = bod.filter(i => i.type === 'box' && i.at[0] === -11.25 && i.y0 === 0);
+});
+
+test('U.etasje: teknisk rom bak kinoen finnes ikke, glass mot badstua og svarte glassdører', () => {
+  // Alt fra BIM i det ubygde tekniske rommet skjules (varmepumpe, vegger)
+  assert.ok(hiddenBimArea('basement', -14.1, -3.3));
+  assert.ok(hiddenBimArea('basement', -14.7, -1.6));
+  assert.equal(hiddenBimArea('basement', -12.56, -0.05), false, 'AV-racket i kinoen står');
+  assert.equal(hiddenBimArea('floor1', -14.1, -3.3), false);
+  assert.equal(ALL_ROOMS.find(r => r.id === 'u-tekrom').rect[1], 5.3, 'teknisk rom ligger i bassengboden');
+  // Kinoens vestvegg finnes som egen bygningsdel
+  const parts = STRUCTURE.basement;
+  assert.ok(parts.some(p => p.at[0] === -12.98 && p.at[2] === -12.86 && p.at[3] >= 0.2));
+  // Hele veggen mellom basseng og badstu er glass
+  assert.ok(hiddenBimElement('basement|IfcWallStandardCase|Basic Wall|28IhcQfGr6qxmbTptu_2'));
+  const glass = parts.find(p => p.glass && p.at[0] === -5.0);
+  assert.ok(glass.at[1] <= 1.63 && glass.at[3] >= 4.8);
+  assert.ok(ROOM_FURNISHINGS['u-basseng'].walls.every(w => !(w.side === 'east' && w.to > 1.63)));
+  // Svarte glassdører fra bassenget til badet og treningsrommet erstatter BIM-dørene
+  assert.ok(hiddenBimElement('basement|IfcDoor|Innerdør Slett (Diplomat)|3QyoxqihLDShTF5w2|0'));
+  assert.equal(hiddenBimElement('basement|IfcWallStandardCase|Basic Wall|3QyoxqihLDShTF5w2aRD'), false);
+  const black = parts.filter(p => p.glass && p.opacity > 0.5);
+  assert.deepEqual(black.map(p => p.at[0]).sort((a, b) => a - b), [-10.35, -6.51]);
+  // Lite treningsrom vegg i vegg med teknisk rom, skilleveggen har døråpning
+  assert.ok(ROOM_FURNISHINGS['u-bassbod'].items.some(i => i.type === 'sunbed'));
+  assert.ok(ROOM_FURNISHINGS['u-tekrom'].bounds[2] <= ROOM_FURNISHINGS['u-bassbod'].bounds[0]);
+  const wall = parts.filter(p => p.at[0] === -11.25 && p.y0 === 0);
   assert.equal(wall.length, 2);
   assert.ok(wall[0].at[3] < wall[1].at[1], 'døråpning i skilleveggen');
-  assert.ok(bod.find(i => i.type === 'sunbed').at[0] > -11.15);
-  assert.ok(bod.find(i => i.type === 'treadmill').at[0] > -11.15);
 });

@@ -28,7 +28,6 @@ export const FLOORS = [
     height: 2.8,
     planId: 'homeBasement',
     rooms: [
-      { id: 'u-tekrom',    name: 'Teknisk rom',    rect: [-14.9, -4.0, -13.1, 0.85],  match: /teknisk/i, kind: 'tech' },
       { id: 'u-kino',      name: 'Kino',           rect: [-12.8, -3.9, -5.0, 0.2],    match: /kino/i, kind: 'living' },
       { id: 'u-basseng',   name: 'Svømmebasseng',  rect: [-12.8, 0.27, -5.05, 4.85],  match: /basseng$|sv.mme/i, kind: 'pool' },
       { id: 'u-sov1',      name: 'Soverom 1',      rect: [-5.0, -3.9, -0.9, -1.75],   match: /soverom 1|hybel/i, kind: 'bed' },
@@ -43,7 +42,9 @@ export const FLOORS = [
       { id: 'u-bad2',      name: 'Bad leilighet',  rect: [1.8, 2.6, 3.8, 4.9],        match: /bad leil/i, kind: 'bath' },
       { id: 'u-entre',     name: 'Entré U.etg',    rect: [3.9, 2.6, 5.4, 4.9],        match: /entr. u/i, kind: 'hall' },
       { id: 'u-stue2',     name: 'Stue leilighet', rect: [5.4, 2.6, 8.3, 4.9],        match: /stue leil/i, kind: 'living' },
-      { id: 'u-bassbod',   name: 'Bassengbod',     rect: [-14.9, 5.3, -8.5, 7.4],     match: /bassengbod|basseng bod/i, kind: 'storage' },
+      // Teknisk rom vest for kinoen ble aldri bygget; bassengboden er delt i teknisk rom og treningsrom
+      { id: 'u-tekrom',    name: 'Teknisk rom',    rect: [-14.9, 5.3, -11.2, 7.4],    match: /teknisk/i, kind: 'tech' },
+      { id: 'u-bassbod',   name: 'Treningsrom',    rect: [-11.2, 5.3, -8.5, 7.4],     match: /trening|bassengbod|basseng bod/i, kind: 'storage' },
       { id: 'u-bassbad',   name: 'Bassengbad',     rect: [-8.3, 5.3, -5.65, 7.4],     match: /bassengbad|bad basseng/i, kind: 'bath' },
       { id: 'u-sportsbod', name: 'Sportsbod',      rect: [-5.15, 5.3, -1.7, 7.7],     match: /sport/i, kind: 'storage' }
     ],

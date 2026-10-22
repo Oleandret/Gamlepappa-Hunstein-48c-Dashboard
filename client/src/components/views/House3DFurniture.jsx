@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
-import { ROOM_FURNISHINGS, FLOOR_TOP, wallSegments } from '../../lib/house3dFurniture.js';
+import { ROOM_FURNISHINGS, STRUCTURE, FLOOR_TOP, wallSegments } from '../../lib/house3dFurniture.js';
 
 /**
  * Tegner faktisk møblering (fra bilder) for rom i ROOM_FURNISHINGS.
@@ -91,13 +91,14 @@ function slatTexture() {
 /** Ensfargede veggflater (malt / flislagt). */
 const FINISH_COLORS = { green: COLORS.green, plywood: '#c99a62', grey: '#8e9398', beige: '#d9ccb8', white: '#eeece7' };
 
-function Box({ x0, z0, x1, z1, y0 = 0, y1, color, clip, roughness = 0.85, metalness = 0, map, emissive, emissiveIntensity, tilt = 0 }) {
+function Box({ x0, z0, x1, z1, y0 = 0, y1, color, clip, roughness = 0.85, metalness = 0, map, emissive, emissiveIntensity, tilt = 0, opacity = 1 }) {
   return (
     <mesh position={[(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2]} rotation={[tilt, 0, 0]} castShadow receiveShadow raycast={() => null}>
       <boxGeometry args={[Math.abs(x1 - x0), Math.abs(y1 - y0), Math.abs(z1 - z0)]} />
       <meshStandardMaterial
         color={color} roughness={roughness} metalness={metalness} map={map || null}
         emissive={emissive || '#000000'} emissiveIntensity={emissiveIntensity || 0}
+        transparent={opacity < 1} opacity={opacity} depthWrite={opacity >= 1}
         clippingPlanes={clip} clipShadows
       />
     </mesh>
@@ -185,13 +186,18 @@ function Item({ item, clip }) {
       return (
         <group>
           <Box {...b} y0={item.y0} y1={item.y1} color={COLORS.black} clip={wallClip} roughness={0.3} />
-          {/* skjermflaten vender inn i rommet (mot nord, eller mot sør med screenTo: 's') */}
+          {/* skjermflaten vender inn i rommet: mot nord (standard), sør, øst eller vest (screenTo) */}
           <mesh
-            position={[(x0 + x1) / 2, (item.y0 + item.y1) / 2, item.screenTo === 's' ? Math.max(z0, z1) + 0.002 : Math.min(z0, z1) - 0.002]}
-            rotation={[0, item.screenTo === 's' ? 0 : Math.PI, 0]}
+            position={{
+              n: [(x0 + x1) / 2, (item.y0 + item.y1) / 2, z0 - 0.002],
+              s: [(x0 + x1) / 2, (item.y0 + item.y1) / 2, z1 + 0.002],
+              e: [x1 + 0.002, (item.y0 + item.y1) / 2, (z0 + z1) / 2],
+              w: [x0 - 0.002, (item.y0 + item.y1) / 2, (z0 + z1) / 2]
+            }[item.screenTo || 'n']}
+            rotation={[0, { n: Math.PI, s: 0, e: Math.PI / 2, w: -Math.PI / 2 }[item.screenTo || 'n'], 0]}
             raycast={() => null}
           >
-            <planeGeometry args={[Math.abs(x1 - x0) - 0.04, Math.abs(item.y1 - item.y0) - 0.04]} />
+            <planeGeometry args={[(item.screenTo === 'e' || item.screenTo === 'w' ? z1 - z0 : x1 - x0) - 0.04, Math.abs(item.y1 - item.y0) - 0.04]} />
             <meshStandardMaterial color={COLORS.screen} emissive="#3b6cff" emissiveIntensity={0.35} roughness={0.2} clippingPlanes={wallClip} />
           </mesh>
           {item.stand && <Box x0={(x0 + x1) / 2 - 0.03} x1={(x0 + x1) / 2 + 0.03} z0={z0} z1={z1} y0={0.58} y1={item.y0} color={COLORS.black} clip={wallClip} />}
@@ -292,11 +298,28 @@ function Item({ item, clip }) {
         </group>
       );
     case 'slats': {
-      const n = Math.max(3, Math.round((x1 - x0) / 0.09)), w = (x1 - x0) / n;
+      // Spiler fordelt langs x (standard) eller langs z (`along: 'z'`)
+      const alongZ = item.along === 'z', len = alongZ ? z1 - z0 : x1 - x0;
+      const n = Math.max(3, Math.round(len / 0.09)), w = len / n;
       return (
         <group>
-          {Array.from({ length: n }).map((_, i) => (
-            <Box key={i} x0={x0 + i * w} x1={x0 + i * w + w * 0.55} z0={z0} z1={z1} y0={0} y1={item.y1} color={item.color} clip={clip} />
+          {Array.from({ length: n }).map((_, i) => (alongZ
+            ? <Box key={i} x0={x0} x1={x1} z0={z0 + i * w} z1={z0 + i * w + w * 0.55} y0={0} y1={item.y1} color={item.color} clip={clip} />
+            : <Box key={i} x0={x0 + i * w} x1={x0 + i * w + w * 0.55} z0={z0} z1={z1} y0={0} y1={item.y1} color={item.color} clip={clip} />
+          ))}
+        </group>
+      );
+    }
+    case 'stairs': {
+      // Hvite trinnblokker med eiketrinn, ett opptrinn høyere for hvert trinn
+      const r = item.rise / (item.steps.length + 1);
+      return (
+        <group>
+          {item.steps.map(([sx0, sz0, sx1, sz1], i) => (
+            <group key={i}>
+              <Box x0={sx0} x1={sx1} z0={sz0} z1={sz1} y0={i * r} y1={(i + 1) * r - 0.04} color="#efeeea" clip={clip} />
+              <Box x0={sx0} x1={sx1} z0={sz0} z1={sz1} y0={(i + 1) * r - 0.04} y1={(i + 1) * r} color="#c9a77c" clip={clip} roughness={0.6} />
+            </group>
           ))}
         </group>
       );
@@ -482,6 +505,12 @@ export function RoomFurnishings({ floorId, baseX = 0, baseY, baseZ = 0, clipY = 
   );
   return (
     <group position={[baseX, baseY + FLOOR_TOP, baseZ]}>
+      {(STRUCTURE[floorId] || []).map((p, i) => {
+        const [x0, z0, x1, z1] = p.at;
+        return p.glass
+          ? <Box key={`s${i}`} x0={x0} x1={x1} z0={z0} z1={z1} y0={p.y0} y1={p.y1} color={p.color || '#cfe9f2'} clip={clip} roughness={0.05} metalness={0.2} opacity={p.opacity ?? 0.22} />
+          : <Box key={`s${i}`} x0={x0} x1={x1} z0={z0} z1={z1} y0={p.y0} y1={p.y1} color={p.color} clip={clip} />;
+      })}
       {Object.entries(ROOM_FURNISHINGS).filter(([, f]) => f.floorId === floorId).map(([roomId, f]) => (
         <group key={roomId}>
           {(f.walls || []).flatMap((w, i) => wallSegments(w, f.doors).map(([from, to], j) => (
