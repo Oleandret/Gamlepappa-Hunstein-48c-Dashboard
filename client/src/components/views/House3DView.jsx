@@ -14,7 +14,8 @@ import { DeviceControls } from '../FloorPlanPin.jsx';
 import { canWrite } from '../../lib/deviceCommands.js';
 import { DeviceCommandStatus, useDeviceCommand } from '../DeviceCommandStatus.jsx';
 import { SaveButton } from '../SaveButton.jsx';
-import { DeviceMarker3D, RoomLighting, RoomLightVolume, DoorAnimator, isLightDevice, deviceReadout } from './House3DDevices.jsx';
+import { DeviceMarker3D, RoomLighting, RoomLightVolume, LightFixtures, DoorAnimator, isLightDevice, deviceReadout } from './House3DDevices.jsx';
+import { FIXTURES_BY_ROOM, fixtureClusters, fixtureSummary } from '../../lib/house3dFixtures.js';
 import { RoomFurnishings } from './House3DFurniture.jsx';
 import { furnishedRoomAt, keepsBimElement, hiddenBimElement, hiddenBimArea, ROOM_FURNISHINGS } from '../../lib/house3dFurniture.js';
 import { useDoorMeta, useHouse3dDoors, resolveDoorLinks, isDoorSensor, doorSensorOpen } from '../../lib/house3dDoors.js';
@@ -896,14 +897,41 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
     return list;
   }, [roomData.markers, doorByDevice, devices]);
 
-  // Lyskilder: pin-posisjon i taket, ellers rommets sentrum
-  const lightSources = useMemo(() => {
+  // Lyskilder: lyspunktene fra el-tegningen der rommet har dem, ellers
+  // pin-posisjon i taket, ellers rommets sentrum
+  const { lightSources, fixtures } = useMemo(() => {
     const out = [];
+    const fixtures = [];
     const pinPos = new Map(roomData.markers.map(m => [m.device.id, m]));
     for (const floor of FLOORS) {
       for (const room of floor.rooms) {
         const data = roomData.byRoom[room.id];
         const lights = data.devices.filter(isLightDevice);
+        const roomFixtures = FIXTURES_BY_ROOM[room.id] || [];
+        if (roomFixtures.length) {
+          // Hver armatur følger nærmeste lampe med pin, ellers den sterkeste lampen i rommet
+          const levels = lights.map(d => ({ level: deviceReadout(d).level || 0, pin: pinPos.get(d.id) }));
+          const pinned = levels.filter(l => l.pin);
+          const maxLevel = Math.max(0, ...levels.map(l => l.level));
+          const lit = roomFixtures.map(f => {
+            let level = maxLevel;
+            if (pinned.length) {
+              const near = pinned.reduce((a, b) => (Math.hypot(a.pin.x - f.x, a.pin.z - f.z) <= Math.hypot(b.pin.x - f.x, b.pin.z - f.z) ? a : b));
+              level = near.level;
+            }
+            return { ...f, key: f.id, floorId: floor.id, ceiling: floor.height, level };
+          });
+          fixtures.push(...lit);
+          // Punktlys: høyst fire per rom, plassert midt i klynger av påslåtte armaturer
+          const on = lit.filter(f => f.level > 0);
+          fixtureClusters(on).forEach((c, i) => {
+            out.push({
+              key: `${room.id}-fx${i}`, floorId: floor.id, ceiling: floor.height, x: c.x, z: c.z,
+              level: Math.max(...c.members.map(j => on[j].level)), weight: Math.min(1.4, 0.6 + 0.15 * c.members.length), fixture: true
+            });
+          });
+          continue;
+        }
         lights.forEach((d, i) => {
           const r = deviceReadout(d);
           const pin = pinPos.get(d.id);
@@ -918,7 +946,7 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
         });
       }
     }
-    return out;
+    return { lightSources: out, fixtures };
   }, [roomData]);
 
   // Pins som ligger i et annet rom enn Homey-sonen tilsier
@@ -1147,6 +1175,18 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                   lights={lightSources
                     .filter(l => mode === 'exterior' || visibleFloors.some(f => f.id === l.floorId))
                     .map(l => ({ ...l, x: l.x + floorShift(l.floorId)[0], z: l.z + floorShift(l.floorId)[1], y: floorY(l.floorId) + (mode === 'interior' ? Math.min(l.ceiling - 0.1, CLIP_HEIGHT + 0.6) : l.ceiling - 0.1) }))}
+                />
+              )}
+              {overlay !== 'temp' && overlay !== 'security' && (
+                <LightFixtures
+                  fixtures={fixtures
+                    .filter(f => visibleFloors.some(fl => fl.id === f.floorId) && (mode === 'interior' || f.kind === 'outdoor'))
+                    .map(f => {
+                      const [sx, sz] = floorShift(f.floorId);
+                      const base = floorY(f.floorId);
+                      const ceil = mode === 'interior' && f.kind !== 'outdoor' ? Math.min(f.ceiling - 0.04, CLIP_HEIGHT + 0.6) : f.ceiling - 0.04;
+                      return { ...f, x: f.x + sx, z: f.z + sz, path: f.path?.map(([x, z]) => [x + sx, z + sz]), floorY: base, y: base + ceil };
+                    })}
                 />
               )}
               {mode === 'interior' && overlay !== 'temp' && overlay !== 'security' && visibleFloors.flatMap(floor =>
@@ -1450,6 +1490,9 @@ function RoomPanel({ data, zones, editing, onSet, onAllLights, onClose, onToggle
             {roomArea(room).toFixed(1)} m² · {devices.length} enheter
             {zoneIds.length > 0 && ` · ${zoneIds.map(id => zones?.[id]?.name).filter(Boolean).join(', ')}`}
           </p>
+          {fixtureSummary(room.id) && (
+            <p className="font-mono text-[10px] text-nx-amber/80" title="Lyspunkter fra el-tegningene">💡 {fixtureSummary(room.id)}</p>
+          )}
         </div>
         <button onClick={onClose} aria-label="Lukk" className="text-nx-mute hover:text-nx-cyan"><X size={16} /></button>
       </div>
