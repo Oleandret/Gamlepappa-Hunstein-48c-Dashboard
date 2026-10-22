@@ -77,3 +77,8 @@ OpenClaw calls timed out at the connector while work continued. Session history 
 
 - Ny fane **Veiledninger** (også underfane i Huset, så beboerne ser den, og mobilsiden `/veiledninger`): hvordan huset brukes og holdes ved like — varmepumpe, varmeanlegg/tappevann, energimåler, ventilasjon, basseng (vannkvalitet, filter, UV, motstrøm, trekk, avfukter), badstu, motoriserte gardiner og rom/overflater. Skrevet med egne ord ut fra FDV-mappa og romskjemaet 08.10.2018; kilden står på hver veiledning, og usikre punkter er merket «(sjekk)». Søk og emnefilter (`client/src/lib/veiledninger.js`).
 - Mangler i FDV: NIBE-brukerhåndbok (menyer og alarmkoder), vedlikeholdsintervaller for varmeanlegget og bytte av batteri i gardinene.
+
+## Pek og endre i 3D-huset — 22. oktober 2026
+
+- **Pek og endre** i 3D-hus: trykk på en vegg, et møbel, en lampe eller et gulv, velg hva det gjelder (BIM-element, møbel, lyspunkt, rom eller punkt) og skriv et endringsønske, eller koble en Homey-enhet dit (dørsensor → døra, andre enheter → pin på stedet, også på 2D-plantegningen).
+- Ønskene lagres på serveren (`/api/house3d/changes`, namespace `house3dChanges`) og vises som nåler i modellen. Når eieren ber om «ny modell», leser Claude listen med `HOUSE3D_CHANGES_TOKEN`, gjør endringene i én PR og merker ønskene gjort. Se `docs/ENDRINGSONSKER.md`.

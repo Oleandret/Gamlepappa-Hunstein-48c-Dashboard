@@ -32,6 +32,13 @@ export function accessControl(req, res, next, { residentSession = req => residen
     req.user = { role: 'photo-reader', method: 'bearer' };
     return next();
   }
+  // Egen, smal nøkkel for å lage ny 3D-modell: lese endringsønskene og merke dem som gjort.
+  // Gir kun GET på /house3d/changes og PATCH på ett ønske — ingenting annet.
+  if (!role && !demo && changesWorker(req)) {
+    if (!rateLimited(req, res)) return;
+    req.user = { role: 'model-worker', method: 'bearer' };
+    return next();
+  }
   if (!role && !demo && req.headers.authorization === undefined && (req.headers.cookie || '').includes(residents.cookieName)) {
     return residentSession(req).then(resident => {
       if (!resident) return res.status(401).json({ error: 'Innlogging kreves', code: 'AUTH_REQUIRED' });
@@ -56,6 +63,15 @@ const PHOTO_READ_PATHS = /^\/room-photos\/(index|rooms\/[a-zA-Z0-9_-]{1,64}|imag
 export function photoReader(req, configured = process.env.ROOM_PHOTO_READ_TOKEN) {
   if (typeof configured !== 'string' || configured.length < 32) return false;
   if (!['GET', 'HEAD'].includes(req.method) || !PHOTO_READ_PATHS.test(req.path)) return false;
+  const token = /^Bearer (.+)$/.exec(req.headers.authorization || '')?.[1];
+  return Boolean(token && token.length <= 512 && timingSafeEqual(digest(token), digest(configured)));
+}
+const CHANGES_READ_PATH = /^\/house3d\/changes$/;
+const CHANGES_PATCH_PATH = /^\/house3d\/changes\/[a-zA-Z0-9-]{1,64}$/;
+export function changesWorker(req, configured = process.env.HOUSE3D_CHANGES_TOKEN) {
+  if (typeof configured !== 'string' || configured.length < 32) return false;
+  const allowed = (['GET', 'HEAD'].includes(req.method) && CHANGES_READ_PATH.test(req.path)) || (req.method === 'PATCH' && CHANGES_PATCH_PATH.test(req.path));
+  if (!allowed) return false;
   const token = /^Bearer (.+)$/.exec(req.headers.authorization || '')?.[1];
   return Boolean(token && token.length <= 512 && timingSafeEqual(digest(token), digest(configured)));
 }
