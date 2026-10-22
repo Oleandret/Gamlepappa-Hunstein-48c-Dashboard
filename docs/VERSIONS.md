@@ -71,3 +71,8 @@ OpenClaw calls timed out at the connector while work continued. Session history 
 - Bassengboden er delt med ny vegg (plantegningen): treningsrom med solarium og tredemølle mot øst, bassengteknikk mot vest.
 - Frontenden speiles på Vercel (`client/vercel.json`); `/api` og `/auth` videresendes til Railway. Google-innlogging kan fullføres på Vercel-adressen (`AUTH_EXTRA_ORIGINS`).
 - Rettet etter tilbakemelding: teknisk rom vest for kinoen ble aldri bygget (BIM i området skjules, vestveggen er TV-veggen), hvit hjørnesofa i hjørnet, trapp opp til 1. etg mellom kino og soverom, hele veggen mellom basseng og badstu i glass, svarte glassdører fra bassenget til bad og treningsrom, teknisk rom og treningsrom vegg i vegg i bassengboden.
+
+## Veiledninger — 22. oktober 2026
+
+- Ny fane **Veiledninger** (også underfane i Huset, så beboerne ser den, og mobilsiden `/veiledninger`): hvordan huset brukes og holdes ved like — varmepumpe, varmeanlegg/tappevann, energimåler, ventilasjon, basseng (vannkvalitet, filter, UV, motstrøm, trekk, avfukter), badstu, motoriserte gardiner og rom/overflater. Skrevet med egne ord ut fra FDV-mappa og romskjemaet 08.10.2018; kilden står på hver veiledning, og usikre punkter er merket «(sjekk)». Søk og emnefilter (`client/src/lib/veiledninger.js`).
+- Mangler i FDV: NIBE-brukerhåndbok (menyer og alarmkoder), vedlikeholdsintervaller for varmeanlegget og bytte av batteri i gardinene.
