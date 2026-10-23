@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { capValue } from './deviceUtils.js';
 
 /**
  * In-memory activity log with pub/sub. Components can push events from
@@ -50,8 +51,10 @@ export function diffDevicesAndLog(prev, next, zonesById = {}) {
     const a = prev[id];
     const b = next[id];
     if (!b) continue;
-    const ac = a?.capabilities || {};
-    const bc = b?.capabilities || {};
+    // Ekte Homey-data har verdiene i capabilitiesObj, demo-data i capabilities.
+    const pick = d => Object.fromEntries(['onoff', 'locked', 'alarm_motion', 'alarm_contact', 'alarm_smoke', 'alarm_water'].map(cap => [cap, capValue(d, cap)]));
+    const ac = pick(a);
+    const bc = pick(b);
     const zoneName = zonesById[b.zone]?.name;
     // onoff
     if (ac.onoff !== bc.onoff && bc.onoff !== undefined) {

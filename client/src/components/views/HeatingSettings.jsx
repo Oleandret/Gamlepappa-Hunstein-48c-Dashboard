@@ -40,7 +40,7 @@ export function HeatingSettings({ connection, onChanged }) {
   const load = useCallback(async () => {
     try {
       const [s, h, c] = await Promise.all([call('/settings'), call('/settings/history').catch(() => ({ days: [] })), call('/settings/changes').catch(() => ({ changes: [] }))]);
-      setData(s); setDays(h.days || []); setChanges(c.changes || []);
+      setData(s); setDays(h.days || []); setChanges(c.changes || []); setError('');
       setDate(d => d || h.days?.[1] || h.days?.[0] || '');
     } catch (e) { setError(e.message); }
   }, []);

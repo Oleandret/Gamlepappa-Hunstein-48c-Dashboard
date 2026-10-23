@@ -2,7 +2,7 @@ import {RoomPhotos} from '../RoomPhotos.jsx';
 import { useMemo, useState } from 'react';
 import { ChevronLeft, Home as HomeIcon, Building2 } from 'lucide-react';
 import { DeviceCard } from '../DeviceCard.jsx';
-import { classLabel } from '../../lib/deviceUtils.js';
+import { capValue, classLabel } from '../../lib/deviceUtils.js';
 
 export function ZonesView({ onOpen3D, devices, zones, onSet, favorites }) {
   const [openZoneId, setOpenZoneId] = useState(null);
@@ -146,7 +146,7 @@ function buildZoneTree(zones, devices) {
   for (const d of devList) {
     if (!d.zone) continue;
     directCount[d.zone] = (directCount[d.zone] || 0) + 1;
-    if (d.capabilities?.onoff) onCount[d.zone] = (onCount[d.zone] || 0) + 1;
+    if (capValue(d, 'onoff') === true) onCount[d.zone] = (onCount[d.zone] || 0) + 1;
     classCounts[d.zone] = classCounts[d.zone] || {};
     classCounts[d.zone][d.class] = (classCounts[d.zone][d.class] || 0) + 1;
   }

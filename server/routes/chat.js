@@ -92,7 +92,7 @@ async function callOpenAI({ messages, tools, model }) {
       'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
     },
     body: JSON.stringify(body)
-  });
+  }, { timeoutMs: 90_000 }); // lange svar tar mer enn standardens 15 s
 }
 
 function mcpContentToString(result) {
