@@ -4,7 +4,7 @@ import { OrbitControls, Html, Edges, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import {
   Box, Layers, Lightbulb, Thermometer, ShieldAlert, Home as HomeIcon, Edit2,
-  RotateCw, Power, ChevronRight, X, Move3d, Activity, DoorOpen, Lock, Unlock, Maximize2, Minimize2, Sun, Moon, MousePointerClick
+  RotateCw, Power, ChevronRight, X, Move3d, Activity, DoorOpen, Lock, Unlock, Maximize2, Minimize2, Sun, Moon, MousePointerClick, Wifi
 } from 'lucide-react';
 import { sunPosition, sunDirection, skyLighting, sunTimes } from '../../lib/sunPosition.js';
 import { FLOORS, ALL_ROOMS, roomPoly, roomCenter, roomArea, planPctToWorld, worldToPlanPct, BIM_MODEL_URL } from '../../lib/house3dModel.js';
@@ -24,6 +24,8 @@ import { FIXTURES_BY_ROOM, fixtureClusters, fixtureSummary } from '../../lib/hou
 import { RoomFurnishings } from './House3DFurniture.jsx';
 import { furnishedRoomAt, keepsBimElement, hiddenBimElement, hiddenBimArea, ROOM_FURNISHINGS } from '../../lib/house3dFurniture.js';
 import { useDoorMeta, useHouse3dDoors, resolveDoorLinks, isDoorSensor, doorSensorOpen } from '../../lib/house3dDoors.js';
+import { NET_CATEGORIES, placeNetDevices } from '../../lib/networkDevices3d.js';
+import { NetworkMarker3D, NetworkPanel, useNetworkDevices } from './House3DNetwork.jsx';
 
 /**
  * Interaktiv 3D-modell av Hunstein 48c. Bygningskroppen er BIM-modellen
@@ -878,6 +880,17 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
   const bim = bimOn && !bimFailed;
   const controlsRef = useRef();
 
+  // Nettverkslag (hjemmenett-monitor). Valgene huskes per enhet.
+  const [netPrefs, setNetPrefs] = useState(() => {
+    const base = { on: false, cats: NET_CATEGORIES.map(c => c.id), sort: 'room', onlineOnly: true, labels: false };
+    try { return { ...base, ...JSON.parse(localStorage.getItem('nexora.house3d.network') || '{}') }; } catch { return base; }
+  });
+  useEffect(() => { try { localStorage.setItem('nexora.house3d.network', JSON.stringify(netPrefs)); } catch {} }, [netPrefs]);
+  const setNet = (patch) => setNetPrefs(p => ({ ...p, ...patch }));
+  const netCats = useMemo(() => new Set(netPrefs.cats), [netPrefs.cats]);
+  const [selectedNetId, setSelectedNetId] = useState(null);
+  const net = useNetworkDevices(netPrefs.on);
+
   const roomData = useRoomData(devices, zones, roomsCfg.config, floorPlanPins);
   // Fokuser rommet én gang per initialHomeyZoneId. zones byttes ut ved hver
   // polling, og uten denne vakta ble brukerens eget romvalg overstyrt hvert 12. sekund.
@@ -993,6 +1006,12 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
     }));
   }, [roomData, zones]);
 
+  const netFiltered = useMemo(() => net.devices.filter(d => netCats.has(d.category) && (!netPrefs.onlineOnly || d.online)
+    && (!selectedRoomId || d.roomId === selectedRoomId)), [net.devices, netCats, netPrefs.onlineOnly, selectedRoomId]);
+  // Plasseringen regnes ut fra alle viste typer (uten romfilter), så diamantene står stille når et rom velges.
+  const netPlaced = useMemo(() => placeNetDevices(net.devices.filter(d => netCats.has(d.category) && (!netPrefs.onlineOnly || d.online))),
+    [net.devices, netCats, netPrefs.onlineOnly]);
+
   const floorIndex = floorFilter === 'all' ? FLOORS.length - 1 : FLOORS.findIndex(f => f.id === floorFilter);
   const visibleFloors = FLOORS.filter((_, i) => i <= floorIndex);
   const selectedRoom = selectedRoomId ? roomData.byRoom[selectedRoomId] : null;
@@ -1029,6 +1048,7 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
     setSelectedRoomId(roomId);
     setSelectedMarkerId(null);
     setSelectedDoorId(null);
+    setSelectedNetId(null);
     if (!roomId) return;
     const room = ALL_ROOMS.find(r => r.id === roomId);
     const [sx, sz] = floorShift(room.floorId);
@@ -1134,6 +1154,24 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
     return { ok: true, confirmed };
   });
 
+  const toggleNetwork = () => {
+    const on = !netPrefs.on;
+    setNet({ on });
+    setSelectedNetId(null);
+    if (on && mode === 'exterior') setMode('interior');
+  };
+
+  const selectNet = (id) => {
+    setSelectedNetId(id);
+    setSelectedMarkerId(null);
+    setSelectedDoorId(null);
+    const p = netPlaced.find(x => x.device.id === id);
+    if (!p) return;
+    if (floorFilter !== 'all' && floorFilter !== p.floorId) setFloorFilter('all');
+    const y = floorY(p.floorId);
+    setFlyTo({ pos: [p.x + 5, y + 7, p.z + 7], target: [p.x, y + 0.8, p.z], key: Date.now() });
+  };
+
   // Totalstatus for topplinja
   const totals = useMemo(() => {
     let lightsOn = 0, lights = 0, motion = 0;
@@ -1174,6 +1212,10 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
         {OVERLAYS.map(o => (
           <ToggleBtn key={o.id} active={overlay === o.id} onClick={() => setOverlay(o.id)} Icon={o.Icon} subtle>{o.label}</ToggleBtn>
         ))}
+        <span className="mx-2 h-4 w-px bg-nx-line" aria-hidden="true" />
+        <ToggleBtn active={netPrefs.on} onClick={toggleNetwork} Icon={Wifi}>
+          Nettverk{netPrefs.on && net.connected ? ` · ${net.devices.filter(d => d.online).length}` : ''}
+        </ToggleBtn>
         <div className="ml-auto flex items-center gap-1.5">
           <SaveButton sync={selectedDoor ? doorsCfg.sync : roomsCfg.sync} size="sm" />
           <ToggleBtn active={pointing} onClick={() => { setPointing(v => !v); setChangePick(null); setEditing(false); }} Icon={MousePointerClick}>
@@ -1194,7 +1236,7 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
             gl={{ localClippingEnabled: true }}
             dpr={[1, 2]}
             camera={{ position: PRESETS.iso.pos, fov: 40, near: 0.1, far: 400 }}
-            onPointerMissed={() => { setSelectedRoomId(null); setSelectedMarkerId(null); setSelectedDoorId(null); }}
+            onPointerMissed={() => { setSelectedRoomId(null); setSelectedMarkerId(null); setSelectedDoorId(null); setSelectedNetId(null); }}
           >
             <color attach="background" args={[mode === 'exterior' ? sun.sky.background : C.bg]} />
             <fog attach="fog" args={[mode === 'exterior' ? sun.sky.background : C.bg, 45, 120]} />
@@ -1321,6 +1363,18 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                     </group>
                   );
                 })}
+              {mode === 'interior' && netPrefs.on && netPlaced
+                .filter(p => visibleFloors.some(f => f.id === p.floorId))
+                .map(p => (
+                  <NetworkMarker3D
+                    key={`net-${p.device.id}`}
+                    placed={p}
+                    baseY={floorY(p.floorId)}
+                    selected={selectedNetId === p.device.id}
+                    showLabel={netPrefs.labels || (!!selectedRoomId && p.roomId === selectedRoomId)}
+                    onSelect={selectNet}
+                  />
+                ))}
             </Suspense>
 
             <OrbitControls
@@ -1425,6 +1479,18 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
               onReset={() => doorsCfg.reset(selectedDoor.id)}
               onSet={onSetCapability}
               onClose={() => setSelectedDoorId(null)}
+            />
+          ) : netPrefs.on && !editing && !selectedMarker ? (
+            <NetworkPanel
+              net={net} filtered={netFiltered}
+              categories={netCats}
+              onToggleCategory={(id) => setNet({ cats: netCats.has(id) ? netPrefs.cats.filter(c => c !== id) : [...netPrefs.cats, id] })}
+              onAllCategories={() => setNet({ cats: netCats.size === NET_CATEGORIES.length ? [] : NET_CATEGORIES.map(c => c.id) })}
+              sort={netPrefs.sort} onSort={(sort) => setNet({ sort })}
+              onlineOnly={netPrefs.onlineOnly} onOnlineOnly={(onlineOnly) => setNet({ onlineOnly })}
+              showLabels={netPrefs.labels} onShowLabels={(labels) => setNet({ labels })}
+              roomFilter={selectedRoomId} onClearRoom={() => setSelectedRoomId(null)}
+              selectedId={selectedNetId} onSelect={(id) => id ? selectNet(id) : setSelectedNetId(null)}
             />
           ) : selectedMarker && !editing ? (
             <MarkerPanel marker={selectedMarker} onSet={onSetCapability} onClose={() => setSelectedMarkerId(null)} />
