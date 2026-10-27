@@ -33,7 +33,7 @@ export function AutoFlowsView() {
   }, [reload]);
 
   const toggleEnabled = async (flow) => {
-    if (!flow.enabled && !confirm(`Aktivere ${flow.title}? Se trigger og handlinger først; kjør gjerne en tørrkjøring i Huspuls.`)) return;
+    if (!flow.enabled && !confirm(`Aktivere ${flow.title}? Se trigger og handlinger først.`)) return;
     try {
       await api.events.updateAutoFlow(flow.id, { enabled: !flow.enabled });
       setFlows(prev => prev.map(f => f.id === flow.id ? { ...f, enabled: !flow.enabled } : f));

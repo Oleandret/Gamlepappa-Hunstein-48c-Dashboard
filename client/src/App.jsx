@@ -4,7 +4,6 @@ import {HistoryView} from './components/views/HistoryView.jsx';
 import {NetworkView} from './components/views/NetworkView.jsx';
 import {HusetView} from './components/huset/HusetView.jsx';
 import { VeiledningerView } from './components/huset/VeiledningerView.jsx';
-import { ExperienceView } from './components/views/ExperienceView.jsx';
 import { VoiceAssistant } from './components/VoiceAssistant.jsx';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
@@ -271,7 +270,6 @@ function SectionView({ onOpen3D, focusZoneId, section, system, data, counts, set
   if (section === 'nettverk') return <NetworkView />;
   if (section === 'huset') return <HusetView />;
   if (section === 'veiledninger') return <VeiledningerView />;
-  if (section === 'huspuls') return <ExperienceView devices={data.devices || {}} />;
   const userName = system?.user || 'Ole';
   const greetingPanel = (
     <div className="col-span-12 lg:col-span-3 panel p-5">
@@ -280,7 +278,7 @@ function SectionView({ onOpen3D, focusZoneId, section, system, data, counts, set
         God kveld, <span className="neon-text">{userName}</span>!
       </h1>
       <p className="mt-1 text-sm text-nx-mute">
-        Se Huspuls for avvik og datakvalitet basert på siste avlesning.
+        Status for huset basert på siste avlesning.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <span className="chip">
