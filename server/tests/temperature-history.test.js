@@ -17,8 +17,8 @@ test('heat pump records: only files in window, missing directory is empty',async
  }finally{await fs.rm(dir,{recursive:true,force:true});}
 });
 test('room series group by device with zone names; query is parameterised',async()=>{
- let seen;const q=async(sql,params)=>{seen={sql,params};return {rows:[{device_id:'a',name:'Stue sensor',zone:'z',bucket:'3600',value:'21.456'},{device_id:'a',name:'Stue sensor',zone:'z',bucket:'7200',value:'22'}]};};
+ let seen;const q=async(sql,params)=>{seen={sql,params};return {rows:[{device_id:'a',name:'Stue sensor',zone:'z',bucket:'3600',value:'21.456'},{device_id:'a',name:'Stue sensor',zone:'z',bucket:'7200',value:'22'},{device_id:'b',name:'Bad',zone:'Bad oppe',bucket:'3600',value:'23'}]};};
  const s=await roomSeries(q,7,RANGES[7]*60000,{z:{name:'Stue'}});
- assert.deepEqual(s,[{id:'a',name:'Stue sensor',zone:'Stue',unit:'°C',points:[{at:3600000,value:21.46},{at:7200000,value:22}]}]);
+ assert.deepEqual(s,[{id:'b',name:'Bad',zone:'Bad oppe',unit:'°C',points:[{at:3600000,value:23}]},{id:'a',name:'Stue sensor',zone:'Stue',unit:'°C',points:[{at:3600000,value:21.46},{at:7200000,value:22}]}]);
  assert.deepEqual(seen.params,[7,3600]);assert.ok(!seen.sql.includes('${'));
 });

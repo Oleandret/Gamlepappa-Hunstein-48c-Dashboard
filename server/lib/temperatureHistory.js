@@ -58,7 +58,7 @@ export async function readHeatpumpRecords(dir, since, { maxFiles = 4096, maxByte
   return { records, startedAt: all.length ? Number(all[0].match(pattern)[1]) : null };
 }
 
-/** Romfølere fra device_events, snitt per bøtte i databasen. */
+/** Romfølere fra device_events, snitt per bøtte i databasen. Poller-raden lagrer sonenavnet; eldre rader kan ha sone-ID. */
 export async function roomSeries(query, days, bucketMs, zones = {}) {
   const bucketSec = bucketMs / 1000;
   const rows = (await query(
@@ -73,7 +73,7 @@ export async function roomSeries(query, days, bucketMs, zones = {}) {
       LIMIT 200000`, [days, bucketSec])).rows;
   const byDevice = new Map();
   for (const r of rows) {
-    const s = byDevice.get(r.device_id) || { id: r.device_id, name: r.name || r.device_id, zone: zones[r.zone]?.name || null, unit: '°C', points: [] };
+    const s = byDevice.get(r.device_id) || { id: r.device_id, name: r.name || r.device_id, zone: zones[r.zone]?.name || r.zone || null, unit: '°C', points: [] };
     const value = Number(r.value);
     if (Number.isFinite(value)) s.points.push({ at: Number(r.bucket) * 1000, value: Math.round(value * 100) / 100 });
     byDevice.set(r.device_id, s);
