@@ -120,8 +120,15 @@ body{background:#0b1119;color:#e8eef6;font-size:14px;line-height:1.5}
 .dashboard-clock>strong{font-size:24px;font-weight:450;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
 .dashboard-clock [role=status]{font-size:9px;letter-spacing:.06em}
 .dashboard-navigation{display:flex;gap:16px;align-items:center;border-block:1px solid #29384a;padding:10px 0;min-width:0}
-.dashboard-navigation nav{display:flex!important;gap:5px;flex-wrap:nowrap;overflow:auto;min-width:0;flex:1;scrollbar-width:thin;padding-bottom:3px}
-.dashboard-navigation nav button{white-space:nowrap;flex-shrink:0;padding:9px 13px;border-radius:8px;font-size:12px;color:#a7b8cc;text-transform:none;letter-spacing:0;min-height:38px}
+.dashboard-navigation nav{display:flex!important;gap:5px;flex-wrap:wrap;min-width:0;flex:1}
+.dashboard-navigation nav button{white-space:nowrap;padding:8px 11px;border-radius:8px;font-size:12px;color:#a7b8cc;text-transform:none;letter-spacing:0;min-height:36px}
+/* Brede skjermer: alle fanene i nøyaktig to like rader (antall kolonner settes i TopBar), uten scrolling. */
+@media(min-width:1200px){
+ .dashboard-navigation nav{display:grid!important;grid-template-columns:repeat(var(--nav-cols,13),minmax(0,1fr));gap:4px}
+ .dashboard-navigation nav button{padding:8px 4px;text-align:center;overflow:hidden;text-overflow:ellipsis}
+}
+/* Fanevelgeren trengs bare på mobil når alle faner vises. */
+@media(min-width:768px){.dashboard-navigation .section-picker{display:none}}
 .dashboard-navigation nav button:hover{background:#1c2a3a;color:#e7f1fa}
 .dashboard-navigation nav button[aria-current=page]{background:#203d38;color:#a7f0d7;font-weight:600}
 .dashboard-presence{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 0 14px}
