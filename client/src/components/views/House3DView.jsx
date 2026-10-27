@@ -25,7 +25,8 @@ import { RoomFurnishings } from './House3DFurniture.jsx';
 import { furnishedRoomAt, keepsBimElement, hiddenBimElement, hiddenBimArea, ROOM_FURNISHINGS } from '../../lib/house3dFurniture.js';
 import { useDoorMeta, useHouse3dDoors, resolveDoorLinks, isDoorSensor, doorSensorOpen } from '../../lib/house3dDoors.js';
 import { NET_CATEGORIES, placeNetDevices } from '../../lib/networkDevices3d.js';
-import { NetworkMarker3D, NetworkPanel, useNetworkDevices } from './House3DNetwork.jsx';
+import { NetworkMarker3D, NetworkPanel } from './House3DNetwork.jsx';
+import { useNetworkDevices } from '../../lib/useNetworkDevices.js';
 
 /**
  * Interaktiv 3D-modell av Hunstein 48c. Bygningskroppen er BIM-modellen

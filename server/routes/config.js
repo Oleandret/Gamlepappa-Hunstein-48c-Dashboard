@@ -21,7 +21,8 @@ const ALLOWED_NS = new Set([
   'flowsSidebarFlows',  // brukervalgte flows i høyre-sidebar (kommer senere)
   'frontSpecials',      // hvilke spesial-kort (Tesla/Tibber/Støvsuger) som vises på Oversikt
   'scenes',
-  'aiModels'            // hvilken OpenAI-modell som brukes for chat og suggestion-engine
+  'aiModels',           // hvilken OpenAI-modell som brukes for chat og suggestion-engine
+  'homePresence'        // nettverksenheter (MAC → person) som vises i «Hjemme» i topplinja
 ]);
 
 function valid(ns) { return ALLOWED_NS.has(ns); }

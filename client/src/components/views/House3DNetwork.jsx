@@ -1,12 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
-import { X, Wifi, WifiOff } from 'lucide-react';
-import { apiFetch } from '../../lib/api.js';
+import { X, Wifi, WifiOff, Home } from 'lucide-react';
 import { ALL_ROOMS } from '../../lib/house3dModel.js';
-import { NET_CATEGORIES, NET_CATEGORY, NET_SORTS, roomIdForName, sortNetDevices, groupKey } from '../../lib/networkDevices3d.js';
-import { usePageVisibility } from '../../lib/usePageVisibility.js';
+import { NET_CATEGORIES, NET_CATEGORY, NET_SORTS, sortNetDevices, groupKey } from '../../lib/networkDevices3d.js';
+import { useHomePresence } from '../../lib/useHomePresence.js';
 
 /**
  * Nettverkslaget i 3D-huset: enhetene fra hjemmenett-monitoren (MCP) som
@@ -18,33 +17,6 @@ const REASON = {
   'demo-isolation': 'Demo-modus: ekte nettverksdata vises ikke.',
   unavailable: 'Fikk ikke kontakt med hjemmenett-monitoren akkurat nå.'
 };
-
-/** Henter enhetslisten hvert 30. sekund mens laget er på og fanen er synlig. */
-export function useNetworkDevices(enabled) {
-  const visible = usePageVisibility();
-  const [state, setState] = useState({ loading: false, connected: false, reason: null, devices: [], fetchedAt: null });
-  useEffect(() => {
-    if (!enabled || !visible) return;
-    const ctrl = new AbortController();
-    let timer;
-    const load = async () => {
-      setState(s => ({ ...s, loading: true }));
-      try {
-        const r = await apiFetch('/api/network/devices', { signal: ctrl.signal });
-        if (!r.ok) throw new Error();
-        const d = await r.json();
-        setState({ loading: false, connected: d.connected, reason: d.reason || null, fetchedAt: d.fetchedAt || null,
-          devices: (d.devices || []).map(x => ({ ...x, roomId: roomIdForName(x.room) })) });
-      } catch (e) {
-        if (e.name !== 'AbortError') setState(s => ({ ...s, loading: false, connected: false, reason: 'unavailable' }));
-      }
-      if (!ctrl.signal.aborted) timer = setTimeout(load, 30_000);
-    };
-    load();
-    return () => { ctrl.abort(); clearTimeout(timer); };
-  }, [enabled, visible]);
-  return state;
-}
 
 export function NetworkMarker3D({ placed, baseY, selected, showLabel, onSelect }) {
   const d = placed.device;
@@ -93,6 +65,8 @@ export function NetworkPanel({ net, filtered, categories, onToggleCategory, onAl
   const selected = net.devices.find(d => d.id === selectedId);
   const placed = filtered.filter(d => d.roomId).length;
   const allOn = categories.size === NET_CATEGORIES.length;
+  const presence = useHomePresence();
+  const shownInTop = selected ? presence.devices[selected.id] : null;
 
   let lastGroup;
   return (
@@ -127,6 +101,25 @@ export function NetworkPanel({ net, filtered, categories, onToggleCategory, onAl
             <dt className="text-nx-mute">MAC</dt><dd>{selected.id}</dd>
             <dt className="text-nx-mute">Data 24 t</dt><dd>{selected.dataLabel || '—'}</dd>
           </dl>
+          <div className="mt-1.5 border-t border-nx-line/40 pt-1.5 space-y-1">
+            <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+              <input type="checkbox" checked={!!shownInTop} onChange={() => presence.toggle(selected)} className="accent-nx-cyan" />
+              <Home size={11} className="text-nx-cyan" aria-hidden="true" /> Vis i «Hjemme» øverst på alle sider
+            </label>
+            {shownInTop && (
+              <label className="flex items-center gap-1.5 font-mono text-[10px] text-nx-mute">
+                Person
+                <input
+                  value={shownInTop.person}
+                  onChange={e => presence.setPerson(selected.id, e.target.value)}
+                  maxLength={40}
+                  placeholder="Navn"
+                  className="flex-1 rounded border border-nx-line/60 bg-nx-bg px-1.5 py-0.5 text-xs text-nx-text"
+                />
+              </label>
+            )}
+            {shownInTop && <p className="text-[10px] text-nx-mute">Flere enheter med samme navn (f.eks. mobil og klokke) blir én person.</p>}
+          </div>
         </div>
       )}
 
@@ -183,6 +176,7 @@ export function NetworkPanel({ net, filtered, categories, onToggleCategory, onAl
                 className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs hover:bg-nx-cyan/5 ${selectedId === d.id ? 'bg-nx-cyan/10' : ''}`}>
                 <span className="h-2 w-2 shrink-0 rotate-45" style={{ background: NET_CATEGORY[d.category].color, opacity: d.online ? 1 : 0.35 }} />
                 <span className={`flex-1 truncate ${d.online ? '' : 'text-nx-mute'}`}>{d.name}</span>
+                {presence.devices[d.id] && <Home size={10} className="shrink-0 text-nx-cyan" aria-label={`Vises i topplinja som ${presence.devices[d.id].person}`} />}
                 {sort !== 'owner' && d.owner && <span className="truncate max-w-[70px] font-mono text-[10px] text-nx-mute">{d.owner}</span>}
                 <span className="w-14 text-right font-mono text-[10px] text-nx-mute">{d.dataLabel || ''}</span>
               </button>
