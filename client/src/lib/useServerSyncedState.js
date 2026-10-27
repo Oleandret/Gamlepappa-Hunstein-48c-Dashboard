@@ -15,6 +15,9 @@ import { api } from './api.js';
  * Setter man `value` til samme referanse som forrige verdi, hoppes write over.
  */
 const DEBOUNCE_MS = 500;
+// Andre komponenter i samme fane som bruker samme namespace (f.eks. topplinja
+// og nettverkspanelet) får endringen via denne hendelsen; `storage` gjelder bare andre faner.
+const SAME_TAB_EVENT = 'server-synced-state';
 
 export function useServerSyncedState(namespace, defaultValue, { storageKey = null } = {}) {
   const lsKey = storageKey || `nexora.${namespace}.v1`;
@@ -41,6 +44,7 @@ export function useServerSyncedState(namespace, defaultValue, { storageKey = nul
   const mountedRef = useRef(true);
   const valueRef = useRef(value);
   valueRef.current = value;
+  const instanceRef = useRef(Symbol(namespace));
 
   // Hent fra server på mount
   useEffect(() => {
@@ -85,8 +89,13 @@ export function useServerSyncedState(namespace, defaultValue, { storageKey = nul
         setValue(parsed);
       } catch {}
     };
+    const onSameTab = (e) => {
+      if (e.detail?.key !== lsKey || e.detail.source === instanceRef.current) return;
+      setValue(e.detail.value);
+    };
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    window.addEventListener(SAME_TAB_EVENT, onSameTab);
+    return () => { window.removeEventListener('storage', onStorage); window.removeEventListener(SAME_TAB_EVENT, onSameTab); };
   }, [lsKey]);
 
   // Felles save-funksjon — flush() bruker den uten debounce, setSyncedValue
@@ -120,6 +129,9 @@ export function useServerSyncedState(namespace, defaultValue, { storageKey = nul
       valueRef.current = next;
       // Skriv localStorage umiddelbart (rask, synkron)
       try { localStorage.setItem(lsKey, JSON.stringify(next)); } catch {}
+      if (typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+        Promise.resolve().then(() => window.dispatchEvent(new CustomEvent(SAME_TAB_EVENT, { detail: { key: lsKey, value: next, source: instanceRef.current } })));
+      }
       // Debounced PUT til server
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => { doSave(next).catch(() => {}); }, DEBOUNCE_MS);

@@ -59,3 +59,12 @@ test('sorting by data puts unknown last, placement only uses rooms in the model'
  assert.equal(placed.length,2);
  assert.ok(placed.every(p=>p.floorId==='basement'&&Number.isFinite(p.x)&&Number.isFinite(p.z)));
 });
+
+test('presence groups devices per person; home if any device online, home first',async()=>{
+ const {presencePeople}=await import('../../client/src/lib/homePresence.js');
+ const net=[{id:'m1',name:'Ole mobil',online:false,status:'sist sett 08:10'},{id:'m2',name:'Ole klokke',online:true,status:'på nett nå'},{id:'m3',name:'Vendela iPhone',online:false,status:'sist sett 07:00'}];
+ const people=presencePeople({m1:{person:'Ole'},m2:{person:' Ole '},m3:{person:'Vendela'},m4:{person:'Andrea'}},net);
+ assert.deepEqual(people.map(p=>[p.person,p.home,p.devices.length]),[['Ole',true,2],['Andrea',false,1],['Vendela',false,1]]);
+ assert.equal(people[1].devices[0].status,'ikke funnet i hjemmenett');
+ assert.deepEqual(presencePeople({},net),[]);
+});
