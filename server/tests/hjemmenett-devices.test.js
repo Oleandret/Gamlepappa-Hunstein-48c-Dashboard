@@ -84,3 +84,13 @@ test('observatory snapshot from hjemmenett: 15-min window, no owner/room, honest
  const none=snapshotFromDevices(devs.map(d=>({...d,online:false})),at);
  assert.equal(none.collector.status,'unknown');assert.equal(collectorReporting(none,now),false);
 });
+
+test('room temperatures leave out outdoor zones (also sub-zones), garage and outdoor-named sensors',async()=>{
+ const {indoorTemperatureGroups,isOutdoorZone}=await import('../../client/src/lib/roomTemps.js');
+ const zones={ute:{id:'ute',name:'Ute'},hage:{id:'hage',name:'Bak huset',parent:'ute'},stue:{id:'stue',name:'Stue'},gar:{id:'gar',name:'Garasje'},kjk:{id:'kjk',name:'Kjøkken'}};
+ const t=(id,zone,v,extra={})=>({id,zone,name:id,capabilitiesObj:{measure_temperature:{value:v}},...extra});
+ const devices={a:t('Stue sensor','stue',21.5),b:t('Sensor bak','hage',6.2),c:t('Garasje temp','gar',9),d:t('Netatmo utendørs','stue',5),e:t('Kjøleskap','kjk',4),f:t('Kjøkken','kjk',22),g:t('Død sensor','stue',3,{available:false})};
+ assert.equal(isOutdoorZone('hage',zones),true);assert.equal(isOutdoorZone('stue',zones),false);
+ const g=indoorTemperatureGroups(devices,zones);
+ assert.deepEqual(g.map(x=>[x.name,x.temp,x.sensorCount]),[['Kjøkken',22,1],['Stue',21.5,1]]);
+});
