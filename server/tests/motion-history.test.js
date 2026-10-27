@@ -29,3 +29,12 @@ test('door, lock and alarm transitions are stored; activity skips baseline and m
  assert.ok(feed[0].ts>=feed.at(-1).ts);assert.equal(feed.find(e=>e.text.startsWith('Åpnet')).active,true);
  assert.equal(state.events.filter(e=>MOTION_CAPS.test(e.capability)).length,3);
 });
+import {activityFromRows,readActivityPage,ACTIVITY_CAPS} from '../lib/activityFeed.js';
+test('long activity history reads device_events with period and paging',async()=>{
+ const rows=[{ts:'2026-10-27T10:00:00Z',device_id:'d',device_name:'Ytterdør',zone:'Gang',capability:'alarm_contact',value:true,time_source:'device'},{ts:'2026-10-27T09:00:00Z',device_id:'p',device_name:'PIR',zone:null,capability:'alarm_motion.1',value:true,time_source:'poll'},{ts:'2026-10-27T08:00:00Z',device_id:'x',device_name:'Lampe',zone:'Stue',capability:'onoff',value:true}];
+ const feed=activityFromRows(rows);assert.deepEqual(feed.map(e=>e.text),['Åpnet — Ytterdør (Gang)','Bevegelse — PIR']);assert.equal(feed[1].timeSource,'observert');
+ let seen;const q=async(sql,params)=>{seen={sql,params};return {rows:rows.slice(0,2)};};
+ const page=await readActivityPage(q,{days:365,before:Date.parse('2026-10-28T00:00:00Z'),limit:1});
+ assert.equal(page.activity.length,1);assert.equal(page.hasMore,true);assert.equal(page.oldest,Date.parse('2026-10-27T10:00:00Z'));
+ assert.deepEqual(seen.params,[ACTIVITY_CAPS,365,'2026-10-28T00:00:00.000Z',2]);assert.ok(!/\$\{/.test(seen.sql));
+});

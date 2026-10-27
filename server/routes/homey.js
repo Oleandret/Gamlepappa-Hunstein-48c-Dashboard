@@ -5,7 +5,8 @@ import { capValue } from '../lib/validation.js';
 import { Router } from 'express';
 import { homeyClient, motionHistory } from '../lib/homeyClient.js';
 import { MOTION_CAPS } from '../lib/motionHistory.js';
-import { activityFromHistory } from '../lib/activityFeed.js';
+import { activityFromHistory, readActivityPage, ACTIVITY_DAYS } from '../lib/activityFeed.js';
+import { isEnabled as dbEnabled, query as dbQuery } from '../lib/db.js';
 import { isDemoMode } from '../config.js';
 import { buildInventory } from '../lib/inventory.js';
 import {
@@ -78,10 +79,20 @@ homeyRoutes.get('/energy', safe(
   async () => ({ report: mockEnergyReport() }), homeyClient.listDevices
 ));
 
-homeyRoutes.get('/activity', safe(
-  async () => ({ activity: activityFromHistory((await motionHistory.read()).events, await homeyClient.listZones().catch(() => ({}))) }),
-  async () => ({ activity: MOCK_ACTIVITY })
-));
+// Aktivitet: lang historikk fra hendelsesloggen i databasen når den finnes,
+// ellers den lokale 7-dagersloggen. ?days= velger periode, ?before= blar bakover.
+homeyRoutes.get('/activity', async (req, res) => {
+  if (isDemoMode()) return res.json({ activity: MOCK_ACTIVITY, _quality: 'demo', source: 'demo', hasMore: false });
+  const days = Number(req.query.days || 7), limit = Math.min(200, Math.max(1, Number(req.query.limit) || 60));
+  const before = req.query.before ? Number(req.query.before) : null;
+  if (!ACTIVITY_DAYS.includes(days) || (before !== null && !Number.isFinite(before))) return res.status(400).json({ error: 'Ugyldig periode' });
+  try {
+    if (dbEnabled()) return res.json({ ...(await readActivityPage(dbQuery, { days, before, limit })), days, source: 'database', _quality: 'live' });
+    const all = activityFromHistory((await motionHistory.read()).events, await homeyClient.listZones().catch(() => ({})), { limit: 2000 })
+      .filter(e => e.ts > Date.now() - days * 86400000 && (before === null || e.ts < before));
+    res.json({ activity: all.slice(0, limit), hasMore: all.length > limit, oldest: all[Math.min(limit, all.length) - 1]?.ts ?? null, days, source: 'logg', retentionDays: 7, _quality: 'live' });
+  } catch { res.status(503).json({ error: 'Aktivitetsloggen kunne ikke leses', _quality: 'unavailable' }); }
+});
 
 /** Inventory: total opptelling av alle devices/zones/flows + capability-statistikk
  *  Pass ?full=true for å inkludere raw devices/zones/flows (større respons). */

@@ -69,13 +69,13 @@ test('presence groups devices per person; home if any device online, home first'
  assert.deepEqual(presencePeople({},net),[]);
 });
 
-test('observatory snapshot from hjemmenett: 15-min window, no owner/room, honest states',async()=>{
+test('observatory snapshot from hjemmenett: 15-min window, no owner, honest states',async()=>{
  const {snapshotFromDevices}=await import('../lib/hjemmenettClient.js');
  const {deviceState,collectorReporting,recentMinutes}=await import('../../client/src/lib/networkModel.js');
  const at='2026-10-27T06:00:00.000Z',now=Date.parse(at);
  const devs=[{id:'02:00:00:00:00:01',name:'A',online:true,status:'på nett nå',ip:'192.168.10.2',owner:'Ole',room:'Stue'},{id:'02:00:00:00:00:02',name:'B',online:false,status:'sist sett 2 t siden',ip:null}];
  const s=snapshotFromDevices(devs,at);
- assert.equal(s.devices[0].owner,undefined);assert.equal(s.devices[0].room,undefined);
+ assert.equal(s.devices[0].owner,undefined);assert.equal(s.devices[0].room,'Stue');
  assert.equal(recentMinutes(s),15);
  assert.equal(deviceState(s.devices[0],s,now),'observed');
  assert.equal(deviceState(s.devices[1],s,now),'stale');
@@ -93,4 +93,15 @@ test('room temperatures leave out outdoor zones (also sub-zones), garage and out
  assert.equal(isOutdoorZone('hage',zones),true);assert.equal(isOutdoorZone('stue',zones),false);
  const g=indoorTemperatureGroups(devices,zones);
  assert.deepEqual(g.map(x=>[x.name,x.temp,x.sensorCount]),[['Kjøkken',22,1],['Stue',21.5,1]]);
+});
+
+test('overview and activity are normalised; timed lookups never leave the server',async()=>{
+ const {normalizeOverview,normalizeActivity,snapshotFromDevices}=await import('../lib/hjemmenettClient.js');
+ const ov=normalizeOverview({period_hours:24,findings:[{level:'advarsel',title:'Mulige IP-konflikter',text:'To enheter',devices:['A','B']},{level:'rar',title:'X'}]},{devices:[{name:'Mac',mac:'AA:BB:CC:DD:EE:01',room:'Stue',amount:'108 GB',bytes:108e9},{name:'bad',mac:'nope'}]},{devices:[{mac:'aa:bb:cc:dd:ee:02',ip:'8.8.8.8',last_seen:'2 min'}]});
+ assert.equal(ov.findings[1].level,'tips');assert.equal(ov.topData.length,1);assert.equal(ov.topData[0].id,'aa:bb:cc:dd:ee:01');assert.equal(ov.newDevices[0].ip,null);
+ const act=normalizeActivity({found:true,top_services_7_days:[{service:'YouTube',category:'Video',lookups:120}],background_7_days:[{service:'iCloud',lookups:9}],data_last_24h:{downloaded:'1,2 GB',sent:'40 MB',noise:'1 MB'},hourly_data_last_24h:[{hour:'08',data:'120 MB'}],recent_lookups:[{time:'08:01',service:'YouTube'}]});
+ assert.equal(act.recent_lookups,undefined);assert.equal(act.services[0].service,'YouTube');assert.equal(act.hourly[0].bytes,120e6);
+ assert.deepEqual(normalizeActivity({found:false}),{found:false});
+ const snap=snapshotFromDevices([{id:'aa:bb:cc:dd:ee:01',name:'Mac',online:true,status:'på nett nå',ip:null,owner:'Ole',room:'Stue',category:'computer',dataLabel:'1 GB',dataBytes:1e9}],'2026-10-27T06:00:00.000Z');
+ assert.equal(snap.devices[0].owner,undefined);assert.equal(snap.devices[0].room,'Stue');assert.equal(snap.devices[0].category,'computer');
 });

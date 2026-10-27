@@ -2,6 +2,7 @@ import {HistoryCharts} from '../HistoryCharts.jsx';
 import {PriceHistory} from '../PriceHistory.jsx';
 import {HUNSTEIN_MAIN_ID} from '../../lib/hunsteinMeter.js';
 import {HunsteinEnergy} from '../HunsteinEnergy.jsx';
+import {ActionPlan} from '../ActionPlan.jsx';
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../lib/api.js';
 import { inventory, siteRows, overview, recommendations, appendSample, meterHistory, intervalCost, simulate, validatePlan } from '../../lib/savingsModel.js';
@@ -44,6 +45,7 @@ export function SavingsView(){
   return <div className="savings">
     <header className="saving-hero"><div><p className="saving-eyebrow">GAMLEPAPPA / ENERGIINNSIKT</p><h1>Strømsparing</h1><p>Forstå forbruket. Prøv tiltak. Behold kontrollen.</p></div><span className="saving-badge">Kun innsikt og simulering</span></header>
     <div className="saving-notice" role="status">{quality==='demo'?'DEMO — alle kildedata er testdata. Ingen bekreftet husmåling.':error||'Lesetilgang · oppdateres tidligst hvert minutt · Europe/Oslo'}<br/>Ingen fysisk automasjon kan aktiveres fra denne fanen.</div>
+    <ActionPlan rows={rows} devices={data?.devices?.value||{}} zones={data?.zones?.value||{}} siteId={siteId}/>
     {siteId==='hunstein'&&<><HistoryCharts/><PriceHistory/></>}
     {siteId==='hunstein'&&<section className="saving-card"><HunsteinEnergy devices={data?.devices?.value} quality={quality}/></section>}
     <section className="saving-metrics" aria-label="Forbruksoversikt">
