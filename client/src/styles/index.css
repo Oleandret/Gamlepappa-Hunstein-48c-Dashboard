@@ -184,3 +184,19 @@ body{background:#0b1119;color:#e8eef6;font-size:14px;line-height:1.5}
 .avvik-mobile textarea,.avvik-mobile select{font-size:16px}
 .avvik-mobile .huset-tab{padding:.65rem 1rem;font-size:.95rem}
 .avvik-mobile input:not([type=checkbox]){font-size:16px}
+/* Historikkblokker (Strømsparing, Historikk): kompakt hode, periodeknapper og grafer side om side. */
+.history-block{display:grid;gap:14px;min-width:0}
+.history-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.history-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;min-width:0}
+.history-note{font-size:11px;line-height:1.6;color:#8ea3ba}
+.period-picker,.date-stepper{display:inline-flex;gap:4px;background:#0f1824;border:1px solid #2c3d51;border-radius:10px;padding:3px;align-items:center}
+.period-picker button,.date-stepper button{border:0!important;background:transparent!important;color:#a7b8cc!important;padding:6px 12px!important;min-height:32px!important;border-radius:7px!important;font-size:12px!important;font-weight:500!important}
+.period-picker button[aria-pressed=true]{background:#203d38!important;color:#a7f0d7!important;font-weight:600!important}
+.period-picker button:hover,.date-stepper button:hover{color:#e7f1fa!important}
+.date-stepper input{background:transparent!important;border:0!important;color:#e4edf6;min-height:32px!important;padding:4px 6px!important;width:auto!important;color-scheme:dark}
+.chart-card .chart-summary strong{font-size:16px}
+.price-table summary{cursor:pointer;font-size:12px;color:#a7b8cc}
+.price-table table{width:100%;max-width:420px;margin-top:8px;font-size:12px;border-collapse:collapse}
+.price-table td,.price-table th{padding:6px 8px;border-bottom:1px solid #26364a;text-align:left}
+.price-table td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+@media(max-width:700px){.history-grid{grid-template-columns:1fr}.history-head{align-items:flex-start}}
