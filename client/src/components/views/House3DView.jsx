@@ -4,7 +4,7 @@ import { OrbitControls, Html, Edges, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import {
   Box, Layers, Lightbulb, Thermometer, ShieldAlert, Home as HomeIcon, Edit2,
-  RotateCw, Power, ChevronRight, X, Move3d, Activity, DoorOpen, Lock, Unlock, Maximize2, Minimize2, Sun, Moon, MousePointerClick, Wifi
+  RotateCw, Power, ChevronRight, X, Move3d, Activity, DoorOpen, Lock, Unlock, Maximize2, Minimize2, Tag, Sun, Moon, MousePointerClick, Wifi
 } from 'lucide-react';
 import { sunPosition, sunDirection, skyLighting, sunTimes } from '../../lib/sunPosition.js';
 import { FLOORS, ALL_ROOMS, roomPoly, roomCenter, roomArea, planPctToWorld, worldToPlanPct, BIM_MODEL_URL } from '../../lib/house3dModel.js';
@@ -248,7 +248,7 @@ function glowTexture() {
 
 // ─── Rom: interiør ──────────────────────────────────────────────────────
 
-function InteriorRoom({ data, overlay, selected, hovered, onSelect, onHover, showLabel, floorHeight }) {
+function InteriorRoom({ data, overlay, selected, hovered, onSelect, onHover, showLabel, labels = true, floorHeight }) {
   const { room, stats, devices } = data;
   const poly = roomPoly(room);
   const slab = useSlabGeometry(poly, 0.12);
@@ -338,7 +338,7 @@ function InteriorRoom({ data, overlay, selected, hovered, onSelect, onHover, sho
         </>
       )}
 
-      {(showLabel || selected || hovered) && (
+      {labels && (showLabel || selected || hovered) && (
         <Html position={[cx, wallH + 0.5, cz]} center distanceFactor={15} zIndexRange={[20, 0]} style={{ pointerEvents: 'none' }}>
           <RoomLabel room={room} stats={stats} deviceCount={devices.length} overlay={overlay} active={selected || hovered} />
         </Html>
@@ -633,7 +633,7 @@ function ExteriorGlow({ roomData }) {
 
 // ─── Etasje ─────────────────────────────────────────────────────────────
 
-function Floor({ floor, index, mode, explode, shift = [0, 0], roomData, overlay, selectedRoomId, hoveredRoomId, onSelect, onHover, isolated, dimmed, bim }) {
+function Floor({ floor, index, mode, explode, shift = [0, 0], roomData, overlay, selectedRoomId, hoveredRoomId, onSelect, onHover, isolated, dimmed, bim, roomLabels = true }) {
   const y = floor.level + (mode === 'interior' ? explode * index * 3.2 : 0);
   return (
     <group position={[shift[0], y, shift[1]]}>
@@ -650,6 +650,7 @@ function Floor({ floor, index, mode, explode, shift = [0, 0], roomData, overlay,
             onSelect={onSelect}
             onHover={onHover}
             showLabel={isolated}
+            labels={roomLabels}
             floorHeight={floor.height}
           />
         ) : (
@@ -851,6 +852,9 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
   const [autoRotate, setAutoRotate] = useState(() => { try { return localStorage.getItem('nexora.house3d.rotate') === '1'; } catch { return false; } });
   const [rotateSpeed, setRotateSpeed] = useState(() => { try { return Number(localStorage.getItem('nexora.house3d.rotateSpeed')) || 0.6; } catch { return 0.6; } });
   useEffect(() => { try { localStorage.setItem('nexora.house3d.rotate', autoRotate ? '1' : '0'); localStorage.setItem('nexora.house3d.rotateSpeed', String(rotateSpeed)); } catch {} }, [autoRotate, rotateSpeed]);
+  // Romnavn i modellen kan skrus av; valget huskes per enhet.
+  const [roomLabels, setRoomLabels] = useState(() => { try { return localStorage.getItem('nexora.house3d.roomLabels') !== '0'; } catch { return true; } });
+  useEffect(() => { try { localStorage.setItem('nexora.house3d.roomLabels', roomLabels ? '1' : '0'); } catch {} }, [roomLabels]);
   // Fullskjerm: ekte Fullscreen API der det finnes, ellers (iPhone) et skjermfyllende lag.
   const stageRef = useRef(null);
   const [nativeFs, setNativeFs] = useState(false);
@@ -1330,6 +1334,7 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                     isolated={floorFilter === floor.id}
                     dimmed={floorFilter !== 'all' && floorFilter !== floor.id && mode === 'interior'}
                     bim={bim}
+                    roomLabels={roomLabels}
                   />
                 );
               })}
@@ -1411,6 +1416,15 @@ export function House3DView({ initialHomeyZoneId, devices, zones, onSetCapabilit
                   autoRotate ? 'border-nx-cyan/60 bg-nx-cyan/15 text-nx-cyan' : 'border-nx-line/70 bg-nx-bg/70 text-nx-mute hover:text-nx-cyan'
                 ].join(' ')}
               ><RotateCw size={10} /> Roter</button>
+              <button
+                onClick={() => setRoomLabels(v => !v)}
+                aria-pressed={roomLabels}
+                aria-label={roomLabels ? 'Skjul romnavn i modellen' : 'Vis romnavn i modellen'}
+                className={[
+                  'inline-flex items-center gap-1 rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em] backdrop-blur',
+                  roomLabels ? 'border-nx-cyan/60 bg-nx-cyan/15 text-nx-cyan' : 'border-nx-line/70 bg-nx-bg/70 text-nx-mute hover:text-nx-cyan'
+                ].join(' ')}
+              ><Tag size={10} /> Romnavn</button>
               {autoRotate && [[0.3, 'Sakte'], [0.6, 'Normal'], [1.5, 'Rask']].map(([v, label]) => (
                 <button key={v} onClick={() => setRotateSpeed(v)} aria-pressed={rotateSpeed === v}
                   className={['rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em] backdrop-blur', rotateSpeed === v ? 'border-nx-cyan/60 bg-nx-cyan/15 text-nx-cyan' : 'border-nx-line/70 bg-nx-bg/70 text-nx-mute hover:text-nx-cyan'].join(' ')}
