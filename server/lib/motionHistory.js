@@ -1,4 +1,7 @@
 // Observe existing Homey snapshots only; never creates a poll or device command.
+// Logger bevegelse/tilstedeværelse og sensorhendelser (dør/vindu, røyk, vann, lås, garasjeport) for Aktivitet.
+export const TRACKED_CAPS=/^(alarm_motion|alarm_presence|alarm_contact|alarm_smoke|alarm_water|alarm_co|locked|garagedoor_closed)(\.|$)/;
+export const MOTION_CAPS=/^(alarm_motion|alarm_presence)(\.|$)/;
 export function createMotionHistory({load,save,now=Date.now}) {
  let queue=Promise.resolve();
  function observe(devices){const task=queue.catch(()=>{}).then(async()=>{
@@ -7,7 +10,7 @@ export function createMotionHistory({load,save,now=Date.now}) {
    if(/tesla/i.test(`${d.name} ${d.driverUri}`))continue;
    const caps=d.capabilitiesObj||{};
    for(const [cap,p]of Object.entries(caps)){
-    if(!/^(alarm_motion|alarm_presence)(\.|$)/.test(cap)||typeof p?.value!=='boolean')continue;
+    if(!TRACKED_CAPS.test(cap)||typeof p?.value!=='boolean')continue;
     const key=`${id}:${cap}`,at=typeof p.lastUpdated==='number'?p.lastUpdated:Date.parse(p.lastUpdated),sourceAt=Number.isFinite(at)?at:null,prev=state.last[key];
     // Out-of-order reports are ignored. Poll observation time is never called event time.
     if(prev?.sourceAt&&sourceAt&&sourceAt<prev.sourceAt)continue;

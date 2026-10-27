@@ -4,6 +4,8 @@ import { recordAction } from '../lib/audit.js';
 import { capValue } from '../lib/validation.js';
 import { Router } from 'express';
 import { homeyClient, motionHistory } from '../lib/homeyClient.js';
+import { MOTION_CAPS } from '../lib/motionHistory.js';
+import { activityFromHistory } from '../lib/activityFeed.js';
 import { isDemoMode } from '../config.js';
 import { buildInventory } from '../lib/inventory.js';
 import {
@@ -44,7 +46,7 @@ function sanitizeMessage(s) {
           .slice(0, 200);
 }
 
-homeyRoutes.get('/motion-history',async(_req,res)=>{try{const state=await motionHistory.read();const zones=await homeyClient.listZones().catch(()=>({}));res.json({startedAt:state.startedAt,retentionDays:7,limit:2000,events:state.events.slice().reverse().map(e=>({...e,room:zones[e.zone]?.name||'Ukjent rom'}))});}catch{res.status(503).json({error:'Bevegelseslogg utilgjengelig'});}});
+homeyRoutes.get('/motion-history',async(_req,res)=>{try{const state=await motionHistory.read();const zones=await homeyClient.listZones().catch(()=>({}));res.json({startedAt:state.startedAt,retentionDays:7,limit:2000,events:state.events.filter(e=>MOTION_CAPS.test(e.capability)).reverse().map(e=>({...e,room:zones[e.zone]?.name||'Ukjent rom'}))});}catch{res.status(503).json({error:'Bevegelseslogg utilgjengelig'});}});
 
 // ── Reads ────────────────────────────────────────────────────────────────
 
@@ -77,7 +79,7 @@ homeyRoutes.get('/energy', safe(
 ));
 
 homeyRoutes.get('/activity', safe(
-  async () => ({ activity: [] }),
+  async () => ({ activity: activityFromHistory((await motionHistory.read()).events, await homeyClient.listZones().catch(() => ({}))) }),
   async () => ({ activity: MOCK_ACTIVITY })
 ));
 
