@@ -18,8 +18,8 @@ export function createSavingsRoutes(client=homeyClient, demo=isDemoMode) {
     // Raw energy responses are intentionally not exposed: units/hierarchy not yet verified.
     const metadata=({quality,updatedAt,retryAt,reason})=>({quality,updatedAt,retryAt,reason,schemaVerified:false});
     // Only fields required by energy insight leave the server.
-    const safeDevices=Object.fromEntries(Object.entries(d.value||{}).map(([id,v])=>[id,{id,name:v.name,zone:v.zone,class:v.class,available:v.available,capabilitiesObj:Object.fromEntries(['measure_power','meter_power','onoff'].filter(k=>v.capabilitiesObj?.[k]).map(k=>[k,{value:v.capabilitiesObj[k].value,lastUpdated:v.capabilitiesObj[k].lastUpdated,units:v.capabilitiesObj[k].units,title:v.capabilitiesObj[k].title}]))}]));
-    const safeZones=Object.fromEntries(Object.entries(z.value||{}).map(([id,v])=>[id,{name:v.name}]));
+    const safeDevices=Object.fromEntries(Object.entries(d.value||{}).map(([id,v])=>[id,{id,name:v.name,zone:v.zone,class:v.class,available:v.available,capabilitiesObj:Object.fromEntries(['measure_power','meter_power','onoff','target_temperature'].filter(k=>v.capabilitiesObj?.[k]).map(k=>[k,{value:v.capabilitiesObj[k].value,lastUpdated:v.capabilitiesObj[k].lastUpdated,units:v.capabilitiesObj[k].units,title:v.capabilitiesObj[k].title}]))}]));
+    const safeZones=Object.fromEntries(Object.entries(z.value||{}).map(([id,v])=>[id,{name:v.name,parent:v.parent||null}]));
     res.json({date,devices:{...d,value:safeDevices},zones:{...z,value:safeZones},live:metadata(l),day:metadata(h),executionEnabled:false,analysis:'rules'});
   });
   // No action endpoint exists, even if a caller manually crafts a request.
