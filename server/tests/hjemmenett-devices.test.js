@@ -68,3 +68,19 @@ test('presence groups devices per person; home if any device online, home first'
  assert.equal(people[1].devices[0].status,'ikke funnet i hjemmenett');
  assert.deepEqual(presencePeople({},net),[]);
 });
+
+test('observatory snapshot from hjemmenett: 15-min window, no owner/room, honest states',async()=>{
+ const {snapshotFromDevices}=await import('../lib/hjemmenettClient.js');
+ const {deviceState,collectorReporting,recentMinutes}=await import('../../client/src/lib/networkModel.js');
+ const at='2026-10-27T06:00:00.000Z',now=Date.parse(at);
+ const devs=[{id:'02:00:00:00:00:01',name:'A',online:true,status:'på nett nå',ip:'192.168.10.2',owner:'Ole',room:'Stue'},{id:'02:00:00:00:00:02',name:'B',online:false,status:'sist sett 2 t siden',ip:null}];
+ const s=snapshotFromDevices(devs,at);
+ assert.equal(s.devices[0].owner,undefined);assert.equal(s.devices[0].room,undefined);
+ assert.equal(recentMinutes(s),15);
+ assert.equal(deviceState(s.devices[0],s,now),'observed');
+ assert.equal(deviceState(s.devices[1],s,now),'stale');
+ assert.equal(deviceState(s.devices[0],s,now+300001),'stale');
+ assert.equal(collectorReporting(s,now),true);
+ const none=snapshotFromDevices(devs.map(d=>({...d,online:false})),at);
+ assert.equal(none.collector.status,'unknown');assert.equal(collectorReporting(none,now),false);
+});
