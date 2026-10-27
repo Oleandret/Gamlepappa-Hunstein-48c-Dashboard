@@ -5,6 +5,7 @@ import { normalizeHeatingPoints } from '../../lib/heatingModel.js';
 import './heating.css';
 import { HeatingConnection } from './HeatingConnection.jsx';
 import { HeatingSettings } from './HeatingSettings.jsx';
+import { HeatingCharts } from './HeatingCharts.jsx';
 const labels = { measured: 'Nylig kildetid', stale: 'Eldre kildetid / cache', missing: 'Mangler', 'unknown-time': 'Ukjent kildetid' };
 const time = value => value == null ? 'Ukjent' : new Date(value).toLocaleString('nb-NO', { timeZone: 'Europe/Oslo' });
 const display = value => value == null ? '—' : typeof value === 'boolean' ? (value ? 'Ja' : 'Nei') : typeof value === 'number' ? value.toLocaleString('nb-NO', { maximumFractionDigits: 3 }) : value;
@@ -12,6 +13,8 @@ export default function HeatingView() {
   const [data, setData] = useState(null), [error, setError] = useState(false), [clock, setClock] = useState(Date.now());
   const [connectionVersion,setConnectionVersion]=useState(0);
   const [search, setSearch] = useState(''), [category, setCategory] = useState('');
+  const [tab, setTab] = useState(() => { try { return localStorage.getItem('nexora.heating.tab') === 'grafer' ? 'grafer' : 'oversikt'; } catch { return 'oversikt'; } });
+  useEffect(() => { try { localStorage.setItem('nexora.heating.tab', tab); } catch {} }, [tab]);
   useEffect(() => {
     const controller = new AbortController(); let alive = true, timer;
     async function load() {
@@ -33,6 +36,8 @@ export default function HeatingView() {
   const alarmsFresh = sourceFresh && data?.alarms?.available && data.alarms.fetchedAt != null && clock - data.alarms.fetchedAt <= 900000;
   return <section className="heating" aria-labelledby="heating-title">
     <header className="heating-head"><div><p className="heating-eyebrow">VARMEPUMPE · HUNSTEIN</p><h1 id="heating-title">Varmestyring</h1><p>NIBE F1255-12 R EM</p></div><span className="heating-badge">{data?.connection?.writeGranted ? 'Lesing og styring' : 'Kun lesing'}</span></header>
+    <div className="heating-tabs" role="tablist" aria-label="Varmestyring">{[['oversikt','Oversikt'],['grafer','Grafer']].map(([id,label])=><button key={id} role="tab" aria-selected={tab===id} onClick={()=>setTab(id)}>{label}</button>)}</div>
+    {tab==='grafer'?<HeatingCharts/>:<>
     <div className="heating-status" role="status"><h2>{error ? 'Varmedata er utilgjengelig' : !data ? 'Henter tilkoblingsstatus…' : data.status === 'not_connected' ? 'myUplink er ikke tilkoblet' : sourceFresh ? 'Varmedata tilgjengelig' : 'Kilden er foreldet eller utilgjengelig'}</h2><p>{error ? 'Eventuelle tidligere målinger vises som foreldet.' : data?.reason}</p>{data?.status === 'not_connected' && <p>Lesetilgang og riktig enhet må godkjennes før tilkobling. Innstillinger kan bare endres etter at skrivetilgang er godkjent.</p>}</div>
     <HeatingConnection connection={data?.connection} onChange={()=>setConnectionVersion(v=>v+1)} />
     <HeatingSettings connection={data?.connection} onChanged={()=>setConnectionVersion(v=>v+1)} />
@@ -42,5 +47,6 @@ export default function HeatingView() {
     {rows.length ? <div className="heating-table"><table><thead><tr><th>Målepunkt</th><th>Verdi</th><th>Kategori</th><th>Kildens tidspunkt</th><th>Datakvalitet</th></tr></thead><tbody>{rows.map((p,i) => <tr key={`${p.id}-${i}`}><td>{p.name || 'Uten navn'}<small>ID {p.id}</small></td><td>{p.invalidSentinel?'Ugyldig kildeverdi':p.enumLabel||`${display(p.value)} ${p.unit||''}`}{p.enumLabel&&<small>Kode {display(p.value)} · enhet fra API tolkes ikke som fysisk måling</small>}</td><td>{p.category || 'Ukjent'}</td><td>{time(p.measuredAt)}</td><td>{labels[p.quality === 'measured' && !sourceFresh ? 'stale' : p.quality]}</td></tr>)}</tbody></table></div> : <p className="heating-empty">{normalized.points.length ? 'Ingen målepunkter passer søket.' : 'Ingen målinger tilgjengelig ennå. Manglende data vises aldri som null forbruk.'}</p>}
     {(normalized.skipped > 0 || normalized.truncated) && <p>Ugyldige punkter utelatt: {normalized.skipped}. {normalized.truncated && 'Visningen er begrenset til 1000 punkter.'}</p>}</article>
     <aside className="heating-panel"><h2>Hva tallene kan fortelle</h2><p>EM gjelder avgitt varmeenergi. Det er ikke det samme som strømforbruk. COP og besparelser krever verifiserte, sammenlignbare målinger av både tilført strøm og avgitt varme.</p><p>Serveren har separat historikklogging. AI-optimalisering er ikke aktivert. Innstillinger endres bare når eieren bekrefter det, og hver endring logges. Ingen temperaturgrenser eller parameter-ID-er er gjettet.</p></aside>
+    </>}
   </section>;
 }
