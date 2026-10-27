@@ -68,6 +68,8 @@ const EnergyView = lazy(() =>
 );
 
 const POLL_MS = 12000;
+// Sidene som viser data.energy; bare der varsles det om energidatakvaliteten.
+const ENERGY_SECTIONS = new Set(['oversikt', 'energi']);
 
 export default function App() {
   const [system, setSystem] = useState(null);
@@ -194,6 +196,10 @@ export default function App() {
     favorites: favorites.ids.length
   }), [data.devices, data.flows, data.zones, favorites.ids]);
 
+  // Enhetsstatus brukes på alle sider; energidata bare på Oversikt (energigrafen) og Energi.
+  const deviceNotice = data.quality?.devices !== 'live';
+  const energyNotice = data.quality?.energy !== 'live' && ENERGY_SECTIONS.has(section);
+
   return (
     <div data-active-section={section} className="relative min-h-screen bg-nx-bg bg-scanlines overflow-hidden">
 
@@ -224,7 +230,7 @@ export default function App() {
             </div>
           )}
 
-          {loaded && (system?.demo || data.quality?.devices !== 'live' || data.quality?.energy !== 'live') && <p role="status" className="quality-notice">{system?.demo ? 'Demonstrasjon · syntetiske testdata, ikke faktiske målinger.' : `Datakvalitet: enheter ${data.quality?.devices || 'ukjent'} · energi ${data.quality?.energy || 'ukjent'}. Eldre data er ikke bekreftet nå-status.`}</p>}
+          {loaded && (system?.demo || deviceNotice || energyNotice) && <p role="status" className="quality-notice">{system?.demo ? 'Demonstrasjon · syntetiske testdata, ikke faktiske målinger.' : `Datakvalitet: ${[deviceNotice && `enheter ${data.quality?.devices || 'ukjent'}`, energyNotice && `energi ${data.quality?.energy || 'ukjent'}`].filter(Boolean).join(' · ')}. Eldre data er ikke bekreftet nå-status.`}</p>}
           {loaded && (
             <SectionBoundary key={section}><SectionView
               onOpen3D={zoneId=>{setFocusZoneId(zoneId);setSection('hus-3d');}}
