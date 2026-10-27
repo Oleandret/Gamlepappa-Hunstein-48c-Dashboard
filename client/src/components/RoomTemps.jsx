@@ -1,53 +1,12 @@
 import { useMemo } from 'react';
+import { indoorTemperatureGroups } from '../lib/roomTemps.js';
 
 /**
- * Romtemperaturer — gruppert per sone og gjennomsnitt av alle innendørs
- * temperatursensorer i rommet. Filtrerer bort kjøleskap/fryser, ute-sensorer
- * og termostater på vannvarmere så ikke ekstreme verdier skjevvrir bildet.
+ * Romtemperaturer — gjennomsnitt av innendørs temperaturfølere per sone.
+ * Utvalget (uten ute-, garasje-, kjøl- og frysfølere) ligger i lib/roomTemps.js.
  */
-
-const EXCLUDE_NAME_RE = /(kj.l|frys|fridge|freezer|ovn|oven|varmtvann|water heater|sauna|ute(?![ns])|outdoor|outside|grill|peis)/i;
-const EXCLUDE_CLASS = new Set(['fridge', 'freezer']);
-
 export function RoomTemps({ devices, zones }) {
-  const groups = useMemo(() => {
-    const all = Object.values(devices || {});
-    const byZone = new Map();
-
-    for (const d of all) {
-      const t = d.capabilities?.measure_temperature ?? d.capabilitiesObj?.measure_temperature?.value;
-      if (typeof t !== 'number' || !Number.isFinite(t)) continue;
-
-      // Filtrer bort kjøl/frys/utendørs ut fra navn og klasse
-      if (EXCLUDE_CLASS.has(d.class)) continue;
-      if (EXCLUDE_NAME_RE.test(d.name || '')) continue;
-
-      // Filtrer bort sensorer i ute/uteareal-soner
-      const zone = zones?.[d.zone];
-      const zoneName = zone?.name || '';
-      if (/^ute$|utvendig|hage(?! .*innendørs)|garasje\b/i.test(zoneName) && zoneName !== 'Hage' /* hagen ok */) {
-        // garasje OK å vise — kommenter ut hvis du vil utelukke
-      }
-
-      if (!zone) continue;
-      if (!byZone.has(zone.id)) byZone.set(zone.id, { id: zone.id, name: zone.name || 'Rom', temps: [], targets: [] });
-      const g = byZone.get(zone.id);
-      g.temps.push(t);
-      const target = d.capabilities?.target_temperature ?? d.capabilitiesObj?.target_temperature?.value;
-      if (Number.isFinite(target)) g.targets.push(target);
-    }
-
-    const list = [...byZone.values()].map(g => ({
-      id: g.id,
-      name: g.name,
-      temp: g.temps.reduce((a, b) => a + b, 0) / g.temps.length,
-      target: g.targets.length ? g.targets.reduce((a, b) => a + b, 0) / g.targets.length : null,
-      sensorCount: g.temps.length
-    }));
-
-    // Sorter alfabetisk og kapp til topp 6 så widgeten ikke blir for høy
-    return list.sort((a, b) => a.name.localeCompare(b.name)).slice(0, 6);
-  }, [devices, zones]);
+  const groups = useMemo(() => indoorTemperatureGroups(devices, zones), [devices, zones]);
 
   // Dynamisk skala basert på data, med litt margin
   const temps = groups.map(g => g.temp);
