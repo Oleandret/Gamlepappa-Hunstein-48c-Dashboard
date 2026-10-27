@@ -82,3 +82,30 @@ export async function readHjemmenettDevices() {
   try { return { connected: true, ...(await reader()) }; }
   catch { return { connected: false, reason: 'unavailable', devices: [] }; }
 }
+
+/**
+ * Observatoriet (/api/network/v1/snapshot) bygget fra list_devices når ingen
+ * lokal snapshot-fil er satt opp. Monitoren gir bare «på nett» (sett siste 15
+ * minutter) og en lesbar «sist sett»-tekst, ikke tidsstempler per enhet, så
+ * last_seen er null og «nylig» betyr 15 minutter. Eier og rom tas ikke med:
+ * observatoriet viser tekniske observasjoner, ikke hvem som er hjemme.
+ */
+export const HJEMMENETT_RECENT_MINUTES = 15;
+export function snapshotFromDevices(devices, fetchedAt) {
+  const anyOnline = devices.some(d => d.online);
+  return {
+    schema_version: 1, snapshot_id: null, source: 'hjemmenett-monitor', recent_minutes: HJEMMENETT_RECENT_MINUTES,
+    observed_at: fetchedAt, received_at: fetchedAt,
+    // Minst én enhet sett siste 15 min betyr at innsamleren hjemme har rapportert i det tidsrommet.
+    collector: { status: anyOnline ? 'ok' : 'unknown', last_seen: anyOnline ? fetchedAt : null },
+    devices: devices.map(d => ({ id: d.id, label: d.name, last_seen: null, seen_text: d.status, status: d.online ? 'observed' : 'stale',
+      source: 'hjemmenett', ip: d.ip, mac: d.id, manufacturer: null })),
+    links: [], events: [], history: [], presence: []
+  };
+}
+
+export async function readHjemmenettSnapshot() {
+  const r = await readHjemmenettDevices();
+  if (!r.connected) return { connected: false, reason: r.reason, snapshot: null };
+  return { connected: true, snapshot: snapshotFromDevices(r.devices, r.fetchedAt) };
+}
