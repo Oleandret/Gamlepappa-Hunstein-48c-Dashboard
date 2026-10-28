@@ -87,7 +87,7 @@ body {
 main>footer{gap:12px;flex-wrap:wrap}
 :focus-visible{outline:2px solid #63e6be;outline-offset:3px}
 @media(max-width:767px){
- aside[aria-label="Hoved-navigasjon"],aside[aria-label="Telefon"]{display:none}
+ aside[aria-label="Hoved-navigasjon"]{display:none}
  [data-active-section] main{padding:16px 12px 80px}
  [data-active-section] nav[aria-label="Seksjons-navigasjon"]{display:none}
  .mobile-section-picker{display:grid;gap:6px;min-width:0;flex:1;color:#9aacbf;font-size:11px}
