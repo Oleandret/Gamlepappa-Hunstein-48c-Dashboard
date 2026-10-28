@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ExternalLink, RefreshCw, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 import { apiFetch } from '../../lib/api.js';
 
@@ -37,15 +37,31 @@ export function IphoneView() {
   }
   useEffect(() => { open(); }, []);
 
-  /** Zoom slik at telefonbildet (pluss toppfeltet over) passer i rammens høyde. */
+  // Rammen fyller resten av vinduet fra der den starter, så siden ikke må rulles.
+  const [stagePx, setStagePx] = useState(600);
+  useLayoutEffect(() => {
+    if (state.status !== 'ready') return;
+    const update = () => {
+      const el = stageRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      setStagePx(Math.max(420, Math.floor(window.innerHeight - top - 16)));
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [state.status]);
+
+  /** Zoom slik at telefonbildet og knappene ved siden av (pluss toppfeltet over) passer i rammens høyde. */
   const measure = useCallback(() => {
     const stage = stageRef.current, doc = frameRef.current?.contentDocument;
     const phone = doc?.querySelector('.phone');
     // Bare når telefonbildet faktisk vises (ikke under innlogging eller før siden er bygd opp).
     if (!stage || !phone || phone.getBoundingClientRect().height < 100) return null;
-    const rect = phone.getBoundingClientRect();          // i rammens egne (uskalerte) koordinater
     const scrollTop = doc.scrollingElement?.scrollTop || 0;
-    const needed = rect.bottom + scrollTop + 16;
+    // I rammens egne (uskalerte) koordinater: det nederste av telefonen og knappestolpen.
+    const bottom = Math.max(...[phone, doc.querySelector('nav.sidebar')].filter(Boolean).map(el => el.getBoundingClientRect().bottom));
+    const needed = bottom + scrollTop + 16;
     if (!(needed > 0)) return null;
     return { stage: stage.clientHeight, needed };
   }, []);
@@ -66,7 +82,6 @@ export function IphoneView() {
     attempt();
   };
 
-  const stageHeight = 'max(560px, calc(100vh - 230px))';
 
   return (
     <section className="space-y-3">
@@ -93,7 +108,7 @@ export function IphoneView() {
       {state.status === 'not-configured' && <p className="panel p-5 text-sm">Iphone-fjernstyring er ikke satt opp på serveren ennå. Sett <code>IPHONE_REMOTE_URL</code>, <code>IPHONE_REMOTE_USER</code> og <code>IPHONE_REMOTE_PASSWORD</code> i Railway.</p>}
       {state.status === 'error' && <p className="panel p-5 text-sm">Fikk ikke kontakt med serveren. <button className="chip ml-2" onClick={open}>Prøv igjen</button></p>}
       {state.status === 'ready' && (
-        <div ref={stageRef} className="relative w-full overflow-hidden rounded-2xl border border-nx-line/60 bg-black" style={{ height: stageHeight }}>
+        <div ref={stageRef} className="relative w-full overflow-hidden rounded-2xl border border-nx-line/60 bg-black" style={{ height: stagePx }}>
           <iframe
             key={frameKey}
             ref={frameRef}
@@ -102,7 +117,7 @@ export function IphoneView() {
             title="Iphone fjernstyring"
             className="block border-0 bg-black"
             // Rammen tegnes større/mindre og skaleres, så den alltid fyller flaten.
-            style={{ width: `${100 / zoom}%`, height: `calc(${stageHeight} / ${zoom})`, transform: `scale(${zoom})`, transformOrigin: '0 0' }}
+            style={{ width: `${100 / zoom}%`, height: `${stagePx / zoom}px`, transform: `scale(${zoom})`, transformOrigin: '0 0' }}
             allow="clipboard-write"
             referrerPolicy="same-origin"
           />
