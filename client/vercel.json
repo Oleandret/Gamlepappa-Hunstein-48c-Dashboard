@@ -7,15 +7,25 @@
   "rewrites": [
     { "source": "/api/:path*", "destination": "https://gamlepappa-hunstein-48c-dashboard-production.up.railway.app/api/:path*" },
     { "source": "/auth/:path*", "destination": "https://gamlepappa-hunstein-48c-dashboard-production.up.railway.app/auth/:path*" },
+    { "source": "/iphone", "destination": "https://gamlepappa-hunstein-48c-dashboard-production.up.railway.app/iphone/" },
+    { "source": "/iphone/:path*", "destination": "https://gamlepappa-hunstein-48c-dashboard-production.up.railway.app/iphone/:path*" },
     { "source": "/((?!assets/|models/|.*\\.[a-z0-9]+$).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
-      "source": "/(.*)",
+      "source": "/((?!iphone(?:/|$)).*)",
       "headers": [
         { "key": "X-Content-Type-Options", "value": "nosniff" },
         { "key": "Referrer-Policy", "value": "same-origin" },
         { "key": "X-Frame-Options", "value": "DENY" }
+      ]
+    },
+    {
+      "source": "/iphone/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "same-origin" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" }
       ]
     },
     {

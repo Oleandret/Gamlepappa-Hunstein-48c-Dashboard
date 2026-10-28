@@ -7,6 +7,7 @@ import {startReminderWorker,stopReminderWorker} from './lib/reminders.js';
 import {roomPhotoRoutes} from './routes/roomPhotos.js';
 import {house3dChangeRoutes} from './routes/house3dChanges.js';
 import {networkRoutes} from './routes/network.js';
+import {createIphoneProxy} from './lib/iphoneProxy.js';
 import {priceRoutes} from './routes/prices.js';
 import {startPriceLogger,stopPriceLogger,priceLogStatus} from './workers/priceLogger.js';
 import {startHeatingLogger,stopHeatingLogger,heatingLogStatus} from './workers/heatingLogger.js';
@@ -38,6 +39,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+const iphone = createIphoneProxy();
 let ready = false;
 const PORT = process.env.PORT || 8080;
 const isProd = process.env.NODE_ENV === 'production';
@@ -79,6 +81,7 @@ app.use('/api/savings', savingsRoutes);
 app.get('/api/prices/status', (_req,res)=>res.json(priceLogStatus));
 app.use('/api/prices',priceRoutes);
 app.use('/api/network',networkRoutes);
+app.use('/api/iphone',iphone.sessionRoute);
 app.use('/api/history',historyRoutes);
 app.use('/api/room-photos',roomPhotoRoutes);
 app.use('/api/house3d/changes',house3dChangeRoutes);
@@ -103,6 +106,9 @@ app.get('/readyz', (_req,res) => res.status(ready ? 200 : 503).json({ready}));
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'not found' });
 });
+
+// Iphone-fanen: iphone-remote via dashboardet, ferdig innlogget (krever billett fra /api/iphone/session).
+app.use('/iphone',iphone.proxy);
 
 // Static frontend (override path with CLIENT_DIST env if needed)
 const clientDist = process.env.CLIENT_DIST

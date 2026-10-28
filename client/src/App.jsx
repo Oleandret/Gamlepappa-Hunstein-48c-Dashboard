@@ -2,6 +2,7 @@ import {SectionBoundary} from './components/SectionBoundary.jsx';
 import {PlanHouseView} from './components/views/PlanHouseView.jsx';
 import {HistoryView} from './components/views/HistoryView.jsx';
 import {NetworkView} from './components/views/NetworkView.jsx';
+import {IphoneView} from './components/views/IphoneView.jsx';
 import {HusetView} from './components/huset/HusetView.jsx';
 import { VeiledningerView } from './components/huset/VeiledningerView.jsx';
 import { VoiceAssistant } from './components/VoiceAssistant.jsx';
@@ -274,6 +275,7 @@ export default function App() {
 function SectionView({ onOpen3D, focusZoneId, section, system, data, counts, setCapability, runFlow, favorites, pinConfig, imageConfig, frontSensors, flowFavorites, links, floorPlanPins, planFlows, frontSpecials }) {
   if (section === 'historikk') return <HistoryView/>;
   if (section === 'nettverk') return <NetworkView />;
+  if (section === 'iphone') return <IphoneView />;
   if (section === 'huset') return <HusetView />;
   if (section === 'veiledninger') return <VeiledningerView />;
   const userName = system?.user || 'Ole';
