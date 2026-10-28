@@ -82,7 +82,11 @@ export function createAvvikRoutes({ read = () => getNamespace(NS), update = fn =
       // SMS sendes i bakgrunnen (telefonen bruker noen sekunder); resultatet lagres på avviket.
       const varsling = { kanal: 'sms', status: 'sender', at: clock().toISOString() };
       const saved = await update(prev => list(prev).map(a => a.id === item.id ? { ...a, varsel: varsling } : a)).catch(() => items);
-      Promise.resolve().then(() => notify(item)).then(varsel => varsel && update(prev => list(prev).map(a => a.id === item.id ? { ...a, varsel } : a))).catch(() => {});
+      Promise.resolve().then(() => notify(item)).then(varsel => {
+        // Status og navn i loggen, aldri telefonnummer eller meldingstekst.
+        if (varsel) console.info(`[avvik] sms til ${item.person}: ${varsel.status}${varsel.feil ? ` (${varsel.feil})` : ''}`);
+        return varsel && update(prev => list(prev).map(a => a.id === item.id ? { ...a, varsel } : a));
+      }).catch(() => {});
       res.status(201).json({ item: { ...item, varsel: varsling }, rule, ...payload(saved) });
     } catch { res.status(503).json({ error: 'Avviket kunne ikke lagres' }); }
   });

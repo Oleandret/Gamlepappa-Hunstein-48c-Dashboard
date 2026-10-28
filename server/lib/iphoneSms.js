@@ -86,26 +86,44 @@ export function createIphoneSms({ env = process.env, fetchImpl = fetch, sleep = 
   }
   const elements = async id => parseElements(await tool('mobile_list_elements_on_screen', { device: id, format: 'json' }));
 
-  async function sendNow(to, text) {
+  // step(tekst) gir en steg-for-steg-logg (brukes av «Send SMS med iPhone» i Huset).
+  async function sendNow(to, text, step) {
     const url = smsUrl(to, text.slice(0, 1000));
-    const id = await phone();
-    await remotePost('/api/unlock', {}).catch(() => {});
-    await remotePost('/api/url', { url });
+    const id = await phone(); step('Fant telefonen via MCP');
+    await remotePost('/api/unlock', {}).then(() => step('Låste opp telefonen'), () => step('Kunne ikke låse opp (fortsetter)'));
+    await remotePost('/api/url', { url }); step('Åpnet Meldinger med mottaker og tekst');
     let button = null;
     for (let i = 0; i < 8 && !button; i++) { await sleep(i ? 1000 : 1500); button = findSendButton(await elements(id)); }
     if (!button) throw new Error('Fant ikke Send-knappen i Meldinger');
-    await tool('mobile_click_on_screen_at_coordinates', { device: id, x: button.x, y: button.y });
+    step(`Fant Send-knappen (${button.x}, ${button.y})`);
+    await tool('mobile_click_on_screen_at_coordinates', { device: id, x: button.x, y: button.y }); step('Trykket Send');
     await sleep(1500);
     // Send-knappen forsvinner når tekstfeltet er tomt, altså når meldingen er sendt.
     if (findSendButton(await elements(id))) throw new Error('Meldingen ser ikke ut til å være sendt');
-    await tool('mobile_press_button', { device: id, button: 'HOME' }).catch(() => {});
+    step('Bekreftet: meldingen er sendt');
+    await tool('mobile_press_button', { device: id, button: 'HOME' }).then(() => step('Tilbake til hjem-skjermen'), () => {});
+  }
+
+  /** Sjekker koblingen uten å sende noe: innlogging, MCP, telefon og at skjermen kan leses. */
+  async function checkNow(step) {
+    await login(); step('Innlogging hos iphone-remote OK');
+    device = null;
+    const id = await phone(); step(`MCP svarer, telefon tilkoblet (${id.slice(0, 8)}…)`);
+    const els = await elements(id); step(`Leste skjermen: ${els.length} elementer`);
+    return { device: id, elements: els.length };
   }
 
   return {
     configured: () => iphoneSmsConfigured(env),
-    send(to, text) {
+    send(to, text, { onStep = () => {} } = {}) {
       if (!iphoneSmsConfigured(env)) return Promise.reject(new Error('SMS via iPhonen er ikke satt opp'));
-      const job = queue.catch(() => {}).then(() => sendNow(to, text));
+      const job = queue.catch(() => {}).then(() => sendNow(to, text, onStep));
+      queue = job;
+      return job;
+    },
+    check({ onStep = () => {} } = {}) {
+      if (!iphoneSmsConfigured(env)) return Promise.reject(new Error('SMS via iPhonen er ikke satt opp'));
+      const job = queue.catch(() => {}).then(() => checkNow(onStep));
       queue = job;
       return job;
     }
