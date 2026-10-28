@@ -1,126 +1,98 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ExternalLink, RefreshCw, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
-import { apiFetch } from '../../lib/api.js';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { ExternalLink, RefreshCw, Globe, Activity } from 'lucide-react';
+import { phoneApi } from '../../lib/iphoneRemote.js';
+import { usePhoneRemote, PhoneScreen, PhoneButtons, PhoneKeyboard, PhoneSessionNotice } from '../PhoneRemote.jsx';
 
 /**
- * Iphone: iphone-remote vist i dashboardet, ferdig innlogget. Serveren holder
- * innloggingen mot iphone-remote; her hentes bare en kortlivet billett
- * (cookie for /iphone/) før rammen lastes.
- *
- * Zoom skalerer hele rammen med CSS (transform), så trykk og sveip fortsatt
- * treffer riktig inne i appen. «Tilpass» måler telefonbildet i rammen og
- * velger zoom slik at hele iPhonen får plass i høyden.
+ * Iphone: fjernstyring av «Mini sin iPhone» i dashboardets egen stil.
+ * Knapper til venstre, telefonskjermen så stor som høyden tillater i midten,
+ * og tastatur, «Åpne URL» og aktivitet til høyre. Flaten fyller resten av
+ * vinduet, så hele telefonen synes uten å rulle. «Eget vindu» åpner hele
+ * iphone-remote-siden (via dashboardet, ferdig innlogget).
  */
-const ZOOM_MIN = 0.3, ZOOM_MAX = 1.5, ZOOM_STEP = 0.1, ZOOM_KEY = 'nexora.iphone.zoom';
-const clamp = z => Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z)) * 100) / 100;
-function savedZoom() { try { const z = Number(localStorage.getItem(ZOOM_KEY)); return Number.isFinite(z) && z > 0 ? clamp(z) : null; } catch { return null; } }
+const time = t => new Date(t).toLocaleTimeString('nb-NO', { timeZone: 'Europe/Oslo', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
 export function IphoneView() {
-  const [state, setState] = useState({ status: 'loading' });
-  const [frameKey, setFrameKey] = useState(0);
-  const [zoom, setZoom] = useState(() => savedZoom() ?? 1);
-  const autoFit = useRef(savedZoom() === null);   // første gang: tilpass automatisk
-  const stageRef = useRef(null), frameRef = useRef(null);
-
-  useEffect(() => { try { localStorage.setItem(ZOOM_KEY, String(zoom)); } catch {} }, [zoom]);
-
-  async function open() {
-    setState({ status: 'loading' });
-    try {
-      const r = await apiFetch('/api/iphone/session', { method: 'POST' });
-      if (r.status === 403) return setState({ status: 'forbidden' });
-      if (!r.ok) throw new Error();
-      const d = await r.json();
-      setState(d.configured ? { status: 'ready', path: d.path } : { status: 'not-configured' });
-      setFrameKey(k => k + 1);
-    } catch { setState({ status: 'error' }); }
-  }
-  useEffect(() => { open(); }, []);
-
-  // Rammen fyller resten av vinduet fra der den starter, så siden ikke må rulles.
+  const remote = usePhoneRemote(true);
+  const ready = remote.status.ready;
+  const stageRef = useRef(null);
   const [stagePx, setStagePx] = useState(600);
+  const [url, setUrl] = useState('');
+
+  // Flaten fyller resten av vinduet fra der den starter.
   useLayoutEffect(() => {
-    if (state.status !== 'ready') return;
+    if (remote.session.status !== 'ready') return;
     const update = () => {
       const el = stageRef.current;
       if (!el) return;
-      const top = el.getBoundingClientRect().top + window.scrollY;
-      setStagePx(Math.max(420, Math.floor(window.innerHeight - top - 16)));
+      setStagePx(Math.max(460, Math.floor(window.innerHeight - (el.getBoundingClientRect().top + window.scrollY) - 16)));
     };
     update();
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
-  }, [state.status]);
-
-  /** Zoom slik at telefonbildet og knappene ved siden av (pluss toppfeltet over) passer i rammens høyde. */
-  const measure = useCallback(() => {
-    const stage = stageRef.current, doc = frameRef.current?.contentDocument;
-    const phone = doc?.querySelector('.phone');
-    // Bare når telefonbildet faktisk vises (ikke under innlogging eller før siden er bygd opp).
-    if (!stage || !phone || phone.getBoundingClientRect().height < 100) return null;
-    const scrollTop = doc.scrollingElement?.scrollTop || 0;
-    // I rammens egne (uskalerte) koordinater: det nederste av telefonen og knappestolpen.
-    const bottom = Math.max(...[phone, doc.querySelector('nav.sidebar')].filter(Boolean).map(el => el.getBoundingClientRect().bottom));
-    const needed = bottom + scrollTop + 16;
-    if (!(needed > 0)) return null;
-    return { stage: stage.clientHeight, needed };
-  }, []);
-  // Ny bredde kan endre appens oppsett, så mål én gang til etter første justering.
-  const fit = useCallback(() => {
-    const m = measure();
-    if (!m) return false;
-    setZoom(clamp(m.stage / m.needed));
-    setTimeout(() => { const again = measure(); if (again) setZoom(clamp(again.stage / again.needed)); }, 350);
-    return true;
-  }, [measure]);
-
-  const onLoad = () => {
-    if (!autoFit.current) return;
-    // Siden bygger seg opp etter innlasting; prøv igjen et par ganger til telefonbildet finnes.
-    let tries = 0;
-    const attempt = () => { if (fit() || ++tries > 10) { autoFit.current = false; return; } setTimeout(attempt, 300); };
-    attempt();
-  };
-
+  }, [remote.session.status]);
 
   return (
     <section className="space-y-3">
       <header className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <p className="panel-title">Fjernstyring</p>
-          <h1 className="text-2xl font-semibold mt-1">Iphone</h1>
+          <h1 className="text-2xl font-semibold mt-1 flex items-center gap-2">Iphone
+            <span className={`h-2.5 w-2.5 rounded-full ${ready ? 'bg-nx-green' : ready === false ? 'bg-nx-red' : 'bg-nx-mute'}`} title={ready ? 'WebDriverAgent klar' : ready === false ? 'WebDriverAgent svarer ikke' : 'Kobler til'} />
+            <span className="text-xs font-normal text-nx-mute">{ready ? 'Telefonen er klar' : ready === false ? 'Telefonen svarer ikke' : ''}</span>
+          </h1>
         </div>
-        {state.status === 'ready' && (
-          <div className="flex gap-2 flex-wrap items-center">
-            <div className="inline-flex items-center rounded-lg border border-nx-line/70 bg-nx-panel/40" role="group" aria-label="Zoom">
-              <button className="px-2.5 py-1.5 text-nx-mute hover:text-nx-cyan disabled:opacity-40" onClick={() => setZoom(z => clamp(z - ZOOM_STEP))} disabled={zoom <= ZOOM_MIN} aria-label="Zoom ut"><ZoomOut size={16} /></button>
-              <button className="min-w-[56px] px-1 py-1.5 font-mono text-xs text-nx-text hover:text-nx-cyan" onClick={() => setZoom(1)} title="Tilbake til 100 %">{Math.round(zoom * 100)} %</button>
-              <button className="px-2.5 py-1.5 text-nx-mute hover:text-nx-cyan disabled:opacity-40" onClick={() => setZoom(z => clamp(z + ZOOM_STEP))} disabled={zoom >= ZOOM_MAX} aria-label="Zoom inn"><ZoomIn size={16} /></button>
-            </div>
-            <button className="chip inline-flex items-center gap-1.5" onClick={fit} title="Tilpass slik at hele iPhonen synes"><Maximize size={14} /> Tilpass</button>
-            <button className="chip inline-flex items-center gap-1.5" onClick={() => { autoFit.current = false; open(); }}><RefreshCw size={14} /> Last inn på nytt</button>
-            <a className="chip inline-flex items-center gap-1.5" href={state.path} target="_blank" rel="noopener"><ExternalLink size={14} /> Eget vindu</a>
+        {remote.session.status === 'ready' && (
+          <div className="flex gap-2">
+            <button className="chip inline-flex items-center gap-1.5" onClick={remote.reconnect}><RefreshCw size={14} /> Koble til skjermen på nytt</button>
+            <a className="chip inline-flex items-center gap-1.5" href="/iphone/" target="_blank" rel="noopener"><ExternalLink size={14} /> Eget vindu</a>
           </div>
         )}
       </header>
-      {state.status === 'loading' && <p className="panel p-5 text-sm text-nx-mute">Kobler til telefonen …</p>}
-      {state.status === 'forbidden' && <p className="panel p-5 text-sm">Iphone-fjernstyring krever administratorinnlogging i dashboardet.</p>}
-      {state.status === 'not-configured' && <p className="panel p-5 text-sm">Iphone-fjernstyring er ikke satt opp på serveren ennå. Sett <code>IPHONE_REMOTE_URL</code>, <code>IPHONE_REMOTE_USER</code> og <code>IPHONE_REMOTE_PASSWORD</code> i Railway.</p>}
-      {state.status === 'error' && <p className="panel p-5 text-sm">Fikk ikke kontakt med serveren. <button className="chip ml-2" onClick={open}>Prøv igjen</button></p>}
-      {state.status === 'ready' && (
-        <div ref={stageRef} className="relative w-full overflow-hidden rounded-2xl border border-nx-line/60 bg-black" style={{ height: stagePx }}>
-          <iframe
-            key={frameKey}
-            ref={frameRef}
-            src={state.path}
-            onLoad={onLoad}
-            title="Iphone fjernstyring"
-            className="block border-0 bg-black"
-            // Rammen tegnes større/mindre og skaleres, så den alltid fyller flaten.
-            style={{ width: `${100 / zoom}%`, height: `${stagePx / zoom}px`, transform: `scale(${zoom})`, transformOrigin: '0 0' }}
-            allow="clipboard-write"
-            referrerPolicy="same-origin"
-          />
+
+      <PhoneSessionNotice remote={remote} className="panel p-5 text-sm" />
+
+      {remote.session.status === 'ready' && (
+        <div ref={stageRef} className="grid gap-4 items-stretch" style={{ height: stagePx, gridTemplateColumns: 'minmax(130px, 160px) minmax(0, auto) minmax(260px, 1fr)' }}>
+          <div className="panel p-3 overflow-y-auto">
+            <p className="panel-title mb-2">Knapper</p>
+            <PhoneButtons remote={remote} vertical />
+          </div>
+
+          <div className="flex items-center justify-center min-w-0 h-full">
+            <PhoneScreen remote={remote} />
+          </div>
+
+          <div className="flex flex-col gap-3 min-h-0">
+            <div className="panel p-4 space-y-2">
+              <p className="panel-title">Tastatur</p>
+              <PhoneKeyboard remote={remote} />
+              <p className="text-[11px] text-nx-mute">Trykk i et tekstfelt på telefonen først, så tastaturet er synlig der.</p>
+            </div>
+            <form className="panel p-4 space-y-2" onSubmit={e => { e.preventDefault(); if (url) remote.run(() => phoneApi('/api/url', { url })); }}>
+              <p className="panel-title flex items-center gap-1.5"><Globe size={13} /> Åpne nettadresse</p>
+              <div className="flex gap-1.5">
+                <input value={url} onChange={e => setUrl(e.target.value)} type="url" placeholder="https://…" aria-label="Nettadresse"
+                  className="min-w-0 flex-1 rounded-lg border border-nx-line/60 bg-nx-bg px-2.5 py-2 text-sm text-nx-text" />
+                <button type="submit" disabled={!/^https?:\/\//i.test(url)} className="chip">Åpne</button>
+              </div>
+            </form>
+            <div className="panel p-4 flex-1 min-h-0 overflow-y-auto">
+              <p className="panel-title flex items-center gap-1.5 mb-2"><Activity size={13} /> Aktivitet</p>
+              {!remote.status.activity.length ? <p className="text-xs text-nx-mute">Ingen aktivitet ennå.</p> : (
+                <ul className="space-y-1 text-xs">
+                  {remote.status.activity.map((a, i) => (
+                    <li key={i} className="flex gap-2">
+                      <span className="font-mono text-nx-mute shrink-0">{a.at ? time(a.at) : ''}</span>
+                      <span className={a.who === 'agent' ? 'text-nx-cyan' : ''}>{a.what}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-[10px] text-nx-mute mt-2">Blått = styrt av en AI-agent via MCP.</p>
+            </div>
+            {remote.err && <p role="alert" className="text-xs text-nx-amber">{remote.err}</p>}
+          </div>
         </div>
       )}
     </section>
