@@ -19,7 +19,7 @@ Hver dag til valgt klokkeslett (norsk tid) får beboere med påminnelser slått 
 | Variabel | Formål |
 |---|---|
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | E-post (koder og påminnelser). Med Gmail: `smtp.gmail.com`, port 465 og et app-passord. |
-| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` (eller `TWILIO_MESSAGING_SERVICE_SID`) | SMS (koder og påminnelser). |
+| `IPHONE_REMOTE_URL`, `IPHONE_REMOTE_USER`, `IPHONE_REMOTE_PASSWORD`, `IPHONE_MCP_TOKEN` | SMS fra iPhonen via iphone-remote (koder, påminnelser og varsel om nye avvik til den det gjelder). |
 | `AUTH_PUBLIC_ORIGIN` | Brukes i invitasjonslenker og lenken i påminnelsene. |
 
 Uten e-post/SMS fungerer invitasjonslenker, men koder og påminnelser sendes ikke.

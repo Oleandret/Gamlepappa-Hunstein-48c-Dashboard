@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getNamespace, updateNamespace } from '../lib/configStore.js';
+import { residents as defaultResidents } from '../lib/residents.js';
+import { messaging as defaultMessaging } from '../lib/messaging.js';
 
 // Avvik for bedre livskvalitet: små ting beboerne gjør feil i huset, registrert
 // så det blir bedre å bo her. Lagres i config-storen, men ikke via /api/config,
@@ -30,10 +32,29 @@ export function parseAvvik(body, now = new Date()) {
   return { id: randomUUID(), person, registrertAv, kategori, beskrivelse, forslag, regelId, opprettet: now.toISOString(), status: 'apen', lost: null };
 }
 
+/** SMS-teksten til den avviket gjelder. */
+export function avvikSms(item) {
+  return `Hei ${item.person}! Nytt avvik i Huset (${item.kategori}): ${item.beskrivelse}${item.forslag ? ` Forslag: ${item.forslag}` : ''} Registrert av ${item.registrertAv}.`;
+}
+
+/**
+ * SMS til den avviket gjelder, hvis personen har telefon og SMS-varsel på.
+ * Returnerer varselstatusen som lagres på avviket.
+ */
+export async function notifyAvvik(item, { residents = defaultResidents, messaging = defaultMessaging, clock = () => new Date() } = {}) {
+  const at = () => clock().toISOString();
+  if (!messaging.channels().sms) return { kanal: 'sms', status: 'ikke_satt_opp', at: at() };
+  const b = (await residents.list()).find(r => r.navn === item.person);
+  if (!b?.telefon) return { kanal: 'sms', status: 'mangler_telefon', at: at() };
+  if (!b.smsVarsel) return { kanal: 'sms', status: 'varsel_av', at: at() };
+  try { await messaging.sendSms(b.telefon, avvikSms(item)); return { kanal: 'sms', status: 'sendt', at: at() }; }
+  catch (e) { return { kanal: 'sms', status: 'feilet', feil: String(e.message || 'ukjent feil').slice(0, 200), at: at() }; }
+}
+
 // A suggestion can be proposed as a new house rule; it lands as 'forslag' until someone approves it.
 const proposeToRules = rule => updateNamespace('_husregler', prev => [rule, ...list(prev)].slice(0, 1000));
 
-export function createAvvikRoutes({ read = () => getNamespace(NS), update = fn => updateNamespace(NS, fn), proposeRule = proposeToRules, clock = () => new Date() } = {}) {
+export function createAvvikRoutes({ read = () => getNamespace(NS), update = fn => updateNamespace(NS, fn), proposeRule = proposeToRules, clock = () => new Date(), notify = item => notifyAvvik(item, { clock }) } = {}) {
   const r = Router();
   const payload = items => ({ items: list(items), residents: RESIDENTS, categories: CATEGORIES });
 
@@ -58,7 +79,11 @@ export function createAvvikRoutes({ read = () => getNamespace(NS), update = fn =
         rule = { id: randomUUID(), tekst: item.forslag, kategori: item.kategori, status: 'forslag', av: item.registrertAv, opprettet: item.opprettet, fraAvvik: item.id };
         await proposeRule(rule).catch(() => { rule = null; });
       }
-      res.status(201).json({ item, rule, ...payload(items) });
+      // SMS sendes i bakgrunnen (telefonen bruker noen sekunder); resultatet lagres på avviket.
+      const varsling = { kanal: 'sms', status: 'sender', at: clock().toISOString() };
+      const saved = await update(prev => list(prev).map(a => a.id === item.id ? { ...a, varsel: varsling } : a)).catch(() => items);
+      Promise.resolve().then(() => notify(item)).then(varsel => varsel && update(prev => list(prev).map(a => a.id === item.id ? { ...a, varsel } : a))).catch(() => {});
+      res.status(201).json({ item: { ...item, varsel: varsling }, rule, ...payload(saved) });
     } catch { res.status(503).json({ error: 'Avviket kunne ikke lagres' }); }
   });
 

@@ -14,6 +14,16 @@ const SUGGESTIONS = {
   'Annet': []
 };
 
+// SMS-varsel til den avviket gjelder (sendt fra iPhonen).
+const VARSEL = {
+  sender: p => `Sender SMS til ${p} …`,
+  sendt: p => `SMS sendt til ${p}`,
+  feilet: p => `SMS til ${p} feilet`,
+  varsel_av: p => `Ingen SMS: ${p} har SMS-varsel av`,
+  mangler_telefon: p => `Ingen SMS: mangler telefonnummer for ${p}`,
+  ikke_satt_opp: () => 'Ingen SMS: iPhone-SMS er ikke satt opp'
+};
+
 export function AvvikPanel({ h, me, setMe, standalone }) {
   const [person, setPerson] = useState('');
   const [kategori, setKategori] = useState('Annet');
@@ -116,6 +126,7 @@ export function AvvikPanel({ h, me, setMe, standalone }) {
                 {a.regelId && ruleById[a.regelId] && <p className="text-xs text-nx-mute mt-1">Husregel: {ruleById[a.regelId].tekst}</p>}
                 {a.forslag && <p className="text-xs mt-1 text-nx-cyan/90 break-words">Forslag: {a.forslag}</p>}
                 <p className="text-xs text-nx-mute mt-1">Registrert av {a.registrertAv}, {time(a.opprettet)}{a.lost ? ` · løst ${time(a.lost)}` : ''}</p>
+                {a.varsel && <p className={`text-xs mt-0.5 ${a.varsel.status === 'sendt' ? 'text-nx-green' : a.varsel.status === 'feilet' ? 'text-nx-amber' : 'text-nx-mute'}`} title={a.varsel.feil || undefined}>{VARSEL[a.varsel.status] ? VARSEL[a.varsel.status](a.person) : ''}</p>}
               </div>
               {a.status === 'apen'
                 ? <button type="button" disabled={h.busy} onClick={() => setStatus(a.id, 'lost')} className={iconButton} title="Merk som løst" aria-label="Merk som løst"><Check size={16} /></button>

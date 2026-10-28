@@ -73,7 +73,7 @@ export function BeborePanel({ standalone }) {
       <h2 className="panel-title">Daglige påminnelser</h2>
       <p className="text-xs text-nx-mute">Hver beboer får en melding når de har gjøremål som er forfalt eller skal gjøres i dag, sammen med antall åpne avvik. Ingen melding sendes når det ikke er noe å si.</p>
       <p className="text-xs">E-post: <strong>{data.kanaler.epost ? 'satt opp' : 'ikke satt opp'}</strong> · SMS: <strong>{data.kanaler.sms ? 'satt opp' : 'ikke satt opp'}</strong></p>
-      {(!data.kanaler.epost || !data.kanaler.sms) && <p className="text-xs text-nx-mute">E-post settes opp med SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS og SMTP_FROM i Railway. SMS bruker Twilio: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN og TWILIO_FROM.</p>}
+      {(!data.kanaler.epost || !data.kanaler.sms) && <p className="text-xs text-nx-mute">E-post settes opp med SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS og SMTP_FROM i Railway. SMS sendes fra iPhonen via iphone-remote: IPHONE_REMOTE_URL, IPHONE_REMOTE_USER, IPHONE_REMOTE_PASSWORD og IPHONE_MCP_TOKEN.</p>}
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={settings.aktiv} onChange={e => setSettings(s => ({ ...s, aktiv: e.target.checked }))} />Send påminnelser automatisk</label>
       <label className="block"><span className="text-xs text-nx-mute">Klokkeslett (norsk tid)</span><input type="time" value={settings.klokkeslett} onChange={e => setSettings(s => ({ ...s, klokkeslett: e.target.value }))} className={`${field} w-full mt-1`} /></label>
       <div className="flex flex-wrap gap-2">
