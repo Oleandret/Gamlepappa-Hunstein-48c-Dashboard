@@ -49,7 +49,7 @@ app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
 app.use(compression());
-app.use((_req,res,next) => { res.set({'X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin','X-Frame-Options':'DENY', 'Content-Security-Policy':"default-src 'self'; script-src 'self' https://unpkg.com/@elevenlabs/convai-widget-embed@0.18.1/ blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' https://*.elevenlabs.io wss://*.elevenlabs.io https://storage.googleapis.com https://*.openfpcdn.io https://cdn.jsdelivr.net; worker-src 'self' blob:; frame-src https://artimis-ai-production.up.railway.app; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"}); next(); });
+app.use((_req,res,next) => { res.set({'X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin','X-Frame-Options':'DENY', 'Content-Security-Policy':"default-src 'self'; script-src 'self' https://unpkg.com/@elevenlabs/convai-widget-embed@0.18.1/ blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' https://*.elevenlabs.io wss://*.elevenlabs.io https://storage.googleapis.com https://*.openfpcdn.io https://cdn.jsdelivr.net; worker-src 'self' blob:; frame-src 'self' https://artimis-ai-production.up.railway.app; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"}); next(); });
 
 // CORS — same-origin in prod (frontend served by this server), permissive in dev
 const allowedOrigin = process.env.CORS_ORIGIN

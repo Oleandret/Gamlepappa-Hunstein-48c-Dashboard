@@ -33,3 +33,11 @@ test('proxy logs in server-side, rewrites the page, forwards API calls and re-lo
   assert.equal((await fetch(`${s.base}/iphone/mcp`,{headers:{cookie}})).status,404);
  }finally{s.close();}
 });
+
+test('dashboard pages may frame same-origin /iphone/ but can never be framed themselves',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const csp=readFileSync(new URL('../index.js',import.meta.url),'utf8').match(/'Content-Security-Policy':"([^"]+)"/)[1];
+ const frameSrc=csp.split(';').map(s=>s.trim()).find(s=>s.startsWith('frame-src'));
+ assert.ok(frameSrc.split(/\s+/).includes("'self'"),frameSrc);
+ assert.match(csp,/frame-ancestors 'none'/);
+});
