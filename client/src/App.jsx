@@ -11,7 +11,7 @@ import { motion } from 'framer-motion';
 import { api } from './lib/api.js';
 import { usePageVisibility } from './lib/usePageVisibility.js';
 import { useFavorites } from './lib/useFavorites.js';
-import { useSidebarPinned, useLogPinned, useFlowsSidebarPinned } from './lib/useSidebarState.js';
+import { useSidebarPinned, useLogPinned, usePhoneSidebarOpen } from './lib/useSidebarState.js';
 import { usePinConfig } from './lib/usePinConfig.js';
 import { useFrontImageConfig } from './lib/useFrontImageConfig.js';
 import { useFrontSensors } from './lib/useFrontSensors.js';
@@ -23,7 +23,7 @@ import { useFrontSpecials } from './lib/useFrontSpecials.js';
 import { pushEvent, diffDevicesAndLog } from './lib/activityLog.js';
 import { ActivityLogPanel } from './components/ActivityLogPanel.jsx';
 import { Sidebar } from './components/Sidebar.jsx';
-import { FlowsSidebar } from './components/FlowsSidebar.jsx';
+import { PhoneSidebar } from './components/PhoneSidebar.jsx';
 import { TopBar } from './components/TopBar.jsx';
 import { HouseView } from './components/HouseView.jsx';
 import { PinEditor } from './components/PinEditor.jsx';
@@ -85,7 +85,7 @@ export default function App() {
   const favorites = useFavorites();
   const sidebar = useSidebarPinned();
   const logPin = useLogPinned();
-  const flowsSidebar = useFlowsSidebarPinned();
+  const phoneSidebar = usePhoneSidebarOpen();
   const pinConfig = usePinConfig();
   const imageConfig = useFrontImageConfig();
   const frontSensors = useFrontSensors();
@@ -259,12 +259,8 @@ export default function App() {
             <span>v{system?.version || '1.0'} · {counts.devices} enh · {counts.zones} rom · {system?.demo ? 'demo' : data.quality?.devices || 'ukjent'}</span>
           </footer>
         </main>
-        <FlowsSidebar
-          flows={data.flows || {}}
-          onRun={runFlow}
-          pinned={flowsSidebar.pinned}
-          onTogglePin={flowsSidebar.toggle}
-        />
+        {/* Iphone-fanen viser telefonen allerede; da trengs ikke panelet. */}
+        {section !== 'iphone' && <PhoneSidebar open={phoneSidebar.open} onToggle={phoneSidebar.toggle} />}
       </div>
 
       <VoiceAssistant section={section} />
