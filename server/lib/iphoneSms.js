@@ -1,11 +1,12 @@
 import { readRpcResponse } from './mcpClient.js';
 
 /**
- * SMS fra iPhonen («Mini sin iPhone») via iphone-remote:
- *  1. iphone-remote åpner Meldinger med mottaker og tekst ferdig utfylt
- *     (sms:-adresse via /api/url; mobile-mcp tillater bare http/https).
- *  2. mobile-mcp (iphone-remote /mcp) finner Send-knappen etter navn og
- *     trykker på den, og sjekker at den er borte etterpå (meldingen er sendt).
+ * SMS fra iPhonen («Mini sin iPhone») via mobile-mcp (iphone-remote /mcp),
+ * som styrer Meldinger-appen slik en person ville gjort (sms:-adresser
+ * går ikke; iphone-remote og mobile-mcp åpner bare http/https):
+ *  Meldinger → «Ny melding» → skriv nummeret i «Til:» → skriv teksten i
+ *  «Melding» → trykk Send → sjekk at Send-knappen er borte (sendt).
+ * Knapper og felt finnes etter navn (lest av telefonen, iOS 16 på norsk).
  * Én melding om gangen: telefonen tåler én styrende part.
  *
  * Miljø: IPHONE_REMOTE_URL/USER/PASSWORD (samme som Iphone-fanen) og
@@ -17,6 +18,7 @@ export function iphoneSmsConfigured(env = process.env) {
   catch { return false; }
 }
 
+const MESSAGES_APP = 'com.apple.MobileSMS';
 const SEND_LABEL = /^(send|sendbutton)$/i;
 /**
  * mobile_list_elements_on_screen svarer «Found these elements on screen: [ … ]»
@@ -27,20 +29,26 @@ export function parseElements(text) {
   if (start < 0) return [];
   try { const v = JSON.parse(text.slice(start)); return Array.isArray(v) ? v : []; } catch { return []; }
 }
-/** Send-knappen i Meldinger (identifier «sendButton», etikett «Send»), med midtpunkt å trykke på. */
-export function findSendButton(elements) {
-  const e = (Array.isArray(elements) ? elements : []).find(el =>
-    ['identifier', 'name', 'label'].some(k => typeof el?.[k] === 'string' && SEND_LABEL.test(el[k].trim())));
+const str = (el, k) => (typeof el?.[k] === 'string' ? el[k].trim() : '');
+/** Første element som passer, med midtpunkt å trykke på. */
+function findElement(elements, match) {
+  const e = (Array.isArray(elements) ? elements : []).find(match);
   const c = e?.coordinates;
   if (!e || !c || ![c.x, c.y, c.width, c.height].every(Number.isFinite)) return null;
   return { ...e, x: Math.round(c.x + c.width / 2), y: Math.round(c.y + c.height / 2) };
 }
+/** Send-knappen i Meldinger (identifier «sendButton», etikett «Send»). */
+export const findSendButton = els => findElement(els, el => ['identifier', 'name', 'label'].some(k => SEND_LABEL.test(str(el, k))));
+/** «Ny melding» øverst til høyre i samtalelisten. */
+export const findComposeButton = els => findElement(els, el => str(el, 'identifier') === 'composeButton' || /^ny melding$|^new message$|^compose$/i.test(str(el, 'label')));
+/** Tilbake-knappen øverst når Meldinger åpner i en samtale. */
+export const findBackButton = els => findElement(els, el => el?.type === 'Button' && el.coordinates?.y < 130 && /tilbake|back/i.test(`${str(el, 'identifier')} ${str(el, 'label')}`));
+/** Mottakerfeltet «Til:» i en ny melding. */
+export const findRecipientField = els => findElement(els, el => /TextField|TextView/.test(el?.type) && /^(til|to):?$/i.test(str(el, 'label')));
+/** Meldingsfeltet (identifier «messageBodyField», etikett «Melding»). */
+export const findBodyField = els => findElement(els, el => str(el, 'identifier') === 'messageBodyField' || (/TextField|TextView/.test(el?.type) && /^(melding|tekstmelding|imessage|message|text message)$/i.test(str(el, 'label'))));
 
-/** sms:-adresse med mottaker og ferdig utfylt tekst. */
-export function smsUrl(to, text) {
-  if (!/^\+\d{8,15}$/.test(to)) throw new Error('Ugyldig telefonnummer');
-  return `sms:${to}&body=${encodeURIComponent(text)}`;
-}
+const validNumber = to => { if (!/^\+\d{8,15}$/.test(to)) throw new Error('Ugyldig telefonnummer'); return to; };
 
 export function createIphoneSms({ env = process.env, fetchImpl = fetch, sleep = ms => new Promise(r => setTimeout(r, ms)) } = {}) {
   let cookie = null, device = null, queue = Promise.resolve(), nextId = 1;
@@ -86,22 +94,55 @@ export function createIphoneSms({ env = process.env, fetchImpl = fetch, sleep = 
   }
   const elements = async id => parseElements(await tool('mobile_list_elements_on_screen', { device: id, format: 'json' }));
 
+  const tap = (id, el) => tool('mobile_click_on_screen_at_coordinates', { device: id, x: el.x, y: el.y });
+  const type = (id, value) => tool('mobile_type_keys', { device: id, text: value, submit: false });
+  /** Leser skjermen til `find` treffer (animasjoner tar litt tid), ellers null. */
+  async function waitFor(id, find, tries = 6) {
+    for (let i = 0; i < tries; i++) {
+      await sleep(i ? 700 : 1000);
+      const el = find(await elements(id));
+      if (el) return el;
+    }
+    return null;
+  }
+
   // step(tekst) gir en steg-for-steg-logg (brukes av «Send SMS med iPhone» i Huset).
-  async function sendNow(to, text, step) {
-    const url = smsUrl(to, text.slice(0, 1000));
+  async function sendNow(to, message, step) {
+    validNumber(to);
     const id = await phone(); step('Fant telefonen via MCP');
     await remotePost('/api/unlock', {}).then(() => step('Låste opp telefonen'), () => step('Kunne ikke låse opp (fortsetter)'));
-    await remotePost('/api/url', { url }); step('Åpnet Meldinger med mottaker og tekst');
-    let button = null;
-    for (let i = 0; i < 8 && !button; i++) { await sleep(i ? 1000 : 1500); button = findSendButton(await elements(id)); }
-    if (!button) throw new Error('Fant ikke Send-knappen i Meldinger');
-    step(`Fant Send-knappen (${button.x}, ${button.y})`);
-    await tool('mobile_click_on_screen_at_coordinates', { device: id, x: button.x, y: button.y }); step('Trykket Send');
-    await sleep(1500);
-    // Send-knappen forsvinner når tekstfeltet er tomt, altså når meldingen er sendt.
-    if (findSendButton(await elements(id))) throw new Error('Meldingen ser ikke ut til å være sendt');
-    step('Bekreftet: meldingen er sendt');
-    await tool('mobile_press_button', { device: id, button: 'HOME' }).then(() => step('Tilbake til hjem-skjermen'), () => {});
+    try {
+      await tool('mobile_launch_app', { device: id, packageName: MESSAGES_APP });
+      let compose = await waitFor(id, findComposeButton);
+      if (!compose) {
+        // Meldinger husker siste samtale: gå tilbake til listen.
+        const back = await waitFor(id, findBackButton, 1);
+        if (back) { await tap(id, back); compose = await waitFor(id, findComposeButton, 4); }
+      }
+      if (!compose) throw new Error('Fant ikke «Ny melding» i Meldinger');
+      step('Åpnet Meldinger');
+
+      await tap(id, compose);
+      const recipient = await waitFor(id, findRecipientField);
+      if (!recipient) throw new Error('Fant ikke «Til:»-feltet i ny melding');
+      await tap(id, recipient);
+      await type(id, to); step(`Skrev mottaker ${to}`);
+
+      const body = await waitFor(id, findBodyField, 4);
+      if (!body) throw new Error('Fant ikke meldingsfeltet');
+      await tap(id, body);
+      await type(id, message.slice(0, 1000)); step('Skrev meldingen');
+
+      const button = await waitFor(id, findSendButton);
+      if (!button) throw new Error('Fant ikke Send-knappen i Meldinger');
+      await tap(id, button); step('Trykket Send');
+      await sleep(1500);
+      // Send-knappen forsvinner når tekstfeltet er tomt, altså når meldingen er sendt.
+      if (findSendButton(await elements(id))) throw new Error('Meldingen ser ikke ut til å være sendt');
+      step('Bekreftet: meldingen er sendt');
+    } finally {
+      await tool('mobile_press_button', { device: id, button: 'HOME' }).then(() => step('Tilbake til hjem-skjermen'), () => {});
+    }
   }
 
   /** Sjekker koblingen uten å sende noe: innlogging, MCP, telefon og at skjermen kan leses. */

@@ -1,38 +1,58 @@
 import test from 'node:test';import assert from 'node:assert/strict';import express from 'express';
-import {createIphoneSms,findSendButton,parseElements,smsUrl,iphoneSmsConfigured} from '../lib/iphoneSms.js';
+import {createIphoneSms,findSendButton,findComposeButton,findRecipientField,findBodyField,parseElements,iphoneSmsConfigured} from '../lib/iphoneSms.js';
 import {notifyAvvik,avvikSms,createAvvikRoutes} from '../routes/avvik.js';
 const env={IPHONE_REMOTE_URL:'https://remote.example',IPHONE_REMOTE_USER:'ole',IPHONE_REMOTE_PASSWORD:'pw',IPHONE_MCP_TOKEN:'t'};
-const sendBtn='{"type":"Button","label":"Send","name":"sendButton","identifier":"sendButton","coordinates":{"x":340,"y":700,"width":30,"height":30}}';
-function fakePhone({sendStays=false,noButton=false}={}){const log=[];let opened=false,sent=false;
+// Elementene slik Meldinger på telefonen (iOS 16, norsk) faktisk viser dem.
+const el=(type,label,x,y,w,h,identifier=null)=>({type,label,name:identifier||label,identifier,coordinates:{x,y,width:w,height:h}});
+const UI={compose:el('Button','Ny melding',318,44,49,44,'composeButton'),back:el('Button','Tilbake',0,44,80,44,'BackButton'),
+ to:el('TextField','Til:',16,134,343,55),body:el('TextField','Melding',131,434,194,38,'messageBodyField'),cancel:el('Button','Avbryt',306,73,53,44),
+ send:el('Button','Send',326,439,29,28,'sendButton'),icon:el('Icon','Været',25,69,64,89,'Været')};
+const hit=(e,x,y)=>{const c=e.coordinates;return x>=c.x&&x<=c.x+c.width&&y>=c.y&&y<=c.y+c.height;};
+/** Falsk telefon: hjem-skjerm → samtaleliste (eller åpen samtale) → ny melding med Til/Melding/Send. */
+function fakePhone({sendStays=false,noSend=false,inConversation=false}={}){const log=[];const st={screen:'home',focus:null,to:'',body:'',sent:[]};
+ const shown=()=>st.screen==='home'?[UI.icon]:st.screen==='conversation'?[UI.back]:st.screen==='list'?[UI.compose]
+  :[UI.cancel,{...UI.to,value:st.to},{...UI.body,value:st.body},...(st.body&&!noSend?[UI.send]:[])];
  const rpc=(id,text)=>new Response(JSON.stringify({jsonrpc:'2.0',id,result:{content:[{type:'text',text}]}}),{headers:{'content-type':'application/json'}});
  const fetchImpl=async(url,o={})=>{const u=new URL(url);const body=o.body?JSON.parse(o.body):null;
   if(u.pathname==='/login')return new Response('{}',{headers:{'set-cookie':'s=1; Path=/'}});
   if(u.pathname==='/api/unlock'){log.push('unlock');return new Response('{}');}
-  if(u.pathname==='/api/url'){log.push('url '+body.url);opened=true;return new Response('{}');}
-  if(u.pathname==='/mcp'){assert.equal(o.headers.authorization,'Bearer t');const {name,arguments:a}=body.params;log.push(name+(a.x?` ${a.x},${a.y}`:a.button?` ${a.button}`:''));
-   if(name==='mobile_list_available_devices')return rpc(body.id,'{"devices":[{"id":"dev1","platform":"ios","state":"online"}]}');
-   if(name==='mobile_list_elements_on_screen')return rpc(body.id,`Found these elements on screen: [${opened&&!noButton&&(!sent||sendStays)?sendBtn:''}]`);
-   if(name==='mobile_click_on_screen_at_coordinates'){sent=true;return rpc(body.id,'ok');}
+  if(u.pathname==='/mcp'){assert.equal(o.headers.authorization,'Bearer t');const {name,arguments:a}=body.params;
+   if(name==='mobile_list_available_devices'){log.push(name);return rpc(body.id,'{"devices":[{"id":"dev1","platform":"ios","state":"online"}]}');}
+   if(name==='mobile_list_elements_on_screen')return rpc(body.id,`Found these elements on screen: ${JSON.stringify(shown())}`);
+   if(name==='mobile_launch_app'){log.push('launch '+a.packageName);st.screen=inConversation?'conversation':'list';return rpc(body.id,'ok');}
+   if(name==='mobile_click_on_screen_at_coordinates'){const e=shown().find(e=>hit(e,a.x,a.y));log.push('tap '+(e?.label??'?'));
+    if(e===UI.compose)st.screen='compose';if(e===UI.back)st.screen='list';if(e?.label==='Til:')st.focus='to';if(e?.label==='Melding')st.focus='body';
+    if(e===UI.send){st.sent.push([st.to,st.body]);if(!sendStays)st.body='';}return rpc(body.id,'ok');}
+   if(name==='mobile_type_keys'){assert.equal(a.submit,false);log.push(`type ${st.focus}`);st[st.focus]+=a.text;return rpc(body.id,'ok');}
+   if(name==='mobile_press_button'){log.push('press '+a.button);st.screen='home';return rpc(body.id,'ok');}
    return rpc(body.id,'ok');}
   throw new Error('unexpected '+url);};
- return {fetchImpl,log};}
+ return {fetchImpl,log,st};}
+const mk=(o)=>{const p=fakePhone(o);return {p,sms:createIphoneSms({env,fetchImpl:p.fetchImpl,sleep:async()=>{}})};};
 
-test('helpers: element parsing, send button centre, sms url, config',()=>{
- const b=findSendButton(parseElements(`Found these elements on screen: [${sendBtn},{"type":"Icon","label":"Været","coordinates":{"x":1,"y":1,"width":2,"height":2}}]`));assert.deepEqual([b.x,b.y],[355,715]);
+test('helpers: element parsing, finding buttons and fields by name, config',()=>{
+ const els=parseElements(`Found these elements on screen: ${JSON.stringify([UI.icon,UI.to,UI.body,UI.send,UI.compose])}`);
+ assert.deepEqual([findSendButton(els).x,findSendButton(els).y],[341,453]);
+ assert.equal(findComposeButton(els).identifier,'composeButton');assert.equal(findRecipientField(els).label,'Til:');assert.equal(findBodyField(els).identifier,'messageBodyField');
  assert.equal(findSendButton(parseElements('Found these elements on screen: []')),null);assert.deepEqual(parseElements('ingen liste'),[]);
- assert.equal(smsUrl('+4799999999','Hei & ha det'),'sms:+4799999999&body=Hei%20%26%20ha%20det');assert.throws(()=>smsUrl('99999999','x'));
  assert.ok(iphoneSmsConfigured(env));assert.ok(!iphoneSmsConfigured({...env,IPHONE_MCP_TOKEN:''}));
 });
 
-test('sends by opening Messages, tapping Send by name and checking it is gone',async()=>{
- const p=fakePhone();const sms=createIphoneSms({env,fetchImpl:p.fetchImpl,sleep:async()=>{}});
- await sms.send('+4799999999','Hei Ylva');
- assert.deepEqual(p.log,['mobile_list_available_devices','unlock','url sms:+4799999999&body=Hei%20Ylva','mobile_list_elements_on_screen','mobile_click_on_screen_at_coordinates 355,715','mobile_list_elements_on_screen','mobile_press_button HOME']);
+test('sends through the Messages app: new message, recipient, text, Send, verified',async()=>{
+ const {p,sms}=mk();await sms.send('+4799999999','Hei Ylva');
+ assert.deepEqual(p.st.sent,[['+4799999999','Hei Ylva']]);
+ assert.deepEqual(p.log,['mobile_list_available_devices','unlock','launch com.apple.MobileSMS','tap Ny melding','tap Til:','type to','tap Melding','type body','tap Send','press HOME']);
 });
 
-test('fails honestly when Send cannot be found or the message stays',async()=>{
- await assert.rejects(createIphoneSms({env,fetchImpl:fakePhone({noButton:true}).fetchImpl,sleep:async()=>{}}).send('+4799999999','x'),/Fant ikke Send-knappen/);
- await assert.rejects(createIphoneSms({env,fetchImpl:fakePhone({sendStays:true}).fetchImpl,sleep:async()=>{}}).send('+4799999999','x'),/ikke ut til å være sendt/);
+test('goes back to the list when Messages opens in a conversation',async()=>{
+ const {p,sms}=mk({inConversation:true});await sms.send('+4799999999','Hei');
+ assert.deepEqual(p.st.sent,[['+4799999999','Hei']]);assert.ok(p.log.includes('tap Tilbake'));
+});
+
+test('fails honestly when Send cannot be found or the message stays, and goes home',async()=>{
+ const a=mk({noSend:true});await assert.rejects(a.sms.send('+4799999999','x'),/Fant ikke Send-knappen/);assert.equal(a.p.log.at(-1),'press HOME');assert.deepEqual(a.p.st.sent,[]);
+ const b=mk({sendStays:true});await assert.rejects(b.sms.send('+4799999999','x'),/ikke ut til å være sendt/);
+ await assert.rejects(mk().sms.send('99999999','x'),/Ugyldig telefonnummer/);
  await assert.rejects(createIphoneSms({env:{},fetchImpl:async()=>{throw new Error('no')}}).send('+4799999999','x'),/ikke satt opp/);
 });
 
@@ -56,12 +76,12 @@ test('route stores the notification result on the avvik',async()=>{
 });
 
 test('check reads only; send reports each step',async()=>{
- const p=fakePhone();const sms=createIphoneSms({env,fetchImpl:p.fetchImpl,sleep:async()=>{}});
+ const {p,sms}=mk();
  const steps=[];const r=await sms.check({onStep:t=>steps.push(t)});
- assert.deepEqual(r,{device:'dev1',elements:0});assert.ok(!p.log.some(l=>l.startsWith('url')||l.startsWith('mobile_click')));
+ assert.deepEqual(r,{device:'dev1',elements:1});assert.ok(!p.log.some(l=>/^(tap|type|launch)/.test(l)));
  assert.deepEqual(steps.map(s=>s.split(' ')[0]),['Innlogging','MCP','Leste']);
  const s2=[];await sms.send('+4799999999','Hei',{onStep:t=>s2.push(t)});
- assert.deepEqual(s2,['Fant telefonen via MCP','Låste opp telefonen','Åpnet Meldinger med mottaker og tekst','Fant Send-knappen (355, 715)','Trykket Send','Bekreftet: meldingen er sendt','Tilbake til hjem-skjermen']);
+ assert.deepEqual(s2,['Fant telefonen via MCP','Låste opp telefonen','Åpnet Meldinger','Skrev mottaker +4799999999','Skrev meldingen','Trykket Send','Bekreftet: meldingen er sendt','Tilbake til hjem-skjermen']);
 });
 
 test('SMS test and send routes: owner only, validated, honest results',async()=>{
