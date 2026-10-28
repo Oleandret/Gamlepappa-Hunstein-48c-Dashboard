@@ -259,8 +259,8 @@ export default function App() {
             <span>v{system?.version || '1.0'} · {counts.devices} enh · {counts.zones} rom · {system?.demo ? 'demo' : data.quality?.devices || 'ukjent'}</span>
           </footer>
         </main>
-        {/* Iphone-fanen viser telefonen allerede; da trengs ikke panelet. */}
-        {section !== 'iphone' && <PhoneSidebar open={phoneSidebar.open} onToggle={phoneSidebar.toggle} />}
+        {/* Telefonpanelet finnes på alle sider. */}
+        <PhoneSidebar open={phoneSidebar.open} onToggle={phoneSidebar.toggle} />
       </div>
 
       <VoiceAssistant section={section} />
