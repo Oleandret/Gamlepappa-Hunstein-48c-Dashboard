@@ -6,6 +6,7 @@ import { AvvikPanel } from './AvvikPanel.jsx';
 import { GjoremalPanel } from './GjoremalPanel.jsx';
 import { HusreglerPanel } from './HusreglerPanel.jsx';
 import { BeborePanel } from './BeborePanel.jsx';
+import { SmsPanel } from './SmsPanel.jsx';
 import { VeiledningerView } from './VeiledningerView.jsx';
 
 // Grafene lastes bare når statistikken åpnes, så mobilsiden holder seg lett.
@@ -31,7 +32,7 @@ export function HusetView({ standalone = false, initialTab = 'statistikk', user 
     ['gjoremal', 'Gjøremål', overdue ? `${overdue} forfalt` : null],
     ['regler', 'Husregler', proposals ? `${proposals} forslag` : null],
     ['veiledninger', 'Veiledninger', null],
-    ...(owner ? [['beboere', 'Beboere', null]] : [])
+    ...(owner ? [['beboere', 'Beboere', null], ['sms', 'Send SMS med iPhone', null]] : [])
   ];
   const props = { h, me, setMe, standalone };
 
@@ -56,6 +57,7 @@ export function HusetView({ standalone = false, initialTab = 'statistikk', user 
       {h.loaded && tab === 'gjoremal' && <GjoremalPanel {...props} />}
       {h.loaded && tab === 'regler' && <HusreglerPanel {...props} />}
       {owner && tab === 'beboere' && <BeborePanel standalone={standalone} />}
+      {owner && tab === 'sms' && <SmsPanel />}
       {tab === 'veiledninger' && <VeiledningerView standalone={standalone} embedded />}
     </div>
   );

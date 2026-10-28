@@ -54,3 +54,26 @@ test('route stores the notification result on the avvik',async()=>{
  const srv=app.listen(0);try{const r=await fetch(`http://127.0.0.1:${srv.address().port}/avvik`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({person:'Ylva',registrertAv:'Ole Andre',kategori:'Kjøkken',beskrivelse:'Test'})});
   const b=await r.json();assert.equal(b.item.varsel.status,'sender');await done;assert.equal(store[0].varsel.status,'sendt');}finally{srv.close();}
 });
+
+test('check reads only; send reports each step',async()=>{
+ const p=fakePhone();const sms=createIphoneSms({env,fetchImpl:p.fetchImpl,sleep:async()=>{}});
+ const steps=[];const r=await sms.check({onStep:t=>steps.push(t)});
+ assert.deepEqual(r,{device:'dev1',elements:0});assert.ok(!p.log.some(l=>l.startsWith('url')||l.startsWith('mobile_click')));
+ assert.deepEqual(steps.map(s=>s.split(' ')[0]),['Innlogging','MCP','Leste']);
+ const s2=[];await sms.send('+4799999999','Hei',{onStep:t=>s2.push(t)});
+ assert.deepEqual(s2,['Fant telefonen via MCP','Låste opp telefonen','Åpnet Meldinger med mottaker og tekst','Fant Send-knappen (355, 715)','Trykket Send','Bekreftet: meldingen er sendt','Tilbake til hjem-skjermen']);
+});
+
+test('SMS test and send routes: owner only, validated, honest results',async()=>{
+ const {createBeboerRoutes}=await import('../routes/beboere.js');
+ const calls=[];const iphoneSms={configured:()=>true,check:async({onStep})=>{onStep('MCP svarer');return {device:'d'};},send:async(to,t,{onStep})=>{calls.push([to,t]);onStep('Trykket Send');if(t==='feil')throw new Error('Fant ikke Send-knappen i Meldinger');}};
+ const mk=owner=>{const app=express().use(express.json()).use('/a',createBeboerRoutes({owner:()=>owner,iphoneSms,residents:{list:async()=>[]},reminders:{settings:async()=>({}),log:async()=>[]},messaging:{channels:()=>({})}}));const s=app.listen(0);return {s,u:`http://127.0.0.1:${s.address().port}/a`};};
+ const post=(u,b)=>fetch(u,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)}).then(async r=>({status:r.status,body:await r.json()}));
+ const no=mk(false);try{assert.equal((await post(no.u+'/sms/send',{til:'99999999',tekst:'x'})).status,403);assert.equal(calls.length,0);}finally{no.s.close();}
+ const yes=mk(true);try{
+  const t=await post(yes.u+'/sms/test',{});assert.equal(t.body.ok,true);assert.equal(t.body.steps[0].tekst,'MCP svarer');
+  assert.equal((await post(yes.u+'/sms/send',{til:'123',tekst:'x'})).status,400);assert.equal((await post(yes.u+'/sms/send',{til:'99999999',tekst:''})).status,400);
+  const ok=await post(yes.u+'/sms/send',{til:'99 99 99 99',tekst:'Hei'});assert.equal(ok.body.ok,true);assert.equal(ok.body.til,'+4799999999');assert.deepEqual(calls.at(-1),['+4799999999','Hei']);
+  const bad=await post(yes.u+'/sms/send',{til:'99999999',tekst:'feil'});assert.equal(bad.body.ok,false);assert.match(bad.body.error,/Send-knappen/);assert.equal(bad.body.steps.length,1);
+ }finally{yes.s.close();}
+});
