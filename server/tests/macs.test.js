@@ -3,6 +3,6 @@ import {MACS,DEFAULT_MAC,validMac,macName,twoLines} from '../../client/src/lib/m
 test('validMac keeps known ids and falls back to the default Mac',()=>{
  for(const m of MACS) assert.equal(validMac(m.id),m.id);
  assert.equal(validMac('mac'),DEFAULT_MAC);assert.equal(validMac(undefined),DEFAULT_MAC);assert.equal(validMac('kjeller'),DEFAULT_MAC);
- assert.equal(DEFAULT_MAC,'soverom');assert.equal(macName('stue'),'Mac i stua');assert.equal(macName('x'),macName(DEFAULT_MAC));
+ assert.equal(DEFAULT_MAC,'soverom');assert.equal(macName('stue'),'Mac i stua');assert.equal(macName('eufy'),'Eufy-Macen');assert.equal(macName('x'),macName(DEFAULT_MAC));
  assert.equal(twoLines('Mac på Soverom'),'Mac på\nSoverom');assert.equal(twoLines('Mac'),'Mac');
 });
