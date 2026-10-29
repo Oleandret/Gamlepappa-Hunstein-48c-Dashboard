@@ -1,13 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Smartphone, X, RefreshCw } from 'lucide-react';
+import { Smartphone, Monitor, X, RefreshCw } from 'lucide-react';
 import { usePhoneRemote, PhoneScreen, PhoneButtons, PhoneKeyboard, PhoneSessionNotice } from './PhoneRemote.jsx';
+import { useMacRemote, MacScreen, MacButtons, MacKeyboard, MacStatusLine } from './MacRemote.jsx';
 
 /**
  * Telefonpanel til høyre på alle sider: iPhone-skjermen (trykk, sveip, langt
  * trykk), knapper og tastatur nederst. Smalt med et ikon når det er lukket;
  * åpnes og lukkes med klikk (ikke hover), og skjermstrømmen går bare mens
  * panelet er åpent. Samme tilgang som Iphone-fanen: administrator.
+ * Øverst velges enhet: iPhone (smalt panel) eller Mac (bredere, 16:9-skjerm).
  */
+const DEVICE_KEY = 'nexora.phoneSidebar.device';
+function useDevice() {
+  const [device, setDevice] = useState(() => { try { return localStorage.getItem(DEVICE_KEY) === 'mac' ? 'mac' : 'iphone'; } catch { return 'iphone'; } });
+  useEffect(() => { try { localStorage.setItem(DEVICE_KEY, device); } catch {} }, [device]);
+  return [device, setDevice];
+}
 function useNarrow(query = '(max-width: 767px)') {
   const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia?.(query).matches);
   useEffect(() => {
@@ -22,8 +30,13 @@ function useNarrow(query = '(max-width: 767px)') {
 
 export function PhoneSidebar({ open, onToggle }) {
   const narrow = useNarrow();
-  const remote = usePhoneRemote(open);
+  const [device, setDevice] = useDevice();
+  const isMac = device === 'mac';
+  const phone = usePhoneRemote(open && !isMac);
+  const mac = useMacRemote(open && isMac);
+  const remote = isMac ? mac : phone;
   const ready = remote.status.ready;
+  const width = isMac ? 'w-[560px]' : 'w-[340px]';
 
   if (!open) {
     // Smal skjerm (mobil): flytende knapp i stedet for en stolpe til høyre.
@@ -46,25 +59,35 @@ export function PhoneSidebar({ open, onToggle }) {
   // Bred skjerm: festet til høyre kant så telefonen står i ro mens siden rulles; plassholderen holder av bredden.
   // Smal skjerm: hele skjermen, over dashboardet.
   return (<>
-    {!narrow && <div className="shrink-0 w-[340px]" aria-hidden="true" />}
-    <aside aria-label="Telefon" className={narrow
+    {!narrow && <div className={`shrink-0 ${width}`} aria-hidden="true" />}
+    <aside aria-label={isMac ? 'Mac' : 'Telefon'} className={narrow
       ? 'fixed inset-0 z-[60] bg-nx-bg pt-4 pb-24 px-3 flex flex-col gap-3'
-      : 'fixed right-0 top-0 bottom-0 w-[340px] border-l border-nx-line/60 bg-nx-bg/95 backdrop-blur-md pt-4 pb-24 px-3 z-40 flex flex-col gap-3'}>
+      : `fixed right-0 top-0 bottom-0 ${width} border-l border-nx-line/60 bg-nx-bg/95 backdrop-blur-md pt-4 pb-24 px-3 z-40 flex flex-col gap-3`}>
       {/* pb-24: taleassistentens knapp ligger fast nede til høyre; tastaturet skal stå over den. */}
       <header className="flex items-center gap-2">
-        <Smartphone size={15} className="text-nx-cyan" />
-        <div className="font-display font-semibold tracking-wide text-sm">IPHONE</div>
-        <span className={`ml-1 h-2 w-2 rounded-full ${ready ? 'bg-nx-green' : ready === false ? 'bg-nx-red' : 'bg-nx-mute'}`} title={ready ? 'WebDriverAgent klar' : ready === false ? 'WebDriverAgent svarer ikke' : 'Kobler til'} />
+        <div className="flex rounded-lg border border-nx-line/60 overflow-hidden text-[11px]" role="tablist" aria-label="Enhet">
+          <button role="tab" aria-selected={!isMac} onClick={() => setDevice('iphone')} className={`flex items-center gap-1 px-2 py-1 ${!isMac ? 'bg-nx-cyan/15 text-nx-cyan' : 'text-nx-mute hover:text-nx-cyan'}`}><Smartphone size={13} /> IPHONE</button>
+          <button role="tab" aria-selected={isMac} onClick={() => setDevice('mac')} className={`flex items-center gap-1 px-2 py-1 ${isMac ? 'bg-nx-cyan/15 text-nx-cyan' : 'text-nx-mute hover:text-nx-cyan'}`}><Monitor size={13} /> MAC</button>
+        </div>
+        <span className={`ml-1 h-2 w-2 rounded-full ${ready ? 'bg-nx-green' : ready === false ? 'bg-nx-red' : 'bg-nx-mute'}`} title={ready ? (isMac ? 'Mac-agenten svarer' : 'WebDriverAgent klar') : ready === false ? (isMac ? 'Mac-agenten svarer ikke' : 'WebDriverAgent svarer ikke') : 'Kobler til'} />
         <button onClick={remote.reconnect} className="ml-auto p-1 text-nx-mute hover:text-nx-cyan" aria-label="Koble til skjermen på nytt"><RefreshCw size={14} /></button>
-        <button onClick={onToggle} className="p-1 text-nx-mute hover:text-nx-cyan" aria-label="Lukk telefonpanelet"><X size={15} /></button>
+        <button onClick={onToggle} className="p-1 text-nx-mute hover:text-nx-cyan" aria-label={isMac ? 'Lukk Mac-panelet' : 'Lukk telefonpanelet'}><X size={15} /></button>
       </header>
       <PhoneSessionNotice remote={remote} />
-      {remote.session.status === 'ready' && <>
+      {remote.session.status === 'ready' && !isMac && <>
         <div className="flex-1 min-h-0 flex items-center justify-center"><PhoneScreen remote={remote} className="rounded-[22px]" /></div>
         <PhoneButtons remote={remote} />
         <PhoneKeyboard remote={remote} />
         {remote.err && <p role="alert" className="text-[11px] text-nx-amber">{remote.err}</p>}
         <p className="text-[10px] text-nx-mute">Klikk = trykk · dra = sveip · hold = langt trykk. Tastaturet på telefonen må være synlig for at tekst skal gå inn.</p>
+      </>}
+      {remote.session.status === 'ready' && isMac && <>
+        <MacStatusLine remote={remote} />
+        <div className="flex-1 min-h-0"><MacScreen remote={remote} /></div>
+        <MacButtons remote={remote} />
+        <MacKeyboard remote={remote} />
+        {remote.err && <p role="alert" className="text-[11px] text-nx-amber">{remote.err}</p>}
+        <p className="text-[10px] text-nx-mute">Klikk = klikk · dra = dra · høyreklikk = meny · hjul = rull. Klikk i bildet og skriv for å sende tastetrykk.</p>
       </>}
     </aside>
   </>);

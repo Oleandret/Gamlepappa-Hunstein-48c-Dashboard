@@ -1,4 +1,4 @@
-import { Network, Thermometer, Home, LayoutGrid, Boxes, Workflow, Zap, ShieldCheck, Star, Settings, Music, Map, Bot, Anchor, Wrench, Bookmark, Activity, Sparkles, MessageSquare, Box, HeartHandshake, BookOpen, Smartphone } from 'lucide-react';
+import { Network, Thermometer, Home, LayoutGrid, Boxes, Workflow, Zap, ShieldCheck, Star, Settings, Music, Map, Bot, Anchor, Wrench, Bookmark, Activity, Sparkles, MessageSquare, Box, HeartHandshake, BookOpen, Smartphone, Monitor } from 'lucide-react';
 
 /** Single source of truth for top-level navigation. */
 export const SECTIONS = [
@@ -17,6 +17,7 @@ export const SECTIONS = [
   { id: 'historikk', label: 'Historikk', Icon: Activity },
   { id: 'nettverk', label: 'Nettverk', Icon: Network },
   { id: 'iphone',            label: 'Iphone',          Icon: Smartphone },
+  { id: 'mac',               label: 'Mac',             Icon: Monitor },
   { id: 'sikkerhet',         label: 'Sikkerhet',       Icon: ShieldCheck },
   { id: 'avatar',            label: 'Avatar',          Icon: Bot },
   { id: 'chat',              label: 'AI-chat',         Icon: MessageSquare },
