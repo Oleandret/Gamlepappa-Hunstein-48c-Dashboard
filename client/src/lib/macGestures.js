@@ -28,3 +28,21 @@ export function keyEventAction(ev) {
   if (!name) return null;
   return ['/api/mac/key', { combo: [...mods, name].join('+') }];
 }
+
+/**
+ * Hvor i boksen bildet ligger når det vises med object-fit: contain (f.eks. i fullskjerm, der
+ * boksen ikke lenger har skjermens sideforhold). Pekerkoordinatene regnes ut fra dette området.
+ */
+export function containedRect(box, aspect) {
+  const w = box.width, h = box.height;
+  if (!w || !h || !aspect) return { left: box.left || 0, top: box.top || 0, width: w || 0, height: h || 0 };
+  const width = Math.min(w, h * aspect), height = width / aspect;
+  return { left: (box.left || 0) + (w - width) / 2, top: (box.top || 0) + (h - height) / 2, width, height };
+}
+
+/** Skjermpunkt fra en pekerhendelse: boksen kan være letterboxet, og punktet klippes til skjermen. */
+export function pointInScreen(ev, box, size) {
+  const r = containedRect(box, size.width / size.height);
+  const clamp = (v, max) => Math.max(0, Math.min(max, v));
+  return { x: clamp((ev.clientX - r.left) / r.width * size.width, size.width), y: clamp((ev.clientY - r.top) / r.height * size.height, size.height) };
+}
