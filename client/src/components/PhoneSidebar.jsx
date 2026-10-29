@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Smartphone, Monitor, X, RefreshCw } from 'lucide-react';
 import { usePhoneRemote, PhoneScreen, PhoneButtons, PhoneKeyboard, PhoneSessionNotice } from './PhoneRemote.jsx';
-import { useMacRemote, MacScreen, MacButtons, MacKeyboard, MacStatusLine } from './MacRemote.jsx';
+import { useMacRemote, MacScreen, MacButtons, MacKeyboard, MacStatusLine, MacQualitySelect } from './MacRemote.jsx';
 
 /**
  * Telefonpanel til høyre på alle sider: iPhone-skjermen (trykk, sveip, langt
@@ -85,6 +85,7 @@ export function PhoneSidebar({ open, onToggle }) {
           <button role="tab" aria-selected={isMac} onClick={() => setDevice('mac')} className={`flex items-center gap-1 px-2 py-1 ${isMac ? 'bg-nx-cyan/15 text-nx-cyan' : 'text-nx-mute hover:text-nx-cyan'}`}><Monitor size={13} /> {MAC_NAME.toUpperCase()}</button>
         </div>
         <span className={`ml-1 h-2 w-2 rounded-full ${ready ? 'bg-nx-green' : ready === false ? 'bg-nx-red' : 'bg-nx-mute'}`} title={ready ? (isMac ? 'Mac-agenten svarer' : 'WebDriverAgent klar') : ready === false ? (isMac ? 'Mac-agenten svarer ikke' : 'WebDriverAgent svarer ikke') : 'Kobler til'} />
+        {isMac && <MacQualitySelect remote={remote} compact className="ml-auto !py-0.5 !px-1.5" />}
         <button onClick={remote.reconnect} className="ml-auto p-1 text-nx-mute hover:text-nx-cyan" aria-label="Koble til skjermen på nytt"><RefreshCw size={14} /></button>
         <button onClick={onToggle} className="p-1 text-nx-mute hover:text-nx-cyan" aria-label={isMac ? 'Lukk Mac-panelet' : 'Lukk telefonpanelet'}><X size={15} /></button>
       </header>

@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { ExternalLink, RefreshCw, Globe, Activity, Sun } from 'lucide-react';
 import { macOpen } from '../../lib/macRemote.js';
-import { useMacRemote, MacScreen, MacButtons, MacKeyboard, MacApps, MacStatusLine, macWake } from '../MacRemote.jsx';
+import { useMacRemote, MacScreen, MacButtons, MacKeyboard, MacApps, MacStatusLine, MacQualitySelect, macWake } from '../MacRemote.jsx';
 import { PhoneSessionNotice } from '../PhoneRemote.jsx';
 
 /**
@@ -43,6 +43,7 @@ export function MacView() {
         </div>
         {remote.session.status === 'ready' && (
           <div className="flex gap-2">
+            <MacQualitySelect remote={remote} />
             <button className="chip inline-flex items-center gap-1.5" onClick={() => remote.run(macWake)}><Sun size={14} /> Vekk skjermen</button>
             <button className="chip inline-flex items-center gap-1.5" onClick={remote.reconnect}><RefreshCw size={14} /> Koble til skjermen på nytt</button>
             <a className="chip inline-flex items-center gap-1.5" href="/iphone/mac.html" target="_blank" rel="noopener"><ExternalLink size={14} /> Eget vindu</a>
