@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Search, ArrowLeftRight, LayoutGrid, X, CornerDownLeft, XSquare, Copy, ClipboardPaste, Undo2, Lock, Sun, Send, Keyboard, AppWindow } from 'lucide-react';
-import { openIphoneSession, macApi, macType, macKey, macActivate, macVideoQuality, macPointerAction, keyEventAction, eventModifiers } from '../lib/macRemote.js';
+import { openIphoneSession, macApi, macType, macKey, macVideoQuality, macPointerAction, keyEventAction, eventModifiers } from '../lib/macRemote.js';
 import { VIDEO_QUALITIES, validQuality } from '../lib/macVideoQuality.js';
+import { DEFAULT_MAC, macName } from '../lib/macs.js';
 import { pointInScreen } from '../lib/macGestures.js';
 import { useFullscreen } from '../lib/useFullscreen.js';
 import { FullscreenButton } from './FullscreenButton.jsx';
 import { createFmp4Player, mseSupported } from '../lib/fmp4Player.js';
 
 /**
- * Felles fjernstyring av Macen (Mac Studio) for Mac-panelet og Mac-fanen:
+ * Felles fjernstyring av en Mac (macId fra macs.js: Soverom eller stua) for Mac-panelet og Mac-fanen:
  * billett (samme som telefonen), skjermstørrelse, status, skjermbilde som
  * H.264-video (MSE) med valgbar kvalitet, MJPEG-strøm og skjermbilder som reserve,
  * klikk/dobbeltklikk/høyreklikk/dra/rull, tastatur-fangst, snarveiknapper og apper.
@@ -21,7 +22,7 @@ export const MAC_BUTTONS = [
 const QUALITY_KEY = 'macVideoQuality';
 const storedQuality = () => { try { return validQuality(localStorage.getItem(QUALITY_KEY)); } catch { return validQuality(); } };
 
-export function useMacRemote(active) {
+export function useMacRemote(active, macId = DEFAULT_MAC) {
   const [session, setSession] = useState({ status: 'idle' });
   const [attempt, setAttempt] = useState(0);
   const [size, setSize] = useState({ width: 1920, height: 1080 });
@@ -51,7 +52,8 @@ export function useMacRemote(active) {
   useEffect(() => {
     if (!active || session.status !== 'ready') return;
     let alive = true;
-    const tick = () => macApi('/status')
+    setStatus(v => ({ ...v, ready: null, error: '' }));
+    const tick = () => macApi('/status', undefined, macId)
       .then(s => {
         if (!alive) return;
         const a = s?.agent || {};
@@ -64,7 +66,7 @@ export function useMacRemote(active) {
       .catch(e => { if (alive) { setStatus(v => ({ ...v, ready: false, error: e.message })); if (e.status === 401) setAttempt(a => a + 1); } });
     tick(); const t = setInterval(tick, 5000);
     return () => { alive = false; clearInterval(t); };
-  }, [active, session.status]);
+  }, [active, session.status, macId]);
 
   useEffect(() => {
     if (!active || mode !== 'shots') return;
@@ -73,15 +75,16 @@ export function useMacRemote(active) {
   }, [active, mode]);
 
   const run = useCallback(async fn => { setErr(''); try { await fn(); } catch (e) { setErr(e.message); } }, []);
-  const send = useCallback(async text => { setBusy(true); await run(() => macType(text)); setBusy(false); }, [run]);
-  const key = useCallback(combo => run(() => macKey(combo)), [run]);
+  const call = useCallback((path, body) => macApi(path, body, macId), [macId]);
+  const send = useCallback(async text => { setBusy(true); await run(() => macType(text, macId)); setBusy(false); }, [run, macId]);
+  const key = useCallback(combo => run(() => macKey(combo, macId)), [run, macId]);
   const reconnect = useCallback(() => { streamErrors.current = 0; setMode(mseSupported() ? 'video' : 'stream'); setVideoStats(null); setFrame(f => f + 1); }, []);
   const retry = useCallback(() => setAttempt(a => a + 1), []);
   const setQuality = useCallback(q => {
     q = validQuality(q); setQualityState(q); qualityChangedAt.current = Date.now();
     try { localStorage.setItem(QUALITY_KEY, q); } catch { /* privat modus */ }
-    if (session.status === 'ready') run(() => macVideoQuality(q));
-  }, [run, session.status]);
+    if (session.status === 'ready') run(() => macVideoQuality(q, macId));
+  }, [run, session.status, macId]);
   // Tre forsøk på nytt, så ett hakk ned: video → MJPEG → skjermbilder.
   const onStreamError = useCallback(() => {
     if (mode === 'shots') return;
@@ -89,15 +92,15 @@ export function useMacRemote(active) {
     else setTimeout(() => setFrame(f => f + 1), 1000 * streamErrors.current);
   }, [mode]);
 
-  const src = session.status !== 'ready' || mode === 'video' ? '' : mode === 'stream' ? `/iphone/api/mac/stream?w=1280&fps=8&t=${frame}` : `/iphone/api/mac/screenshot?w=1280&t=${frame}`;
+  const src = session.status !== 'ready' || mode === 'video' ? '' : mode === 'stream' ? `/iphone/api/mac/stream?mac=${macId}&w=1280&fps=8&t=${frame}` : `/iphone/api/mac/screenshot?mac=${macId}&w=1280&t=${frame}`;
   // Kvaliteten sendes med når strømmen startes (ref, ikke state: et bytte underveis skal ikke starte spilleren på nytt).
-  const videoUrl = useMemo(() => session.status === 'ready' && mode === 'video' ? `/iphone/api/mac/video?quality=${qualityRef.current}&t=${frame}` : '', [session.status, mode, frame]);
-  return { session, size, status, mode, src, videoUrl, videoStats, setVideoStats, quality, setQuality, busy, err, run, send, key, reconnect, retry, onStreamError };
+  const videoUrl = useMemo(() => session.status === 'ready' && mode === 'video' ? `/iphone/api/mac/video?mac=${macId}&quality=${qualityRef.current}&t=${frame}` : '', [session.status, mode, frame, macId]);
+  return { session, macId, macName: macName(macId), size, status, mode, src, videoUrl, videoStats, setVideoStats, quality, setQuality, busy, err, run, call, send, key, reconnect, retry, onStreamError };
 }
 
 /** Mac-skjermen: så stor som plassen tillater i skjermens sideforhold. Klikk i bildet og skriv for å sende tastetrykk. Knappen nede til høyre gir fullskjerm (Esc avslutter). */
 export function MacScreen({ remote, className = '' }) {
-  const { size, src, videoUrl, run, onStreamError, setVideoStats } = remote;
+  const { size, src, videoUrl, run, call, onStreamError, setVideoStats } = remote;
   const wrapRef = useRef(null), screenRef = useRef(null), overlayRef = useRef(null), videoRef = useRef(null), down = useRef(null);
   const [box, setBox] = useState({ width: 0, height: 0 });
   const [focused, setFocused] = useState(false);
@@ -126,9 +129,9 @@ export function MacScreen({ remote, className = '' }) {
     const d = down.current; down.current = null;
     if (!d || ev.button !== 0) return;
     const [path, body] = macPointerAction(d.p, toPoint(ev), (Date.now() - d.t) / 1000, ev.detail, eventModifiers(ev));
-    run(() => macApi(path.replace('/api/mac', ''), body));
+    run(() => call(path.replace('/api/mac', ''), body));
   };
-  const onContext = ev => { ev.preventDefault(); const p = toPoint(ev); run(() => macApi('/click', { x: p.x, y: p.y, button: 'right' })); };
+  const onContext = ev => { ev.preventDefault(); const p = toPoint(ev); run(() => call('/click', { x: p.x, y: p.y, button: 'right' })); };
   const wheel = useRef({ dx: 0, dy: 0, pos: null, busy: false });
   const flushWheel = async () => {
     const w = wheel.current;
@@ -137,7 +140,7 @@ export function MacScreen({ remote, className = '' }) {
     await new Promise(r => setTimeout(r, 80));
     const dx = Math.round(w.dx), dy = Math.round(w.dy); w.dx = 0; w.dy = 0;
     const p = w.pos || { x: size.width / 2, y: size.height / 2 };
-    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) await run(() => macApi('/scroll', { x: p.x, y: p.y, dx, dy }));
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) await run(() => call('/scroll', { x: p.x, y: p.y, dx, dy }));
     w.busy = false;
     if (Math.abs(w.dx) > 2 || Math.abs(w.dy) > 2) flushWheel();
   };
@@ -147,7 +150,7 @@ export function MacScreen({ remote, className = '' }) {
     const action = keyEventAction(ev);
     if (!action) return;
     ev.preventDefault();
-    run(() => macApi(action[0].replace('/api/mac', ''), action[1]));
+    run(() => call(action[0].replace('/api/mac', ''), action[1]));
   };
   // Videoen (H.264 over MSE) startes når adressen settes; feil gir ett hakk ned til MJPEG via onStreamError.
   useEffect(() => {
@@ -214,7 +217,7 @@ export function MacKeyboard({ remote }) {
 /** Kjørende apper; klikk henter appen fram. */
 export function MacApps({ remote, active = true }) {
   const [apps, setApps] = useState(null);
-  const load = useCallback(() => macApi('/apps').then(r => setApps(r.apps || [])).catch(() => setApps([])), []);
+  const load = useCallback(() => remote.call('/apps').then(r => setApps(r.apps || [])).catch(() => setApps([])), [remote.call]);
   useEffect(() => { if (!active || remote.session.status !== 'ready') return; load(); const t = setInterval(load, 15000); return () => clearInterval(t); }, [active, remote.session.status, load]);
   if (apps === null) return <p className="text-xs text-nx-mute">Henter apper …</p>;
   if (!apps.length) return <p className="text-xs text-nx-mute">Ingen apper med vindu.</p>;
@@ -222,7 +225,7 @@ export function MacApps({ remote, active = true }) {
     <ul className="space-y-1 text-xs">
       {apps.map(a => (
         <li key={a.pid}>
-          <button onClick={() => remote.run(() => macActivate(a.bundleId || a.name)).then(() => setTimeout(load, 800))} className={`flex w-full items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-nx-cyan/10 ${a.active ? 'text-nx-green' : 'text-nx-text'}`}>
+          <button onClick={() => remote.run(() => remote.call('/activate', { app: a.bundleId || a.name })).then(() => setTimeout(load, 800))} className={`flex w-full items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-nx-cyan/10 ${a.active ? 'text-nx-green' : 'text-nx-text'}`}>
             <AppWindow size={12} className="shrink-0 text-nx-mute" /><span className="truncate">{a.name}</span>{a.hidden && <span className="ml-auto text-[10px] text-nx-mute">skjult</span>}
           </button>
         </li>
@@ -258,5 +261,5 @@ export function MacStatusLine({ remote }) {
 }
 
 /** Vekk skjermen. */
-export const macWake = () => macApi('/wake', {});
+export const macWake = remote => remote.call('/wake', {});
 export { Sun as WakeIcon };
