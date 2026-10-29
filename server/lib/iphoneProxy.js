@@ -90,7 +90,7 @@ export function createIphoneProxy({ env = process.env, fetchImpl = fetch, isProd
   proxy.use(async (req, res) => {
     // Egne sikkerhetshoder: siden kan bare vises i dashboardet (samme opphav) og trenger innebygde skript.
     res.set({ 'X-Frame-Options': 'SAMEORIGIN', 'Cache-Control': 'no-store',
-      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'none'; form-action 'self'" });
+      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'none'; form-action 'self'" });
     if (!iphoneConfigured(env)) return res.status(503).type('text').send('Iphone-fjernstyring er ikke satt opp på serveren.');
     if (!validTicket(readCookie(req, TICKET_COOKIE))) return res.status(401).type('text').send('Åpne Iphone-fanen i dashboardet på nytt.');
     const path = upstreamPath(req.path);
