@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Home, ArrowLeft, LayoutGrid, SlidersHorizontal, Lock, Unlock, Volume1, Volume2, ChevronUp, ChevronDown, CornerDownLeft, Delete, Send } from 'lucide-react';
 import { openIphoneSession, phoneApi, gestures, pointerAction, typeText } from '../lib/iphoneRemote.js';
+import { pointInScreen } from '../lib/macGestures.js';
+import { useFullscreen } from '../lib/useFullscreen.js';
+import { FullscreenButton } from './FullscreenButton.jsx';
 
 /**
  * Felles fjernstyring av iPhonen for telefonpanelet og Iphone-fanen:
@@ -72,11 +75,10 @@ export function usePhoneRemote(active) {
 /** Telefonskjermen: fyller høyden den får, med telefonens sideforhold. */
 export function PhoneScreen({ remote, className = '' }) {
   const { size, src, run, onStreamError } = remote;
-  const overlayRef = useRef(null), down = useRef(null);
-  const toPoint = ev => {
-    const r = overlayRef.current.getBoundingClientRect();
-    return { x: Math.max(0, Math.min(size.width, (ev.clientX - r.left) / r.width * size.width)), y: Math.max(0, Math.min(size.height, (ev.clientY - r.top) / r.height * size.height)) };
-  };
+  const screenRef = useRef(null), overlayRef = useRef(null), down = useRef(null);
+  const [full, toggleFull] = useFullscreen(screenRef);
+  // I fullskjerm fyller ikke bildet hele boksen (object-fit: contain), så punktet regnes fra bildets område.
+  const toPoint = ev => pointInScreen(ev, overlayRef.current.getBoundingClientRect(), size);
   const onDown = ev => { ev.currentTarget.setPointerCapture(ev.pointerId); down.current = { p: toPoint(ev), t: Date.now() }; };
   const onUp = ev => {
     const d = down.current; down.current = null;
@@ -85,10 +87,11 @@ export function PhoneScreen({ remote, className = '' }) {
     run(() => phoneApi(path, body));
   };
   return (
-    <div className={`relative h-full max-w-full rounded-[26px] overflow-hidden border border-nx-line/70 bg-black select-none shadow-[0_10px_40px_#0008] ${className}`} style={{ aspectRatio: `${size.width} / ${size.height}`, touchAction: 'none' }}>
+    <div ref={screenRef} className={`relative h-full max-w-full rounded-[26px] overflow-hidden border border-nx-line/70 bg-black select-none shadow-[0_10px_40px_#0008] ${className}`} style={{ aspectRatio: `${size.width} / ${size.height}`, touchAction: 'none' }}>
       {src && <img src={src} alt="iPhone-skjerm" className="absolute inset-0 h-full w-full object-contain pointer-events-none" onError={onStreamError} />}
       <div ref={overlayRef} className="absolute inset-0 cursor-crosshair" onPointerDown={onDown} onPointerUp={onUp}
         onDoubleClick={ev => run(() => phoneApi('/api/doubletap', toPoint(ev)))} onContextMenu={ev => ev.preventDefault()} />
+      <FullscreenButton full={full} onToggle={toggleFull} />
     </div>
   );
 }

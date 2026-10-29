@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Search, ArrowLeftRight, LayoutGrid, X, CornerDownLeft, XSquare, Copy, ClipboardPaste, Undo2, Lock, Sun, Send, Keyboard, AppWindow } from 'lucide-react';
 import { openIphoneSession, macApi, macType, macKey, macActivate, macPointerAction, keyEventAction, eventModifiers } from '../lib/macRemote.js';
+import { pointInScreen } from '../lib/macGestures.js';
+import { useFullscreen } from '../lib/useFullscreen.js';
+import { FullscreenButton } from './FullscreenButton.jsx';
 
 /**
  * Felles fjernstyring av Macen (Mac Studio) for Mac-panelet og Mac-fanen:
@@ -72,12 +75,13 @@ export function useMacRemote(active) {
   return { session, size, status, src, busy, err, run, send, key, reconnect, retry, onStreamError };
 }
 
-/** Mac-skjermen: så stor som plassen tillater i skjermens sideforhold. Klikk i bildet og skriv for å sende tastetrykk. */
+/** Mac-skjermen: så stor som plassen tillater i skjermens sideforhold. Klikk i bildet og skriv for å sende tastetrykk. Knappen nede til høyre gir fullskjerm (Esc avslutter). */
 export function MacScreen({ remote, className = '' }) {
   const { size, src, run, onStreamError } = remote;
-  const wrapRef = useRef(null), overlayRef = useRef(null), down = useRef(null);
+  const wrapRef = useRef(null), screenRef = useRef(null), overlayRef = useRef(null), down = useRef(null);
   const [box, setBox] = useState({ width: 0, height: 0 });
   const [focused, setFocused] = useState(false);
+  const [full, toggleFull] = useFullscreen(screenRef);
 
   // Bildet skal fylle boksen helt (pekerkoordinatene regner med det), så boksen får skjermens sideforhold innenfor plassen den har.
   useLayoutEffect(() => {
@@ -95,10 +99,8 @@ export function MacScreen({ remote, className = '' }) {
     return () => ro.disconnect();
   }, [size.width, size.height]);
 
-  const toPoint = ev => {
-    const r = overlayRef.current.getBoundingClientRect();
-    return { x: Math.max(0, Math.min(size.width, (ev.clientX - r.left) / r.width * size.width)), y: Math.max(0, Math.min(size.height, (ev.clientY - r.top) / r.height * size.height)) };
-  };
+  // I fullskjerm fyller ikke bildet hele boksen (object-fit: contain), så punktet regnes fra bildets område.
+  const toPoint = ev => pointInScreen(ev, overlayRef.current.getBoundingClientRect(), size);
   const onDown = ev => { ev.currentTarget.focus(); if (ev.button !== 0) return; ev.currentTarget.setPointerCapture(ev.pointerId); down.current = { p: toPoint(ev), t: Date.now() }; };
   const onUp = ev => {
     const d = down.current; down.current = null;
@@ -121,6 +123,7 @@ export function MacScreen({ remote, className = '' }) {
   };
   const onWheel = ev => { ev.preventDefault(); wheel.current.dx += ev.deltaX; wheel.current.dy += ev.deltaY; wheel.current.pos = toPoint(ev); flushWheel(); };
   const onKey = ev => {
+    if (ev.key === 'Escape' && full) return; // nettleseren avslutter fullskjerm; ikke send Esc til Macen i tillegg
     const action = keyEventAction(ev);
     if (!action) return;
     ev.preventDefault();
@@ -131,12 +134,13 @@ export function MacScreen({ remote, className = '' }) {
 
   return (
     <div ref={wrapRef} className={`h-full w-full flex items-center justify-center min-h-0 min-w-0 ${className}`}>
-      <div className={`relative rounded-xl overflow-hidden border bg-black select-none shadow-[0_10px_40px_#0008] outline-none ${focused ? 'border-nx-cyan/70' : 'border-nx-line/70'}`}
+      <div ref={screenRef} className={`relative rounded-xl overflow-hidden border bg-black select-none shadow-[0_10px_40px_#0008] outline-none ${focused ? 'border-nx-cyan/70' : 'border-nx-line/70'}`}
         style={{ width: box.width || '100%', height: box.height || undefined, aspectRatio: box.width ? undefined : `${size.width} / ${size.height}`, touchAction: 'none' }}
         tabIndex={0} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onKeyDown={onKey} aria-label="Mac-skjerm, tastetrykk sendes til Macen når den har fokus">
         {src && <img src={src} alt="Mac-skjerm" className="absolute inset-0 h-full w-full object-contain pointer-events-none" onError={onStreamError} />}
         <div ref={overlayRef} className="absolute inset-0 cursor-crosshair" onPointerDown={onDown} onPointerUp={onUp} onContextMenu={onContext} />
         {focused && <span className="absolute right-2 top-2 rounded-md bg-nx-bg/70 px-1.5 py-0.5 text-[10px] text-nx-cyan flex items-center gap-1"><Keyboard size={11} /> tastatur til Macen</span>}
+        <FullscreenButton full={full} onToggle={toggleFull} />
       </div>
     </div>
   );
