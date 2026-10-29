@@ -13,6 +13,8 @@ import { Readable } from 'node:stream';
  *    dashboardet. Uten gyldig billett svarer /iphone/ 401.
  *  - Siden til iphone-remote bruker absolutte stier (/api/…, /login); de
  *    skrives om til /iphone/… så de ikke treffer dashboardets eget /api.
+ *  - Macen (mac-agent via samme iphone-remote) går samme vei: /iphone/api/mac/… og
+ *    siden /iphone/mac.html.
  */
 const TICKET_COOKIE = 'gp_iphone';
 const TICKET_TTL_MS = 12 * 3600_000;
@@ -35,12 +37,14 @@ const readCookie = (req, name) => (req.headers.cookie || '').split(';').map(v =>
 
 /** Absolutte stier i iphone-remote-siden → /iphone/…, så de går via mellomtjeneren. */
 export function rewriteHtml(html) {
-  return html.replace(/(["'`])\/(api\/|login\b|logout\b)/g, '$1/iphone/$2');
+  return html.replace(/(["'`])\/(api\/|login\b|logout\b|mac\.html\b)/g, '$1/iphone/$2').replace(/href="\/"/g, 'href="/iphone/"');
 }
+const PAGES = new Set(['/', '/mac.html']);
 
 // Upstream-sti fra /iphone/…; bare appen, API-et og inn/utlogging slippes gjennom.
 export function upstreamPath(path) {
   if (path === '/' || path === '') return '/';
+  if (path === '/mac.html') return path;
   if (/^\/api\/[a-z0-9/_-]+$/i.test(path) || path === '/login' || path === '/logout') return path;
   return null;
 }
@@ -99,10 +103,10 @@ export function createIphoneProxy({ env = process.env, fetchImpl = fetch, isProd
     try {
       const r = await forward(req, path, ctrl.signal);
       res.status(r.status);
-      for (const h of ['content-type', 'content-length', 'cache-control']) { const v = r.headers.get(h); if (v && !(path === '/' && h === 'content-length')) res.set(h, v); }
+      for (const h of ['content-type', 'content-length', 'cache-control']) { const v = r.headers.get(h); if (v && !(PAGES.has(path) && h === 'content-length')) res.set(h, v); }
       // no-transform: komprimering ville bufret skjermstrømmen (multipart/x-mixed-replace).
       res.set('Cache-Control', 'no-store, no-transform');
-      if (path === '/') return res.send(rewriteHtml(await r.text()));
+      if (PAGES.has(path)) return res.send(rewriteHtml(await r.text()));
       if (!r.body) return res.end();
       Readable.fromWeb(r.body).on('error', () => res.destroy()).pipe(res);
     } catch (e) {

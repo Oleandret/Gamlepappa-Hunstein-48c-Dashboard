@@ -12,6 +12,8 @@ const ticketCookie=async base=>{const r=await fetch(`${base}/api/iphone/session`
 
 test('helpers: path allowlist, html rewrite, tickets, config',()=>{
  assert.equal(upstreamPath('/'),'/');assert.equal(upstreamPath('/api/tap'),'/api/tap');assert.equal(upstreamPath('/mcp'),null);assert.equal(upstreamPath('/../etc'),null);
+ assert.equal(upstreamPath('/mac.html'),'/mac.html');assert.equal(upstreamPath('/api/mac/stream'),'/api/mac/stream');assert.equal(upstreamPath('/mac/mcp'),null);
+ assert.equal(rewriteHtml('<a href="/mac.html">Mac</a><a href="/">iPhone</a>'),'<a href="/iphone/mac.html">Mac</a><a href="/iphone/">iPhone</a>');
  assert.equal(rewriteHtml('fetch("/api/x");src=\'/login\';`/logout`; "/mcp"'),'fetch("/iphone/api/x");src=\'/iphone/login\';`/iphone/logout`; "/mcp"');
  const n=Date.parse('2026-10-28T12:00:00Z'),t=makeTicket(n);assert.ok(validTicket(t,n+1));assert.ok(!validTicket(t,n+13*3600000));assert.ok(!validTicket(t.replace(/.$/,'x'),n+1));assert.ok(!validTicket('',1));
  assert.ok(iphoneConfigured(env));assert.ok(!iphoneConfigured({...env,IPHONE_REMOTE_URL:'http://x'}));assert.ok(!iphoneConfigured({}));
