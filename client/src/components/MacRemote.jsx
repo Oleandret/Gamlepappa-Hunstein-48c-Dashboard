@@ -59,6 +59,8 @@ export function useMacRemote(active, macId = DEFAULT_MAC) {
         const a = s?.agent || {};
         if (a.display?.width) setSize({ width: a.display.width, height: a.display.height });
         setStatus({ ready: a.ok === true, permissions: a.permissions || {}, frontmost: a.frontmost?.name || '', locked: !!a.screenLocked, activity: Array.isArray(s?.activity) ? s.activity.slice(0, 12) : [], error: a.ok ? '' : (a.error || (s?.enabled === false ? 'Mac-fjernstyring er ikke satt opp i iphone-remote.' : 'Mac-agenten svarer ikke.')) });
+        // Macer der ScreenCaptureKit ikke gir bilder (Eufy-Macen, macOS 12): rett til MJPEG uten å vente på at videoen feiler.
+        if (a.video?.unsupported) { setMode(m => m === 'video' ? 'stream' : m); setVideoStats(null); }
         // Kvaliteten er felles: vis den agenten faktisk strømmer med, men ikke rett etter at vi selv byttet.
         const q = a.video?.capturing ? a.video.quality : null;
         if (q && validQuality(q) === q && Date.now() - qualityChangedAt.current > 8000) setQualityState(q);
