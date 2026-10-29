@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Search, ArrowLeftRight, LayoutGrid, X, CornerDownLeft, XSquare, Copy, ClipboardPaste, Undo2, Lock, Sun, Send, Keyboard, AppWindow } from 'lucide-react';
-import { openIphoneSession, macApi, macType, macKey, macActivate, macPointerAction, keyEventAction, eventModifiers } from '../lib/macRemote.js';
+import { openIphoneSession, macApi, macType, macKey, macActivate, macVideoQuality, macPointerAction, keyEventAction, eventModifiers } from '../lib/macRemote.js';
+import { VIDEO_QUALITIES, validQuality } from '../lib/macVideoQuality.js';
 import { pointInScreen } from '../lib/macGestures.js';
 import { useFullscreen } from '../lib/useFullscreen.js';
 import { FullscreenButton } from './FullscreenButton.jsx';
@@ -9,13 +10,16 @@ import { createFmp4Player, mseSupported } from '../lib/fmp4Player.js';
 /**
  * Felles fjernstyring av Macen (Mac Studio) for Mac-panelet og Mac-fanen:
  * billett (samme som telefonen), skjermstørrelse, status, skjermbilde som
- * H.264-video (MSE) med MJPEG-strøm og skjermbilder som reserve,
+ * H.264-video (MSE) med valgbar kvalitet, MJPEG-strøm og skjermbilder som reserve,
  * klikk/dobbeltklikk/høyreklikk/dra/rull, tastatur-fangst, snarveiknapper og apper.
  */
 export const MAC_BUTTONS = [
   ['cmd+space', 'Spotlight', Search], ['cmd+tab', 'Bytt app', ArrowLeftRight], ['ctrl+up', 'Oversikt', LayoutGrid], ['escape', 'Esc', X], ['return', 'Enter', CornerDownLeft],
   ['cmd+w', 'Lukk vindu', XSquare], ['cmd+c', 'Kopier', Copy], ['cmd+v', 'Lim inn', ClipboardPaste], ['cmd+z', 'Angre', Undo2], ['ctrl+cmd+q', 'Lås', Lock]
 ];
+
+const QUALITY_KEY = 'macVideoQuality';
+const storedQuality = () => { try { return validQuality(localStorage.getItem(QUALITY_KEY)); } catch { return validQuality(); } };
 
 export function useMacRemote(active) {
   const [session, setSession] = useState({ status: 'idle' });
@@ -25,6 +29,9 @@ export function useMacRemote(active) {
   const [mode, setMode] = useState(() => mseSupported() ? 'video' : 'stream');   // video → stream (MJPEG) → shots
   const [frame, setFrame] = useState(0);
   const [videoStats, setVideoStats] = useState(null);
+  const [quality, setQualityState] = useState(storedQuality);
+  const qualityRef = useRef(quality); qualityRef.current = quality;
+  const qualityChangedAt = useRef(0);
   const [busy, setBusy] = useState(false), [err, setErr] = useState('');
   const streamErrors = useRef(0);
 
@@ -50,6 +57,9 @@ export function useMacRemote(active) {
         const a = s?.agent || {};
         if (a.display?.width) setSize({ width: a.display.width, height: a.display.height });
         setStatus({ ready: a.ok === true, permissions: a.permissions || {}, frontmost: a.frontmost?.name || '', locked: !!a.screenLocked, activity: Array.isArray(s?.activity) ? s.activity.slice(0, 12) : [], error: a.ok ? '' : (a.error || (s?.enabled === false ? 'Mac-fjernstyring er ikke satt opp i iphone-remote.' : 'Mac-agenten svarer ikke.')) });
+        // Kvaliteten er felles: vis den agenten faktisk strømmer med, men ikke rett etter at vi selv byttet.
+        const q = a.video?.capturing ? a.video.quality : null;
+        if (q && validQuality(q) === q && Date.now() - qualityChangedAt.current > 8000) setQualityState(q);
       })
       .catch(e => { if (alive) { setStatus(v => ({ ...v, ready: false, error: e.message })); if (e.status === 401) setAttempt(a => a + 1); } });
     tick(); const t = setInterval(tick, 5000);
@@ -67,6 +77,11 @@ export function useMacRemote(active) {
   const key = useCallback(combo => run(() => macKey(combo)), [run]);
   const reconnect = useCallback(() => { streamErrors.current = 0; setMode(mseSupported() ? 'video' : 'stream'); setVideoStats(null); setFrame(f => f + 1); }, []);
   const retry = useCallback(() => setAttempt(a => a + 1), []);
+  const setQuality = useCallback(q => {
+    q = validQuality(q); setQualityState(q); qualityChangedAt.current = Date.now();
+    try { localStorage.setItem(QUALITY_KEY, q); } catch { /* privat modus */ }
+    if (session.status === 'ready') run(() => macVideoQuality(q));
+  }, [run, session.status]);
   // Tre forsøk på nytt, så ett hakk ned: video → MJPEG → skjermbilder.
   const onStreamError = useCallback(() => {
     if (mode === 'shots') return;
@@ -75,8 +90,9 @@ export function useMacRemote(active) {
   }, [mode]);
 
   const src = session.status !== 'ready' || mode === 'video' ? '' : mode === 'stream' ? `/iphone/api/mac/stream?w=1280&fps=8&t=${frame}` : `/iphone/api/mac/screenshot?w=1280&t=${frame}`;
-  const videoUrl = session.status === 'ready' && mode === 'video' ? `/iphone/api/mac/video?t=${frame}` : '';
-  return { session, size, status, mode, src, videoUrl, videoStats, setVideoStats, busy, err, run, send, key, reconnect, retry, onStreamError };
+  // Kvaliteten sendes med når strømmen startes (ref, ikke state: et bytte underveis skal ikke starte spilleren på nytt).
+  const videoUrl = useMemo(() => session.status === 'ready' && mode === 'video' ? `/iphone/api/mac/video?quality=${qualityRef.current}&t=${frame}` : '', [session.status, mode, frame]);
+  return { session, size, status, mode, src, videoUrl, videoStats, setVideoStats, quality, setQuality, busy, err, run, send, key, reconnect, retry, onStreamError };
 }
 
 /** Mac-skjermen: så stor som plassen tillater i skjermens sideforhold. Klikk i bildet og skriv for å sende tastetrykk. Knappen nede til høyre gir fullskjerm (Esc avslutter). */
@@ -212,6 +228,18 @@ export function MacApps({ remote, active = true }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/** Videokvalitet: byttes live for alle som ser (koderen er felles). Vises bare når skjermen går som video. */
+export function MacQualitySelect({ remote, compact = false, className = '' }) {
+  if (remote.session.status !== 'ready' || remote.mode !== 'video') return null;
+  return (
+    <select value={remote.quality} onChange={e => remote.setQuality(e.target.value)} aria-label="Videokvalitet"
+      title="Videokvalitet (bitrate når noe beveger seg). Byttes uten avbrudd og gjelder alle som ser."
+      className={`chip bg-nx-bg text-xs cursor-pointer ${className}`}>
+      {VIDEO_QUALITIES.map(([id, label, rate]) => <option key={id} value={id}>{compact ? label : `${label} · ${rate}`}</option>)}
+    </select>
   );
 }
 
