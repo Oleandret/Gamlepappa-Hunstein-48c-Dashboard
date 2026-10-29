@@ -1,5 +1,5 @@
 /**
- * Macene som kan fjernstyres via iphone-remote. id er gatewayens navn (MAC_<ID>_HOST der;
+ * Maskinene (Macer og Windows-maskiner med win-agent) som kan fjernstyres via iphone-remote. id er gatewayens navn (MAC_<ID>_HOST der;
  * «soverom» er gatewayens standard uten mac=). Legges en ny Mac til i gatewayen, legges den til her.
  */
 export const MACS = [
@@ -7,7 +7,8 @@ export const MACS = [
   { id: 'stue', name: 'Mac i stua', short: 'Stua' },
   { id: 'eufy', name: 'Eufy-Macen', short: 'Eufy' },
   { id: 'andreas', name: 'Andreas-iMac', short: 'Andreas' },
-  { id: 'halsaneset', name: 'Mac på Halsaneset', short: 'Halsaneset' }
+  { id: 'halsaneset', name: 'Mac på Halsaneset', short: 'Halsaneset' },
+  { id: 'travbaneveien', name: 'Travbaneveien-laptop', short: 'Travbane' }
 ];
 export const DEFAULT_MAC = MACS[0].id;
 export const validMac = id => MACS.some(m => m.id === id) ? id : DEFAULT_MAC;
