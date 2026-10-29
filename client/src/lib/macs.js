@@ -5,7 +5,8 @@
 export const MACS = [
   { id: 'soverom', name: 'Mac på Soverom', short: 'Soverom' },
   { id: 'stue', name: 'Mac i stua', short: 'Stua' },
-  { id: 'eufy', name: 'Eufy-Macen', short: 'Eufy' }
+  { id: 'eufy', name: 'Eufy-Macen', short: 'Eufy' },
+  { id: 'andreas', name: 'Andreas-iMac', short: 'Andreas' }
 ];
 export const DEFAULT_MAC = MACS[0].id;
 export const validMac = id => MACS.some(m => m.id === id) ? id : DEFAULT_MAC;
