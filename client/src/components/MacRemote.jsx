@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, ArrowLeftRight, LayoutGrid, X, CornerDownLeft, XSquare, Copy, ClipboardPaste, Undo2, Lock, Sun, Send, Keyboard, AppWindow } from 'lucide-react';
 import { openIphoneSession, macApi, macType, macKey, macVideoQuality, macPointerAction, keyEventAction, eventModifiers } from '../lib/macRemote.js';
 import { VIDEO_QUALITIES, validQuality } from '../lib/macVideoQuality.js';
 import { DEFAULT_MAC, macName } from '../lib/macs.js';
 import { pointInScreen } from '../lib/macGestures.js';
-import { useFullscreen } from '../lib/useFullscreen.js';
+import { useFullscreen, FAKE_FULLSCREEN_STYLE } from '../lib/useFullscreen.js';
 import { FullscreenButton } from './FullscreenButton.jsx';
 import { createFmp4Player, mseSupported } from '../lib/fmp4Player.js';
 
@@ -106,7 +107,7 @@ export function MacScreen({ remote, className = '' }) {
   const wrapRef = useRef(null), screenRef = useRef(null), overlayRef = useRef(null), videoRef = useRef(null), down = useRef(null);
   const [box, setBox] = useState({ width: 0, height: 0 });
   const [focused, setFocused] = useState(false);
-  const [full, toggleFull] = useFullscreen(screenRef);
+  const [full, toggleFull, fake] = useFullscreen(screenRef);   // fake: Safari på iPhone, skjermen legges over vinduet i stedet
 
   // Bildet skal fylle boksen helt (pekerkoordinatene regner med det), så boksen får skjermens sideforhold innenfor plassen den har.
   useLayoutEffect(() => {
@@ -155,19 +156,19 @@ export function MacScreen({ remote, className = '' }) {
     run(() => call(action[0].replace('/api/mac', ''), action[1]));
   };
   // Videoen (H.264 over MSE) startes når adressen settes; feil gir ett hakk ned til MJPEG via onStreamError.
+  // Uekte fullskjerm flytter elementet til <body> (nytt <video>), så spilleren startes på nytt da.
   useEffect(() => {
     const v = videoRef.current;
     if (!videoUrl || !v) return;
     const p = createFmp4Player(v, videoUrl, { onError: onStreamError, onStats: setVideoStats });
     return () => p.stop();
-  }, [videoUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [videoUrl, fake]); // eslint-disable-line react-hooks/exhaustive-deps
   // Hjul-hendelsen må registreres uten passive for at preventDefault skal virke.
   useEffect(() => { const el = overlayRef.current; if (!el) return; el.addEventListener('wheel', onWheel, { passive: false }); return () => el.removeEventListener('wheel', onWheel); });
 
-  return (
-    <div ref={wrapRef} className={`h-full w-full flex items-center justify-center min-h-0 min-w-0 ${className}`}>
+  const screen = (
       <div ref={screenRef} className={`relative rounded-xl overflow-hidden border bg-black select-none shadow-[0_10px_40px_#0008] outline-none ${focused ? 'border-nx-cyan/70' : 'border-nx-line/70'}`}
-        style={{ width: box.width || '100%', height: box.height || undefined, aspectRatio: box.width ? undefined : `${size.width} / ${size.height}`, touchAction: 'none' }}
+        style={{ width: box.width || '100%', height: box.height || undefined, aspectRatio: box.width ? undefined : `${size.width} / ${size.height}`, touchAction: 'none', ...(fake ? FAKE_FULLSCREEN_STYLE : null) }}
         tabIndex={0} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onKeyDown={onKey} aria-label="Mac-skjerm, tastetrykk sendes til Macen når den har fokus">
         {videoUrl && <video ref={videoRef} muted autoPlay playsInline aria-label="Mac-skjerm (video)" className="absolute inset-0 h-full w-full object-contain pointer-events-none bg-black" />}
         {src && <img src={src} alt="Mac-skjerm" className="absolute inset-0 h-full w-full object-contain pointer-events-none" onError={onStreamError} />}
@@ -175,6 +176,11 @@ export function MacScreen({ remote, className = '' }) {
         {focused && <span className="absolute right-2 top-2 rounded-md bg-nx-bg/70 px-1.5 py-0.5 text-[10px] text-nx-cyan flex items-center gap-1"><Keyboard size={11} /> tastatur til Macen</span>}
         <FullscreenButton full={full} onToggle={toggleFull} />
       </div>
+  );
+  // Uekte fullskjerm (Safari på iPhone) legges rett i <body>: panelet har backdrop-blur, som ellers holder «fixed» innenfor panelet.
+  return (
+    <div ref={wrapRef} className={`h-full w-full flex items-center justify-center min-h-0 min-w-0 ${className}`}>
+      {fake ? createPortal(screen, document.body) : screen}
     </div>
   );
 }

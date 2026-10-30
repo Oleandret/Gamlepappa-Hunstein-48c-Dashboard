@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Home, ArrowLeft, LayoutGrid, SlidersHorizontal, Lock, Unlock, Volume1, Volume2, ChevronUp, ChevronDown, CornerDownLeft, Delete, Send } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Home, ArrowLeft, LayoutGrid, SlidersHorizontal, Lock, Unlock, Volume1, Volume2, ChevronUp, ChevronDown, CornerDownLeft, Delete, Send, RectangleVertical, StretchVertical, Maximize2 } from 'lucide-react';
 import { openIphoneSession, phoneApi, gestures, pointerAction, typeText } from '../lib/iphoneRemote.js';
 import { pointInScreen } from '../lib/macGestures.js';
-import { useFullscreen } from '../lib/useFullscreen.js';
+import { useFullscreen, FAKE_FULLSCREEN_STYLE } from '../lib/useFullscreen.js';
+import { PHONE_VIEWS, PHONE_VIEW_KEY, validPhoneView } from '../lib/phoneView.js';
 import { FullscreenButton } from './FullscreenButton.jsx';
 
 /**
@@ -72,11 +74,53 @@ export function usePhoneRemote(active) {
   return { session, size, status, src, busy, err, run, send, reconnect, retry, onStreamError, gestures: gestures(size) };
 }
 
-/** Telefonskjermen: fyller høyden den får, med telefonens sideforhold. */
-export function PhoneScreen({ remote, className = '' }) {
+/** Visningsmodus for iPhone-skjermen ('normal' | 'stor'), huskes per nettleser. Fullskjerm er en egen veksel (nettleseren krever et klikk hver gang). */
+export function usePhoneView() {
+  const [view, setView] = useState(() => { try { return validPhoneView(localStorage.getItem(PHONE_VIEW_KEY)); } catch { return 'normal'; } });
+  useEffect(() => { try { localStorage.setItem(PHONE_VIEW_KEY, view); } catch { /* privat modus */ } }, [view]);
+  return [view, setView];
+}
+
+const VIEW_ICONS = { normal: RectangleVertical, stor: StretchVertical, full: Maximize2 };
+
+/**
+ * Velger for visning: Normal, Stor (bare skjermen, så høy som vinduet) og Fullskjerm.
+ * «Fullskjerm» veksler nettleserens fullskjerm på skjermelementet; valg av Normal/Stor avslutter den.
+ * `compact` viser bare ikonene (telefonpanelet).
+ */
+export function PhoneViewSelect({ view, setView, full, toggleFull, compact = false, className = '' }) {
+  const current = full ? 'full' : view;
+  const pick = id => {
+    if (id === 'full') { toggleFull(); return; }
+    if (full) toggleFull();
+    setView(id);
+  };
+  return (
+    <div className={`flex rounded-lg border border-nx-line/60 overflow-hidden text-[11px] ${className}`} role="radiogroup" aria-label="Visning">
+      {PHONE_VIEWS.map(([id, label]) => {
+        const Icon = VIEW_ICONS[id];
+        return (
+          <button key={id} type="button" role="radio" aria-checked={current === id} onClick={() => pick(id)} title={label} aria-label={label}
+            className={`flex items-center gap-1 ${compact ? 'px-1.5' : 'px-2'} py-1 ${current === id ? 'bg-nx-cyan/15 text-nx-cyan' : 'text-nx-mute hover:text-nx-cyan'}`}>
+            <Icon size={13} />{!compact && <span>{label}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Telefonskjermen: fyller høyden den får, med telefonens sideforhold.
+ * `screenRef`/`fullscreen` lar den som tegner rundt (panelet, fanen) eie fullskjermvekselen, så
+ * visningsvelgeren i toppteksten kan styre den; ellers har skjermen sin egen.
+ */
+export function PhoneScreen({ remote, className = '', screenRef: outerRef, fullscreen }) {
   const { size, src, run, onStreamError } = remote;
-  const screenRef = useRef(null), overlayRef = useRef(null), down = useRef(null);
-  const [full, toggleFull] = useFullscreen(screenRef);
+  const ownRef = useRef(null), overlayRef = useRef(null), down = useRef(null);
+  const screenRef = outerRef || ownRef;
+  const own = useFullscreen(screenRef);
+  const [full, toggleFull, fake] = fullscreen || own;
   // I fullskjerm fyller ikke bildet hele boksen (object-fit: contain), så punktet regnes fra bildets område.
   const toPoint = ev => pointInScreen(ev, overlayRef.current.getBoundingClientRect(), size);
   const onDown = ev => { ev.currentTarget.setPointerCapture(ev.pointerId); down.current = { p: toPoint(ev), t: Date.now() }; };
@@ -86,14 +130,16 @@ export function PhoneScreen({ remote, className = '' }) {
     const [path, body] = pointerAction(d.p, toPoint(ev), (Date.now() - d.t) / 1000);
     run(() => phoneApi(path, body));
   };
-  return (
-    <div ref={screenRef} className={`relative h-full max-w-full rounded-[26px] overflow-hidden border border-nx-line/70 bg-black select-none shadow-[0_10px_40px_#0008] ${className}`} style={{ aspectRatio: `${size.width} / ${size.height}`, touchAction: 'none' }}>
+  const screen = (
+    <div ref={screenRef} className={`relative h-full max-w-full rounded-[26px] overflow-hidden border border-nx-line/70 bg-black select-none shadow-[0_10px_40px_#0008] ${className}`} style={{ aspectRatio: `${size.width} / ${size.height}`, touchAction: 'none', ...(fake ? FAKE_FULLSCREEN_STYLE : null) }}>
       {src && <img src={src} alt="iPhone-skjerm" className="absolute inset-0 h-full w-full object-contain pointer-events-none" onError={onStreamError} />}
       <div ref={overlayRef} className="absolute inset-0 cursor-crosshair" onPointerDown={onDown} onPointerUp={onUp}
         onDoubleClick={ev => run(() => phoneApi('/api/doubletap', toPoint(ev)))} onContextMenu={ev => ev.preventDefault()} />
       <FullscreenButton full={full} onToggle={toggleFull} />
     </div>
   );
+  // Uekte fullskjerm legges rett i <body>: panelet har backdrop-blur, som ellers ville holdt «fixed» innenfor panelet.
+  return fake ? createPortal(screen, document.body) : screen;
 }
 
 /** Knappene. `vertical` gir én kolonne med etikett ved siden av ikonet. */

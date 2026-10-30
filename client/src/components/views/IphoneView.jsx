@@ -1,7 +1,8 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { ExternalLink, RefreshCw, Globe, Activity } from 'lucide-react';
 import { phoneApi } from '../../lib/iphoneRemote.js';
-import { usePhoneRemote, PhoneScreen, PhoneButtons, PhoneKeyboard, PhoneSessionNotice } from '../PhoneRemote.jsx';
+import { usePhoneRemote, usePhoneView, PhoneViewSelect, PhoneScreen, PhoneButtons, PhoneKeyboard, PhoneSessionNotice } from '../PhoneRemote.jsx';
+import { useFullscreen } from '../../lib/useFullscreen.js';
 
 /**
  * Iphone: fjernstyring av «Mini sin iPhone» i dashboardets egen stil.
@@ -9,15 +10,20 @@ import { usePhoneRemote, PhoneScreen, PhoneButtons, PhoneKeyboard, PhoneSessionN
  * og tastatur, «Åpne URL» og aktivitet til høyre. Flaten fyller resten av
  * vinduet, så hele telefonen synes uten å rulle. «Eget vindu» åpner hele
  * iphone-remote-siden (via dashboardet, ferdig innlogget).
+ * Visning (velger i toppteksten): Normal, Stor (bare skjermen, uten kolonnene
+ * rundt – den får hele bredden når vinduet er smalt) og Fullskjerm.
  */
 const time = t => new Date(t).toLocaleTimeString('nb-NO', { timeZone: 'Europe/Oslo', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
 export function IphoneView() {
   const remote = usePhoneRemote(true);
   const ready = remote.status.ready;
-  const stageRef = useRef(null);
+  const stageRef = useRef(null), screenRef = useRef(null);
   const [stagePx, setStagePx] = useState(600);
   const [url, setUrl] = useState('');
+  const [view, setView] = usePhoneView();
+  const [full, toggleFull, fake] = useFullscreen(screenRef);
+  const stor = view === 'stor';
 
   // Flaten fyller resten av vinduet fra der den starter.
   useLayoutEffect(() => {
@@ -30,7 +36,7 @@ export function IphoneView() {
     update();
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
-  }, [remote.session.status]);
+  }, [remote.session.status, stor]);
 
   return (
     <section className="space-y-3">
@@ -43,7 +49,8 @@ export function IphoneView() {
           </h1>
         </div>
         {remote.session.status === 'ready' && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center flex-wrap">
+            <PhoneViewSelect view={view} setView={setView} full={full} toggleFull={toggleFull} />
             <button className="chip inline-flex items-center gap-1.5" onClick={remote.reconnect}><RefreshCw size={14} /> Koble til skjermen på nytt</button>
             <a className="chip inline-flex items-center gap-1.5" href="/iphone/" target="_blank" rel="noopener"><ExternalLink size={14} /> Eget vindu</a>
           </div>
@@ -52,7 +59,13 @@ export function IphoneView() {
 
       <PhoneSessionNotice remote={remote} className="panel p-5 text-sm" />
 
-      {remote.session.status === 'ready' && (
+      {remote.session.status === 'ready' && stor && (
+        <div ref={stageRef} className="flex items-center justify-center" style={{ height: stagePx }}>
+          <PhoneScreen remote={remote} screenRef={screenRef} fullscreen={[full, toggleFull, fake]} />
+        </div>
+      )}
+
+      {remote.session.status === 'ready' && !stor && (
         <div ref={stageRef} className="grid gap-4 items-stretch" style={{ height: stagePx, gridTemplateColumns: 'minmax(130px, 160px) minmax(0, auto) minmax(260px, 1fr)' }}>
           <div className="panel p-3 overflow-y-auto">
             <p className="panel-title mb-2">Knapper</p>
@@ -60,7 +73,7 @@ export function IphoneView() {
           </div>
 
           <div className="flex items-center justify-center min-w-0 h-full">
-            <PhoneScreen remote={remote} />
+            <PhoneScreen remote={remote} screenRef={screenRef} fullscreen={[full, toggleFull, fake]} />
           </div>
 
           <div className="flex flex-col gap-3 min-h-0">
