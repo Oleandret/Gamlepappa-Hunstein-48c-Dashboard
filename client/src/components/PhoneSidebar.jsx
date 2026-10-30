@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Smartphone, Monitor, X, RefreshCw } from 'lucide-react';
-import { usePhoneRemote, PhoneScreen, PhoneButtons, PhoneKeyboard, PhoneSessionNotice } from './PhoneRemote.jsx';
+import { usePhoneRemote, usePhoneView, PhoneViewSelect, PhoneScreen, PhoneButtons, PhoneKeyboard, PhoneSessionNotice } from './PhoneRemote.jsx';
 import { useMacRemote, MacScreen, MacButtons, MacKeyboard, MacStatusLine, MacQualitySelect } from './MacRemote.jsx';
 import { MACS, DEFAULT_MAC, validMac, macName, twoLines } from '../lib/macs.js';
+import { useFullscreen } from '../lib/useFullscreen.js';
+import { storPanelWidth } from '../lib/phoneView.js';
 
 /**
  * Telefonpanel til høyre på alle sider: iPhone-skjermen (trykk, sveip, langt
@@ -12,6 +14,8 @@ import { MACS, DEFAULT_MAC, validMac, macName, twoLines } from '../lib/macs.js';
  * Lukket viser stolpen to valg under hverandre, «Iphone» og «Mac på Soverom»; klikk åpner
  * panelet med den enheten. Øverst i det åpne panelet kan en bytte: iPhone (smalt panel)
  * eller Mac på Soverom (bredere, 16:9-skjerm).
+ * iPhonen har tre visninger (velger i toppteksten): Normal, Stor – bare skjermen, så høy som
+ * vinduet, panelet vokser mot venstre og knapper/tastatur er borte – og Fullskjerm.
  */
 export const MAC_NAME = macName(DEFAULT_MAC);
 const DEVICE_KEY = 'nexora.phoneSidebar.device';
@@ -42,7 +46,21 @@ export function PhoneSidebar({ open, onToggle }) {
   const mac = useMacRemote(open && isMac, macId);
   const remote = isMac ? mac : phone;
   const ready = remote.status.ready;
-  const width = isMac ? 'w-[560px]' : 'w-[340px]';
+  const [view, setView] = usePhoneView();
+  const phoneScreenRef = useRef(null), headerRef = useRef(null);
+  const [full, toggleFull, fake] = useFullscreen(phoneScreenRef);
+  const stor = open && !isMac && view === 'stor';
+  // «Stor» på bred skjerm: panelet blir så bredt at telefonen får hele vindushøyden.
+  const [storPx, setStorPx] = useState(480);
+  useLayoutEffect(() => {
+    if (!stor || narrow) return;
+    const update = () => setStorPx(storPanelWidth({ innerWidth: window.innerWidth, innerHeight: window.innerHeight, chrome: 16 + 80 + 12 + (headerRef.current?.offsetHeight || 28), size: phone.size }));
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [stor, narrow, phone.size.width, phone.size.height]);
+  const width = isMac ? 'w-[560px]' : stor ? '' : 'w-[340px]';
+  const widthStyle = stor && !narrow ? { width: storPx } : undefined;
 
   const openWith = d => { setDevice(d); if (!open) onToggle(); };
 
@@ -77,28 +95,31 @@ export function PhoneSidebar({ open, onToggle }) {
   // Bred skjerm: festet til høyre kant så telefonen står i ro mens siden rulles; plassholderen holder av bredden.
   // Smal skjerm: hele skjermen, over dashboardet.
   return (<>
-    {!narrow && <div className={`shrink-0 ${width}`} aria-hidden="true" />}
-    <aside aria-label={isMac ? macName(macId) : 'Telefon'} className={narrow
-      ? 'fixed inset-0 z-[60] bg-nx-bg pt-4 pb-24 px-3 flex flex-col gap-3'
-      : `fixed right-0 top-0 bottom-0 ${width} border-l border-nx-line/60 bg-nx-bg/95 backdrop-blur-md pt-4 pb-24 px-3 z-40 flex flex-col gap-3`}>
-      {/* pb-24: taleassistentens knapp ligger fast nede til høyre; tastaturet skal stå over den. */}
-      <header className="flex items-center gap-2">
-        <div className="flex rounded-lg border border-nx-line/60 overflow-hidden text-[11px]" role="tablist" aria-label="Enhet">
+    {!narrow && <div className={`shrink-0 ${width}`} style={widthStyle} aria-hidden="true" />}
+    <aside aria-label={isMac ? macName(macId) : 'Telefon'} style={widthStyle} className={narrow
+      ? `fixed inset-0 z-[60] bg-nx-bg pt-4 ${stor ? 'pb-3' : 'pb-24'} px-3 flex flex-col gap-3`
+      : `fixed right-0 top-0 bottom-0 ${width} border-l border-nx-line/60 bg-nx-bg/95 backdrop-blur-md pt-4 ${stor ? 'pb-20' : 'pb-24'} px-3 z-40 flex flex-col gap-3`}>
+      {/* pb-24: taleassistentens knapp ligger fast nede til høyre; tastaturet skal stå over den. I «Stor» står bare skjermen der, så litt mindre luft. */}
+      <header ref={headerRef} className="flex items-center gap-2 flex-wrap">
+        <div className="flex max-w-full overflow-x-auto rounded-lg border border-nx-line/60 text-[11px]" role="tablist" aria-label="Enhet">
           <button role="tab" aria-selected={!isMac} onClick={() => setDevice('iphone')} className={`flex items-center gap-1 px-2 py-1 ${!isMac ? 'bg-nx-cyan/15 text-nx-cyan' : 'text-nx-mute hover:text-nx-cyan'}`}><Smartphone size={13} /> IPHONE</button>
           {MACS.map(m => <button key={m.id} role="tab" aria-selected={device === m.id} onClick={() => setDevice(m.id)} title={m.name} className={`flex items-center gap-1 px-2 py-1 ${device === m.id ? 'bg-nx-cyan/15 text-nx-cyan' : 'text-nx-mute hover:text-nx-cyan'}`}><Monitor size={13} /> {m.short.toUpperCase()}</button>)}
         </div>
         <span className={`ml-1 h-2 w-2 rounded-full ${ready ? 'bg-nx-green' : ready === false ? 'bg-nx-red' : 'bg-nx-mute'}`} title={ready ? (isMac ? 'Mac-agenten svarer' : 'WebDriverAgent klar') : ready === false ? (isMac ? 'Mac-agenten svarer ikke' : 'WebDriverAgent svarer ikke') : 'Kobler til'} />
         {isMac && <MacQualitySelect remote={remote} compact className="ml-auto !py-0.5 !px-1.5" />}
+        {!isMac && <PhoneViewSelect view={view} setView={setView} full={full} toggleFull={toggleFull} compact className="ml-auto" />}
         <button onClick={remote.reconnect} className="ml-auto p-1 text-nx-mute hover:text-nx-cyan" aria-label="Koble til skjermen på nytt"><RefreshCw size={14} /></button>
         <button onClick={onToggle} className="p-1 text-nx-mute hover:text-nx-cyan" aria-label={isMac ? 'Lukk Mac-panelet' : 'Lukk telefonpanelet'}><X size={15} /></button>
       </header>
       <PhoneSessionNotice remote={remote} />
       {remote.session.status === 'ready' && !isMac && <>
-        <div className="flex-1 min-h-0 flex items-center justify-center"><PhoneScreen remote={remote} className="rounded-[22px]" /></div>
-        <PhoneButtons remote={remote} />
-        <PhoneKeyboard remote={remote} />
+        <div className="flex-1 min-h-0 flex items-center justify-center"><PhoneScreen remote={remote} className="rounded-[22px]" screenRef={phoneScreenRef} fullscreen={[full, toggleFull, fake]} /></div>
+        {!stor && <>
+          <PhoneButtons remote={remote} />
+          <PhoneKeyboard remote={remote} />
+        </>}
         {remote.err && <p role="alert" className="text-[11px] text-nx-amber">{remote.err}</p>}
-        <p className="text-[10px] text-nx-mute">Klikk = trykk · dra = sveip · hold = langt trykk. Tastaturet på telefonen må være synlig for at tekst skal gå inn.</p>
+        {!stor && <p className="text-[10px] text-nx-mute">Klikk = trykk · dra = sveip · hold = langt trykk. Tastaturet på telefonen må være synlig for at tekst skal gå inn.</p>}
       </>}
       {remote.session.status === 'ready' && isMac && <>
         <MacStatusLine remote={remote} />
