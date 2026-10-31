@@ -4,11 +4,11 @@ import { getNamespace, updateNamespace } from './configStore.js';
 import { messaging as defaultMessaging } from './messaging.js';
 import { residents as defaultResidents } from './residents.js';
 import { RESIDENTS } from '../routes/avvik.js';
-import { osloToday } from '../routes/huset.js';
+import { osloToday, osloClock } from './osloTime.js';
+import { smsReminders } from './smsReminders.js';
 
 const SETTINGS = '_paaminnelser', LOG = '_paaminnelseLogg';
 export const DEFAULT_SETTINGS = { aktiv: false, klokkeslett: '07:30', sistKjort: null };
-const osloClock = now => new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Oslo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(now);
 const day = d => new Date(`${d}T12:00:00Z`).toLocaleDateString('nb-NO', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' });
 
 export function composeReminder(navn, { tasks = [], avvik = [], today, origin = '', always = false }) {
@@ -71,7 +71,8 @@ export const reminders = createReminders();
 let timer;
 export function startReminderWorker() {
   if (timer) return;
-  const loop = () => { reminders.tick().catch(() => console.warn('[paaminnelser] kjøring feilet')).finally(() => { timer = setTimeout(loop, 60_000); timer.unref(); }); };
+  // Daglig oppsummering først, så planlagte påminnelser og gjøremål; telefonen tar én SMS om gangen.
+  const loop = () => { reminders.tick().catch(() => console.warn('[paaminnelser] kjøring feilet')).then(() => smsReminders.tick()).catch(() => console.warn('[paaminnelser] planlagte feilet')).finally(() => { timer = setTimeout(loop, 60_000); timer.unref(); }); };
   timer = setTimeout(loop, 30_000); timer.unref();
 }
 export function stopReminderWorker() { clearTimeout(timer); timer = null; }

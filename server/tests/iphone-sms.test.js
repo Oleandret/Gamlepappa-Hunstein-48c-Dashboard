@@ -79,8 +79,12 @@ test('avvik notification: only to the person concerned, honest statuses',async()
  const sent=[];const messaging={channels:()=>({sms:true}),sendSms:async(to,t)=>sent.push([to,t])};
  const residents=(o)=>({list:async()=>[{navn:'Ylva',...o},{navn:'Ole Andre',telefon:'+4711111111',smsVarsel:true}]});
  assert.equal((await notifyAvvik(item,{messaging,residents:residents({telefon:'+4799999999',smsVarsel:true})})).status,'sendt');
- assert.deepEqual(sent,[['+4799999999',avvikSms(item)]]);assert.match(sent[0][1],/Hei Ylva! Nytt avvik i Huset \(Kjøkken\): Oppvasken ble stående Registrert av Ole Andre\./);
- assert.equal((await notifyAvvik(item,{messaging,residents:residents({telefon:'+4799999999',smsVarsel:false})})).status,'varsel_av');
+ assert.deepEqual(sent,[['+4799999999',avvikSms(item)]]);assert.match(sent[0][1],/^Hei Ylva, Gamlepappa har registrert ett avvik idag som går på trivsel i huset\. Og håper du kan fikse: Oppvasken ble stående\nRegistrert av Ole Andre\.$/);
+ // SMS-varsel-innstillingen gjelder de daglige påminnelsene; avviket får SMS så lenge det er valgt på avviket.
+ assert.equal((await notifyAvvik(item,{messaging,residents:residents({telefon:'+4799999999',smsVarsel:false})})).status,'sendt');
+ assert.equal((await notifyAvvik({...item,sms:false},{messaging,residents:residents({telefon:'+4799999999'})})).status,'valgt_bort');
+ assert.equal(avvikSms({...item,smsTekst:'Egen tekst'}),'Egen tekst');
+ assert.match(avvikSms({...item,forslag:'Ta den med en gang'},'https://huset.test'),/\nForslag: Ta den med en gang\nRegistrert av Ole Andre\.\nhttps:\/\/huset\.test\/avvik$/);
  assert.equal((await notifyAvvik(item,{messaging,residents:residents({})})).status,'mangler_telefon');
  assert.equal((await notifyAvvik(item,{messaging:{...messaging,channels:()=>({sms:false})},residents:residents({})})).status,'ikke_satt_opp');
  const fail=await notifyAvvik(item,{messaging:{...messaging,sendSms:async()=>{throw new Error('Fant ikke Send-knappen i Meldinger')}},residents:residents({telefon:'+4799999999',smsVarsel:true})});assert.equal(fail.status,'feilet');assert.match(fail.feil,/Send-knappen/);
@@ -90,7 +94,9 @@ test('route stores the notification result on the avvik',async()=>{
  let store;const done=new Promise(r=>{globalThis.__done=r;});
  const app=express().use(express.json()).use('/avvik',createAvvikRoutes({read:async()=>store,update:async fn=>(store=fn(structuredClone(store))),clock:()=>new Date('2026-10-28T08:00:00Z'),notify:async()=>{setTimeout(()=>globalThis.__done(),20);return {kanal:'sms',status:'sendt',at:'x'};}}));
  const srv=app.listen(0);try{const r=await fetch(`http://127.0.0.1:${srv.address().port}/avvik`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({person:'Ylva',registrertAv:'Ole Andre',kategori:'Kjøkken',beskrivelse:'Test'})});
-  const b=await r.json();assert.equal(b.item.varsel.status,'sender');await done;assert.equal(store[0].varsel.status,'sendt');}finally{srv.close();}
+  const b=await r.json();assert.equal(b.item.varsel.status,'sender');await done;assert.equal(store[0].varsel.status,'sendt');
+  const off=await (await fetch(`http://127.0.0.1:${srv.address().port}/avvik`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({person:'Ylva',registrertAv:'Ole Andre',kategori:'Kjøkken',beskrivelse:'Uten SMS',sendSms:false})})).json();
+  assert.equal(off.item.varsel.status,'valgt_bort');assert.equal(off.item.sms,false);assert.equal(store[0].varsel.status,'valgt_bort');}finally{srv.close();}
 });
 
 test('check reads only; send reports each step',async()=>{
