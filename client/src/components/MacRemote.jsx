@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, ArrowLeftRight, LayoutGrid, X, CornerDownLeft, XSquare, Copy, ClipboardPaste, Undo2, Lock, Sun, Send, Keyboard, AppWindow } from 'lucide-react';
+import { Search, ArrowLeftRight, LayoutGrid, X, CornerDownLeft, XSquare, Copy, ClipboardPaste, Undo2, Lock, Sun, Send, Keyboard, AppWindow, ScreenShare } from 'lucide-react';
 import { openIphoneSession, macApi, macType, macKey, macVideoQuality, macPointerAction, keyEventAction, eventModifiers } from '../lib/macRemote.js';
 import { VIDEO_QUALITIES, validQuality } from '../lib/macVideoQuality.js';
-import { DEFAULT_MAC, macName } from '../lib/macs.js';
+import { DEFAULT_MAC, macName, macVncUrl } from '../lib/macs.js';
 import { pointInScreen } from '../lib/macGestures.js';
 import { useFullscreen, FAKE_FULLSCREEN_STYLE } from '../lib/useFullscreen.js';
 import { FullscreenButton } from './FullscreenButton.jsx';
@@ -251,6 +251,23 @@ export function MacQualitySelect({ remote, compact = false, className = '' }) {
       className={`chip bg-nx-bg text-xs cursor-pointer ${className}`}>
       {VIDEO_QUALITIES.map(([id, label, rate]) => <option key={id} value={id}>{compact ? label : `${label} · ${rate}`}</option>)}
     </select>
+  );
+}
+
+/**
+ * «Skjermdeling»: åpner macOS' innebygde VNC-klient (Skjermdeling.app) mot Macen, med full skjerm og
+ * lyd/utklippstavle som agenten ikke har. Virker bare når nettleseren står på en Mac på tailnettet og
+ * Skjermdeling er slått på på mål-Macen (Systeminnstillinger → Generelt → Deling).
+ */
+export function MacVncLink({ macId, compact = false, className = '' }) {
+  const href = macVncUrl(macId);
+  if (!href) return null;
+  const title = `Åpne ${macName(macId)} i Skjermdeling (VNC, full skjerm). Krever en Mac på tailnettet, og at Skjermdeling er slått på på ${macName(macId)}.`;
+  return (
+    <a href={href} title={title} aria-label={compact ? `Åpne ${macName(macId)} i Skjermdeling` : undefined}
+      className={compact ? `p-1 text-nx-mute hover:text-nx-cyan ${className}` : `chip inline-flex items-center gap-1.5 ${className}`}>
+      <ScreenShare size={compact ? 14 : 14} />{!compact && ' Skjermdeling'}
+    </a>
   );
 }
 
