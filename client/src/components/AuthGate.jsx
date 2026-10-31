@@ -26,7 +26,7 @@ export function AuthGate({ children }) {
     check();
     fetch('/auth/config', { credentials: 'same-origin' }).then(r => r.json()).then(c => setGoogleEnabled(c.googleEnabled === true)).catch(() => {});
     if (new URLSearchParams(window.location.search).get('login') === 'failed') {
-      setError('Google-innloggingen ble ikke godkjent. Bruk eierens Google-konto og prøv igjen.');
+      setError('Google-innloggingen ble ikke godkjent. Bruk eierens Google-konto, eller en Google-konto med e-posten som er registrert på deg under Beboere.');
       window.history.replaceState(null, '', window.location.pathname);
     }
     const reset = () => { setReady(false); setCsrfToken(''); };
@@ -52,9 +52,8 @@ export function AuthGate({ children }) {
   if (ready) return <><button className="btn fixed bottom-2 left-2 z-50 text-xs" onClick={logout}>Logg ut{session?.navn ? ` (${session.navn})` : ''}</button>{error && <p role="alert" className="fixed bottom-12 left-2 z-50 panel p-2">{error}</p>}{typeof children === 'function' ? children(session) : children}</>;
   return <main className="min-h-screen grid place-items-center bg-nx-bg text-nx-text p-4"><section className="panel p-6 sm:p-8 w-full max-w-md">
     <h1 className="text-xl mb-4">Logg inn</h1>
+    {googleEnabled && <><p className="my-3 text-sm">Eier og beboere: logg inn med Google-kontoen din. Beboere må ha Google-e-posten sin registrert under Beboere.</p><button className="btn w-full" onClick={() => { sessionStorage.removeItem('dashboard.session'); setCsrfToken(''); sessionStorage.setItem('dashboard.returnTo', window.location.pathname); window.location.assign(`/auth/google?origin=${encodeURIComponent(window.location.origin)}`); }}>Fortsett med Google</button><hr className="my-6 border-nx-line" /></>}
     <ResidentLogin onLoggedIn={() => { sessionStorage.removeItem('dashboard.session'); check(); }} />
-    <hr className="my-6 border-nx-line" />
-    {googleEnabled && <><p className="my-3 text-sm">Eier: logg inn med Google-kontoen.</p><button className="btn w-full" onClick={() => { sessionStorage.removeItem('dashboard.session'); setCsrfToken(''); sessionStorage.setItem('dashboard.returnTo', window.location.pathname); window.location.assign(`/auth/google?origin=${encodeURIComponent(window.location.origin)}`); }}>Fortsett med Google</button></>}
     <details className="mt-4" open={!googleEnabled}><summary>Administratortilgang</summary><form onSubmit={e => {
       e.preventDefault(); sessionStorage.setItem('dashboard.session', token); setToken(''); setError(''); check(true);
     }}><p className="my-3 text-sm">Tilgangsnøkkelen brukes bare i denne nettleserøkten.</p><label>Tilgangsnøkkel<input type="password" required autoComplete="off" value={token} onChange={e => setToken(e.target.value)} className="block w-full bg-nx-bg border p-2 my-2" /></label><button className="btn">Logg inn med nøkkel</button></form></details>

@@ -44,7 +44,7 @@ export function ResidentLogin({ onLoggedIn }) {
   const passwordField = (label, auto) => <label className="block text-sm mt-3">{label}<input type="password" value={passord} onChange={e => setPassord(e.target.value)} required minLength={auto === 'new-password' ? 10 : undefined} autoComplete={auto} className={input} /></label>;
 
   return <div>
-    <h2 className="text-lg">{mode === 'invitasjon' ? `Velkommen${navn ? `, ${navn}` : ''}!` : 'Beboere i Hunstein 48c'}</h2>
+    <h2 className="text-lg">{mode === 'invitasjon' ? `Velkommen${navn ? `, ${navn}` : ''}!` : 'Beboere uten Google-konto'}</h2>
     {mode === 'logginn' && <form onSubmit={login} className="mt-3">
       {idField}{passwordField('Passord', 'current-password')}
       <button className="btn w-full mt-4" disabled={busy}>Logg inn</button>
