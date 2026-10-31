@@ -31,7 +31,9 @@ export function AuthGate({ children }) {
     }
     const reset = () => { setReady(false); setCsrfToken(''); };
     window.addEventListener('dashboard-auth-required', reset);
-    return () => window.removeEventListener('dashboard-auth-required', reset);
+    // Mobilsidene har egen «Logg ut»-knapp i toppen (den flytende dekker skjemaene der).
+    window.addEventListener('dashboard-logout', logout);
+    return () => { window.removeEventListener('dashboard-auth-required', reset); window.removeEventListener('dashboard-logout', logout); };
   }, []);
   async function logout() {
     try {
@@ -49,7 +51,7 @@ export function AuthGate({ children }) {
       sessionStorage.removeItem('dashboard.session'); setCsrfToken(''); setReady(false);
     } catch { setError('Kunne ikke logge ut. Prøv igjen.'); }
   }
-  if (ready) return <><button className="btn fixed bottom-2 left-2 z-50 text-xs" onClick={logout}>Logg ut{session?.navn ? ` (${session.navn})` : ''}</button>{error && <p role="alert" className="fixed bottom-12 left-2 z-50 panel p-2">{error}</p>}{typeof children === 'function' ? children(session) : children}</>;
+  if (ready) return <><button className="btn fixed bottom-2 left-2 z-50 text-xs max-sm:hidden" onClick={logout}>Logg ut{session?.navn ? ` (${session.navn})` : ''}</button>{error && <p role="alert" className="fixed bottom-12 left-2 z-50 panel p-2">{error}</p>}{typeof children === 'function' ? children(session) : children}</>;
   return <main className="min-h-screen grid place-items-center bg-nx-bg text-nx-text p-4"><section className="panel p-6 sm:p-8 w-full max-w-md">
     <h1 className="text-xl mb-4">Logg inn</h1>
     {googleEnabled && <><p className="my-3 text-sm">Eier og beboere: logg inn med Google-kontoen din. Beboere må ha Google-e-posten sin registrert under Beboere.</p><button className="btn w-full" onClick={() => { sessionStorage.removeItem('dashboard.session'); setCsrfToken(''); sessionStorage.setItem('dashboard.returnTo', window.location.pathname); window.location.assign(`/auth/google?origin=${encodeURIComponent(window.location.origin)}`); }}>Fortsett med Google</button><hr className="my-6 border-nx-line" /></>}

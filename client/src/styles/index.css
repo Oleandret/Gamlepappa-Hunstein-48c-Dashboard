@@ -202,3 +202,5 @@ body{background:#0b1119;color:#e8eef6;font-size:14px;line-height:1.5}
 .price-table td,.price-table th{padding:6px 8px;border-bottom:1px solid #26364a;text-align:left}
 .price-table td:last-child{text-align:right;font-variant-numeric:tabular-nums}
 @media(max-width:700px){.history-grid{grid-template-columns:1fr}.history-head{align-items:flex-start}}
+.huset-tabs-mobile{scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.huset-tabs-mobile::-webkit-scrollbar{display:none}

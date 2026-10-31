@@ -78,21 +78,19 @@ export function PaaminnelserPanel({ h, me, setMe, standalone, owner }) {
         {h.loaded && !sorted.length && <p className="text-sm text-nx-mute mt-3">Ingen påminnelser ennå. Legg inn den første, f.eks. «sett ut søppeldunkene» hver tirsdag kl. 20.</p>}
         <ul className="mt-3 divide-y divide-nx-line/40">
           {sorted.map(r => (
-            <li key={r.id} className={`py-3 flex gap-3 items-start ${r.aktiv ? '' : 'opacity-60'}`}>
+            <li key={r.id} className={`py-3 flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-start ${r.aktiv ? '' : 'opacity-60'}`}>
               <div className="flex-1 min-w-0">
                 <p className="text-sm break-words flex items-start gap-1.5">{r.aktiv ? <Bell size={14} aria-hidden="true" className="text-nx-cyan mt-0.5 shrink-0" /> : <BellOff size={14} aria-hidden="true" className="mt-0.5 shrink-0" />}<strong>{r.tekst}</strong></p>
-                <p className="text-xs text-nx-mute mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className="inline-flex items-center gap-1"><Repeat size={12} aria-hidden="true" />{scheduleLabel(r)}</span>
-                  <span>· til {r.mottakere.join(', ')}</span>
-                  <span>· {r.aktiv ? `neste ${nextLabel(r)}` : 'satt på pause'}</span>
-                </p>
+                <p className="text-xs text-nx-mute mt-0.5"><Repeat size={12} aria-hidden="true" className="inline mr-1 align-[-2px]" />{scheduleLabel(r)} · til {r.mottakere.join(', ')} · {r.aktiv ? `neste ${nextLabel(r)}` : 'satt på pause'}</p>
                 {r.siste && <p className={`text-xs mt-0.5 ${STATUS[r.siste.status] || 'text-nx-mute'}`}>Sist {r.siste.status} {time(r.siste.at)}{r.siste.feil ? ` · ${r.siste.feil}` : ''}</p>}
                 <p className="text-xs text-nx-mute mt-0.5">Lagt inn av {r.av}</p>
               </div>
-              <button type="button" disabled={h.busy} onClick={() => edit(r)} className={iconButton} title="Endre" aria-label={`Endre ${r.tekst}`}><Pencil size={16} /></button>
-              <button type="button" disabled={h.busy} onClick={() => toggle(r)} className={iconButton} title={r.aktiv ? 'Sett på pause' : 'Slå på igjen'} aria-label={r.aktiv ? `Sett ${r.tekst} på pause` : `Slå på ${r.tekst}`}>{r.aktiv ? <Pause size={16} /> : <Play size={16} />}</button>
-              <button type="button" disabled={h.busy} onClick={() => sendNow(r)} className={iconButton} title="Send nå" aria-label={`Send ${r.tekst} nå`}><Send size={16} /></button>
-              <button type="button" disabled={h.busy} onClick={() => remove(r)} className={`${iconButton} hover:text-nx-amber`} title="Slett" aria-label={`Slett ${r.tekst}`}><Trash2 size={16} /></button>
+              <div className="flex gap-1 shrink-0 -ml-2 sm:ml-0">
+                <button type="button" disabled={h.busy} onClick={() => edit(r)} className={iconButton} title="Endre" aria-label={`Endre ${r.tekst}`}><Pencil size={16} /></button>
+                <button type="button" disabled={h.busy} onClick={() => toggle(r)} className={iconButton} title={r.aktiv ? 'Sett på pause' : 'Slå på igjen'} aria-label={r.aktiv ? `Sett ${r.tekst} på pause` : `Slå på ${r.tekst}`}>{r.aktiv ? <Pause size={16} /> : <Play size={16} />}</button>
+                <button type="button" disabled={h.busy} onClick={() => sendNow(r)} className={iconButton} title="Send nå" aria-label={`Send ${r.tekst} nå`}><Send size={16} /></button>
+                <button type="button" disabled={h.busy} onClick={() => remove(r)} className={`${iconButton} hover:text-nx-amber`} title="Slett" aria-label={`Slett ${r.tekst}`}><Trash2 size={16} /></button>
+              </div>
             </li>
           ))}
         </ul>

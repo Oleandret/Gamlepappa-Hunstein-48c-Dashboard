@@ -3,7 +3,7 @@ import { Check, Trash2, Plus, Repeat, Bell, BellOff, Send } from 'lucide-react';
 import { chip, field, primaryButton, iconButton, dayLabel, addDays, RECURRENCE_LABEL, taskReminderLabel, time } from './shared.js';
 
 const DEFAULT_REMINDER = { sms: true, dagerFor: 0, klokkeslett: '08:00', purring: false };
-const daysLabel = n => n === 0 ? 'På fristdagen' : n === 1 ? 'Dagen før' : `${n} dager før`;
+const daysLabel = n => n === 0 ? 'Fristdagen' : n === 1 ? 'Dagen før' : `${n} dager før`;
 const smallButton = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border border-nx-line/60 text-nx-mute hover:text-nx-text hover:border-nx-cyan/40 disabled:opacity-40';
 
 /** Valg for SMS-påminnelse om et gjøremål: hvilken dag (0–N dager før fristen), klokkeslett og purring. */
