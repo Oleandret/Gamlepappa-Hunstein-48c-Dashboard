@@ -84,7 +84,7 @@ export function createHusetRoutes({ rules = rulesStore, tasks = tasksStore, remi
   const add = (store, item) => store.update(prev => { if (list(prev).length >= MAX_ITEMS) throw bad('Listen er full'); return [item, ...list(prev)]; });
 
   // En innlogget beboer handler alltid i eget navn, uansett hva klienten sender.
-  const asSelf = req => req.user?.method === 'beboer' ? { ...req.body, av: req.user.navn } : req.body;
+  const asSelf = req => req.user?.role === 'beboer' ? { ...req.body, av: req.user.navn } : req.body;
 
   r.get('/', handle(async (_req, res) => {
     const [rl, tl, pl, smsMottakere] = await Promise.all([rules.read(), tasks.read(), reminders.read(), withPhone()]);

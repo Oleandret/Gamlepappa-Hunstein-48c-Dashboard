@@ -1,6 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { Router } from 'express';
+import { residents } from './residents.js';
 
 export const OWNER_EMAIL = 'oleandretorjussen@gmail.com';
 const SESSION_COOKIE = '__Host-dashboard-session';
@@ -29,17 +30,26 @@ export function googleConfig(env = process.env) {
   } catch { return null; }
 }
 const googleKeys = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
-export async function verifyGoogleIdentity(token, config, nonce, keys = googleKeys) {
+// `allowed(email)` avgjør hvem som slipper inn: eieren alene som standard, ellers eieren og beboere med
+// Google-e-posten registrert under Beboere (se resolveUser).
+export async function verifyGoogleIdentity(token, config, nonce, keys = googleKeys, allowed = email => email === OWNER_EMAIL) {
   const { payload } = await jwtVerify(token, keys, {
     issuer: ['https://accounts.google.com', 'accounts.google.com'], audience: config.clientId,
     algorithms: ['RS256'], requiredClaims: ['exp', 'iat', 'sub', 'nonce', 'email', 'email_verified'], maxTokenAge: '10m',
   });
-  if (!equal(payload.nonce, nonce) || payload.email !== OWNER_EMAIL || payload.email_verified !== true || typeof payload.sub !== 'string' || !payload.sub || (payload.azp && payload.azp !== config.clientId) || (Array.isArray(payload.aud) && payload.aud.length > 1 && payload.azp !== config.clientId)) throw new Error('Identity rejected');
+  if (!equal(payload.nonce, nonce) || typeof payload.email !== 'string' || !(await allowed(payload.email)) || payload.email_verified !== true || typeof payload.sub !== 'string' || !payload.sub || (payload.azp && payload.azp !== config.clientId) || (Array.isArray(payload.aud) && payload.aud.length > 1 && payload.azp !== config.clientId)) throw new Error('Identity rejected');
   return { sub: payload.sub, email: payload.email };
 }
 
+/** Hvem en bekreftet Google-e-post er: eieren (admin) eller en beboer med denne e-posten registrert under Beboere. */
+export async function resolveUser(email, { byEmail = e => residents.byEmail(e) } = {}) {
+  if (email === OWNER_EMAIL) return { role: 'admin' };
+  const navn = await byEmail(email).catch(() => null);
+  return navn ? { role: 'beboer', navn } : null;
+}
+
 // One process/replica: restart revokes all sessions. No refresh or provider access tokens are stored.
-export function createGoogleAuth({ config = () => googleConfig(), fetchImpl = fetch, verify = verifyGoogleIdentity, now = Date.now } = {}) {
+export function createGoogleAuth({ config = () => googleConfig(), fetchImpl = fetch, verify = verifyGoogleIdentity, now = Date.now, resolve = resolveUser } = {}) {
   const logins = new Map(), sessions = new Map(), limits = new Map();
   const prune = map => { for (const [key, value] of map) if (value.expires <= now()) map.delete(key); };
   const router = Router();
@@ -58,7 +68,7 @@ export function createGoogleAuth({ config = () => googleConfig(), fetchImpl = fe
     logins.set(hash(state), { binding: hash(binding), nonce, verifier, origin, redirectUri, expires: now() + LOGIN_TTL });
     res.cookie(LOGIN_COOKIE, binding, { ...cookieOptions, maxAge: LOGIN_TTL });
     const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    url.search = new URLSearchParams({ client_id: cfg.clientId, redirect_uri: redirectUri, response_type: 'code', scope: 'openid email', state, nonce, code_challenge: hash(verifier), code_challenge_method: 'S256', login_hint: OWNER_EMAIL, prompt: 'select_account' });
+    url.search = new URLSearchParams({ client_id: cfg.clientId, redirect_uri: redirectUri, response_type: 'code', scope: 'openid email', state, nonce, code_challenge: hash(verifier), code_challenge_method: 'S256', prompt: 'select_account' });
     res.redirect(url.href);
   });
   router.get('/google/callback', async (req, res) => {
@@ -76,12 +86,14 @@ export function createGoogleAuth({ config = () => googleConfig(), fetchImpl = fe
       });
       if (!response.ok) throw new Error('Exchange failed');
       const tokens = await response.json();
-      const identity = await verify(tokens.id_token, cfg, attempt.nonce);
+      const identity = await verify(tokens.id_token, cfg, attempt.nonce, undefined, async email => Boolean(await resolve(email)));
+      const user = await resolve(identity.email);
+      if (!user) throw new Error('Identity rejected');
       prune(sessions);
       if (sessions.size >= 1000) throw new Error('Session limit');
       sessions.delete(hash(cookie(req, SESSION_COOKIE)));
       const id = random();
-      sessions.set(hash(id), { ...identity, origin: attempt.origin, role: 'admin', csrfToken: random(), expires: now() + SESSION_TTL });
+      sessions.set(hash(id), { ...identity, origin: attempt.origin, role: user.role, ...(user.navn ? { navn: user.navn } : {}), csrfToken: random(), expires: now() + SESSION_TTL });
       res.cookie(SESSION_COOKIE, id, { ...cookieOptions, maxAge: SESSION_TTL });
       return res.redirect('/');
     } catch {

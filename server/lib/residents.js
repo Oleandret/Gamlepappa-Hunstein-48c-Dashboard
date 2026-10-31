@@ -161,6 +161,14 @@ export function createResidents({ store = { read: () => getNamespace(NS), update
     res.clearCookie(COOKIE, cookieOptions);
   }
 
+  /** Beboeren som har denne e-posten registrert (brukes av Google-innloggingen), ellers null. */
+  async function byEmail(raw) {
+    const email = normalizeEmail(raw);
+    if (!email) return null;
+    const l = await all();
+    return RESIDENTS.find(n => l[n]?.epost === email) || null;
+  }
+
   // Owner tools.
   async function list() { const l = await all(); return RESIDENTS.map(n => publicResident(n, l[n])); }
   async function updateContact(navn, body) {
@@ -185,6 +193,6 @@ export function createResidents({ store = { read: () => getNamespace(NS), update
     await endSessions(navn);
     return list();
   }
-  return { router, session, logout, list, all, updateContact, createInvite, removePassword, cookieName: COOKIE };
+  return { router, session, logout, list, all, byEmail, updateContact, createInvite, removePassword, cookieName: COOKIE };
 }
 export const residents = createResidents();

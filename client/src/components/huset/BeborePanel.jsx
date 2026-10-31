@@ -64,7 +64,7 @@ export function BeborePanel({ standalone }) {
   return <div className="grid grid-cols-12 gap-3 lg:gap-4">
     <section className={`col-span-12 panel ${standalone ? 'p-4' : 'lg:col-span-7 p-5'}`}>
       <h2 className="panel-title">Beboere · kontaktinfo og innlogging</h2>
-      <p className="text-xs text-nx-mute mt-1">Bare du ser dette. Beboerne logger inn med e-posten eller mobilnummeret her og et passord de lager selv, enten med en kode de får tilsendt eller med en invitasjonslenke. De får bare tilgang til Huset.</p>
+      <p className="text-xs text-nx-mute mt-1">Bare du ser dette. Beboerne logger inn med Google-kontoen sin hvis e-posten her er Google-e-posten deres, ellers med e-posten eller mobilnummeret her og et passord de lager selv (kode på e-post/SMS eller invitasjonslenke). De får bare tilgang til Trivsel.</p>
       {error && <p role="alert" className="text-sm text-nx-amber mt-3">{error}</p>}
       {notice && <div role="status" className="text-sm text-nx-cyan mt-3 break-words">{notice.text}{notice.link && <><input readOnly value={notice.link} onFocus={e => e.target.select()} className={`${field} w-full mt-2`} /><button type="button" className={`${smallButton} mt-2`} onClick={() => navigator.clipboard?.writeText(notice.link)}>Kopier lenke</button></>}</div>}
       <ul className="divide-y divide-nx-line/40 mt-2">{data.beboere.map(b => <ResidentCard key={b.navn} b={b} busy={busy} kanaler={data.kanaler} onSave={save} onInvite={invite} onRemovePassword={removePassword} onTest={test} />)}</ul>

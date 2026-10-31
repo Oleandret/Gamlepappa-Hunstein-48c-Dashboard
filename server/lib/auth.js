@@ -51,6 +51,14 @@ export function accessControl(req, res, next, { residentSession = req => residen
     }, () => res.status(503).json({ error: 'Innloggingen kunne ikke kontrolleres' }));
   }
   if (!role) return res.status(401).json({ error: 'Innlogging kreves', code: 'AUTH_REQUIRED' });
+  // En beboer som logget inn med Google (e-posten registrert under Beboere) får samme smale tilgang som med passord.
+  if (session?.role === 'beboer') {
+    if (!RESIDENT_PATHS.test(req.path)) return res.status(403).json({ error: 'Beboerinnlogging gir bare tilgang til Huset' });
+    if (!['GET','HEAD'].includes(req.method) && !googleAuth.csrfValid(req, session)) return res.status(403).json({ error: 'Last siden på nytt og prøv igjen', code: 'CSRF_REQUIRED' });
+    if (!rateLimited(req, res)) return;
+    req.user = { role: 'beboer', method: 'google', navn: session.navn, email: session.email, csrfToken: session.csrfToken };
+    return next();
+  }
   if (session && !['GET','HEAD'].includes(req.method) && !googleAuth.csrfValid(req, session)) return res.status(403).json({ error: 'Last siden på nytt og prøv igjen', code: 'CSRF_REQUIRED' });
   if (!rateLimited(req, res)) return;
   if (!['GET','HEAD'].includes(req.method) && !(req.method === 'POST' && req.path === '/logout')) {

@@ -25,6 +25,15 @@ function setup(t, { channels = { epost: true, sms: true } } = {}) {
   return { call, sent, residents, cookie: () => cookie, clearCookie: () => { cookie = ''; } };
 }
 
+test('byEmail finds the resident with that e-mail registered (for Google login)', async t => {
+  const { residents } = setup(t);
+  await residents.updateContact('Ylva', { epost: 'Ylva@Gmail.com' });
+  assert.equal(await residents.byEmail('ylva@gmail.com'), 'Ylva');
+  assert.equal(await residents.byEmail('  YLVA@gmail.com '), 'Ylva');
+  assert.equal(await residents.byEmail('ukjent@gmail.com'), null);
+  assert.equal(await residents.byEmail('ikke en e-post'), null);
+});
+
 test('phone and e-mail are normalized; Norwegian 8 digits get +47', () => {
   assert.equal(normalizePhone('912 34 567'), '+4791234567');
   assert.equal(normalizePhone('0047 91234567'), '+4791234567');

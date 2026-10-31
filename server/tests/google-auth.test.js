@@ -135,3 +135,58 @@ test('innlogging fra et tillatt speil fullføres og låses til speilets opprinne
   assert.equal((await write(MIRROR)).status, 200);
   assert.equal((await write(cfg.origin)).status, 403);
 });
+
+test('residents with their Google e-mail registered log in as themselves and only reach Trivsel', async t => {
+  const { resolveUser } = await import('../lib/googleAuth.js');
+  const byEmail = async e => (e === 'ylva@gmail.com' ? 'Ylva' : null);
+  assert.deepEqual(await resolveUser(OWNER_EMAIL, { byEmail }), { role: 'admin' });
+  assert.deepEqual(await resolveUser('ylva@gmail.com', { byEmail }), { role: 'beboer', navn: 'Ylva' });
+  assert.equal(await resolveUser('other@gmail.com', { byEmail }), null);
+  assert.equal(await resolveUser('x@gmail.com', { byEmail: async () => { throw new Error('db'); } }), null);
+  // Verifisering med egen tillatelsesliste: en beboer slipper gjennom, en ukjent ikke.
+  const allowed = async e => Boolean(await resolveUser(e, { byEmail }));
+  assert.equal((await verifyGoogleIdentity(await sign({ ...claims, email: 'ylva@gmail.com' }), cfg, claims.nonce, keys.publicKey, allowed)).email, 'ylva@gmail.com');
+  await assert.rejects(verifyGoogleIdentity(await sign({ ...claims, email: 'other@gmail.com' }), cfg, claims.nonce, keys.publicKey, allowed));
+  // Hele flyten: Google-økta får rolle beboer og navn.
+  let email = 'ylva@gmail.com';
+  const auth = createGoogleAuth({ config: () => cfg, resolve: e => resolveUser(e, { byEmail }), verify: (token, config, nonce, _k, ok) => verifyGoogleIdentity(token, config, nonce, keys.publicKey, ok),
+    fetchImpl: async () => ({ ok: true, json: async () => ({ id_token: await sign({ ...claims, email, nonce: activeNonce }) }) }) });
+  let activeNonce;
+  const app = express(); app.use('/auth', auth.router);
+  app.get('/session', (req, res) => { const s = auth.session(req); res.status(s ? 200 : 401).json(s ? { role: s.role, navn: s.navn } : {}); });
+  const server = app.listen(0, '127.0.0.1'); await new Promise(r => server.once('listening', r));
+  t.after(() => new Promise(r => { server.close(r); server.closeAllConnections(); }));
+  const request = (path, options = {}) => fetch(`http://127.0.0.1:${server.address().port}${path}`, { ...options, redirect: 'manual' });
+  async function login() {
+    const response = await request('/auth/google'); const url = new URL(response.headers.get('location')); activeNonce = url.searchParams.get('nonce');
+    assert.equal(url.searchParams.has('login_hint'), false, 'beboere velger egen konto');
+    const cb = await request(`/auth/google/callback?state=${url.searchParams.get('state')}&code=fixture-code`, { headers: { cookie: response.headers.get('set-cookie').split(';')[0] } });
+    const raw = cb.headers.getSetCookie()?.find(v => v.startsWith('__Host-dashboard-session=')) || '';
+    return { location: cb.headers.get('location'), cookie: raw.split(';')[0] };
+  }
+  const ylva = await login();
+  assert.equal(ylva.location, '/');
+  assert.deepEqual(await (await request('/session', { headers: { cookie: ylva.cookie } })).json(), { role: 'beboer', navn: 'Ylva' });
+  email = 'other@gmail.com';
+  assert.equal((await login()).location, '/?login=failed');
+  email = OWNER_EMAIL;
+  assert.deepEqual(await (await request('/session', { headers: { cookie: (await login()).cookie } })).json(), { role: 'admin' });
+
+  // Tilgangskontrollen: Google-beboer får Trivsel, ikke resten, og må ha CSRF for å skrive.
+  const oldSession = googleAuth.session, oldCsrf = googleAuth.csrfValid, oldDemo = process.env.DEMO_MODE; process.env.DEMO_MODE = 'false';
+  googleAuth.session = () => ({ role: 'beboer', navn: 'Ylva', email: 'ylva@gmail.com', csrfToken: 'fixture' }); googleAuth.csrfValid = (req, s) => req.headers['x-csrf-token'] === s.csrfToken;
+  function invoke(path, method, headers = {}) {
+    let status = 200, user = null;
+    accessControl({ headers: { cookie: '__Host-dashboard-session=x', ...headers }, method, ip: 'fixture-' + path + method, path }, { status(n) { status = n; return this; }, json() {} }, function () { user = this.user; }.bind({ get user() { return null; } }));
+    return status;
+  }
+  try {
+    const req = { headers: { cookie: '__Host-dashboard-session=x' }, method: 'GET', ip: 'g1', path: '/huset' };
+    let allowed = false; accessControl(req, { status() { return this; }, json() {} }, () => { allowed = true; });
+    assert.equal(allowed, true); assert.deepEqual([req.user.role, req.user.method, req.user.navn], ['beboer', 'google', 'Ylva']);
+    assert.equal(invoke('/heating/settings', 'GET'), 403);
+    assert.equal(invoke('/huset/admin', 'GET'), 403);
+    assert.equal(invoke('/huset/gjoremal', 'POST'), 403, 'uten CSRF');
+    assert.equal(invoke('/huset/gjoremal', 'POST', { 'x-csrf-token': 'fixture' }), 200);
+  } finally { googleAuth.session = oldSession; googleAuth.csrfValid = oldCsrf; if (oldDemo === undefined) delete process.env.DEMO_MODE; else process.env.DEMO_MODE = oldDemo; }
+});
