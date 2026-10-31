@@ -81,9 +81,9 @@ export function BeborePanel({ standalone }) {
         <button type="button" className={smallButton} disabled={busy} onClick={runNow}>Send dagens nå</button>
       </div>
       {settings.sistKjort && <p className="text-xs text-nx-mute">Sist sendt automatisk: {settings.sistKjort}</p>}
-      <h3 className="text-xs uppercase tracking-[0.14em] text-nx-mute pt-2">Utsendingslogg</h3>
+      <h3 className="text-xs uppercase tracking-[0.14em] text-nx-mute pt-2">Utsendingslogg · også faste påminnelser og gjøremål</h3>
       {!data.logg.length ? <p className="text-xs text-nx-mute">Ingen påminnelser sendt ennå.</p> :
-        <ul className="text-xs space-y-1">{data.logg.slice(0, 20).map((l, i) => <li key={i}><span className="text-nx-mute">{time(l.at)}</span> · {l.navn} · {l.kanal} · <span className={l.status === 'sendt' ? 'text-nx-cyan' : 'text-nx-amber'}>{l.status}</span>{l.feil ? ` (${l.feil})` : ''}</li>)}</ul>}
+        <ul className="text-xs space-y-1">{data.logg.slice(0, 20).map((l, i) => <li key={i}><span className="text-nx-mute">{time(l.at)}</span> · {l.navn} · {l.kanal}{l.emne ? ` · «${l.emne}»` : ''}{l.kilde && l.kilde !== 'daglig' ? ` (${{ planlagt: 'fast påminnelse', gjoremal: 'gjøremål', manuell: 'sendt manuelt', test: 'test' }[l.kilde] || l.kilde})` : ''} · <span className={l.status === 'sendt' ? 'text-nx-cyan' : 'text-nx-amber'}>{l.status}</span>{l.feil ? ` (${l.feil})` : ''}</li>)}</ul>}
     </section>
   </div>;
 }

@@ -2,20 +2,21 @@ import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getNamespace, updateNamespace } from '../lib/configStore.js';
 import { RESIDENTS, CATEGORIES } from './avvik.js';
+import { residents as defaultResidents } from '../lib/residents.js';
+import { messaging as defaultMessaging } from '../lib/messaging.js';
+import { osloToday, isDate, addDays } from '../lib/osloTime.js';
+import { parseReminder, parseTaskReminder, nextOccurrence, reminderStore, smsReminders as defaultSmsReminders, REMINDER_RECURRENCE, WEEKDAYS, MAX_DAYS_BEFORE } from '../lib/smsReminders.js';
 
-// Huset: felles husregler og gjøremål per beboer (også gjentakende), i samme
-// system som avvikene. Hver endring er én atomisk operasjon i config-storen.
+// Trivsel («Huset»): felles husregler, gjøremål per beboer (også gjentakende, med
+// SMS-påminnelse på valgt dag) og planlagte SMS-påminnelser, i samme system som
+// avvikene. Hver endring er én atomisk operasjon i config-storen.
+export { osloToday };
 export const RECURRENCE = ['ingen', 'daglig', 'ukentlig', 'annenhver-uke', 'maanedlig'];
 const RULE_STATUS = ['gjeldende', 'forslag'];
 const MAX_ITEMS = 1000, MAX_HISTORY = 200, MAX_TEXT = 500;
 const list = v => Array.isArray(v) ? v : [];
 const text = v => typeof v === 'string' ? v.trim().replace(/\s+/g, ' ') : '';
 const bad = message => Object.assign(new Error(message), { status: 400 });
-// Rundtur gjennom toISOString: Date.parse godtar 2026-02-31 og ruller til 3. mars.
-const isDate = v => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`)) && new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v;
-export const osloToday = (now = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Oslo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
-
-function addDays(date, days) { const d = new Date(`${date}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); }
 function addMonth(date) {
   const [y, m, d] = date.split('-').map(Number);
   const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
@@ -52,20 +53,25 @@ export function parseTask(body, now = new Date()) {
   if (!CATEGORIES.includes(kategori)) throw bad('Ukjent kategori');
   if (!RECURRENCE.includes(gjentakelse)) throw bad('Ukjent gjentakelse');
   if (!isDate(frist)) throw bad('Ugyldig frist');
-  return { id: randomUUID(), tittel, ansvarlig, kategori, gjentakelse, frist, notat, av, opprettet: now.toISOString(), status: 'aktiv', fullfort: [] };
+  const paaminnelse = parseTaskReminder(body?.paaminnelse);
+  return { id: randomUUID(), tittel, ansvarlig, kategori, gjentakelse, frist, notat, av, opprettet: now.toISOString(), status: 'aktiv', fullfort: [], paaminnelse, sistPaaminnet: null };
 }
 
 // Store helpers shared with the avvik route (a suggestion can become a proposed rule).
 export const rulesStore = { read: () => getNamespace('_husregler'), update: fn => updateNamespace('_husregler', fn) };
 export const tasksStore = { read: () => getNamespace('_gjoremal'), update: fn => updateNamespace('_gjoremal', fn) };
 
-export function createHusetRoutes({ rules = rulesStore, tasks = tasksStore, clock = () => new Date() } = {}) {
+export function createHusetRoutes({ rules = rulesStore, tasks = tasksStore, reminders = reminderStore, sms = defaultSmsReminders, residents = defaultResidents, messaging = defaultMessaging, clock = () => new Date() } = {}) {
   const r = Router();
   const handle = fn => async (req, res) => {
     try { await fn(req, res); }
     catch (e) { res.status([400, 404].includes(e.status) ? e.status : 503).json({ error: [400, 404].includes(e.status) ? e.message : 'Kunne ikke lagre. Prøv igjen.' }); }
   };
-  const meta = { residents: RESIDENTS, categories: CATEGORIES, recurrence: RECURRENCE };
+  const meta = { residents: RESIDENTS, categories: CATEGORIES, recurrence: RECURRENCE, reminderRecurrence: REMINDER_RECURRENCE, weekdays: WEEKDAYS, maxDaysBefore: MAX_DAYS_BEFORE };
+  // Hvem som kan få SMS (har mobilnummer) – bare navn, aldri numrene.
+  const withPhone = async () => { const all = await residents.all().catch(() => ({})); return RESIDENTS.filter(n => Boolean(all[n]?.telefon)); };
+  const osloClock = d => new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Oslo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d);
+  const withNext = items => { const t = clock(), today = osloToday(t), c = osloClock(t); return list(items).map(r => ({ ...r, neste: nextOccurrence(r, today, c) })); };
   const notFound = () => Object.assign(new Error('Finnes ikke'), { status: 404 });
   function edit(store, id, fn) {
     let found = false;
@@ -81,8 +87,8 @@ export function createHusetRoutes({ rules = rulesStore, tasks = tasksStore, cloc
   const asSelf = req => req.user?.method === 'beboer' ? { ...req.body, av: req.user.navn } : req.body;
 
   r.get('/', handle(async (_req, res) => {
-    const [rl, tl] = await Promise.all([rules.read(), tasks.read()]);
-    res.json({ ...meta, today: osloToday(clock()), rules: list(rl), tasks: list(tl) });
+    const [rl, tl, pl, smsMottakere] = await Promise.all([rules.read(), tasks.read(), reminders.read(), withPhone()]);
+    res.json({ ...meta, today: osloToday(clock()), rules: list(rl), tasks: list(tl), paaminnelser: withNext(pl), smsKanal: messaging.channels().sms, smsMottakere });
   }));
 
   r.post('/regler', handle(async (req, res) => res.status(201).json({ rules: await add(rules, parseRule(asSelf(req), clock())) })));
@@ -111,9 +117,25 @@ export function createHusetRoutes({ rules = rulesStore, tasks = tasksStore, cloc
     if (req.body?.ansvarlig !== undefined) { if (!RESIDENTS.includes(req.body.ansvarlig)) throw bad('Ukjent beboer'); patch.ansvarlig = req.body.ansvarlig; }
     if (req.body?.frist !== undefined) { if (!isDate(req.body.frist)) throw bad('Ugyldig frist'); patch.frist = req.body.frist; }
     if (req.body?.status !== undefined) { if (!['aktiv', 'ferdig'].includes(req.body.status)) throw bad('Ugyldig status'); patch.status = req.body.status; }
+    if (req.body?.paaminnelse !== undefined) patch.paaminnelse = parseTaskReminder(req.body.paaminnelse);
     res.json({ tasks: await edit(tasks, req.params.id, x => ({ ...x, ...patch })) });
   }));
   r.delete('/gjoremal/:id', handle(async (req, res) => res.json({ tasks: await remove(tasks, req.params.id) })));
+  r.post('/gjoremal/:id/paaminn', handle(async (req, res) => { const sendt = await sms.sendTaskNow(req.params.id); res.json({ tasks: list(await tasks.read()), sendt }); }));
+
+  // Planlagte SMS-påminnelser: alle i huset kan legge inn, endre og slette.
+  r.post('/paaminnelser', handle(async (req, res) => res.status(201).json({ paaminnelser: withNext(await add(reminders, parseReminder(asSelf(req), clock()))) })));
+  r.patch('/paaminnelser/:id', handle(async (req, res) => {
+    const body = req.body || {};
+    res.json({ paaminnelser: withNext(await edit(reminders, req.params.id, x => {
+      if (Object.keys(body).every(k => k === 'aktiv')) return { ...x, aktiv: body.aktiv !== false };
+      // Hele skjemaet sendes på nytt; id, opprettelse og sendehistorikk beholdes.
+      const parsed = parseReminder({ ...x, ...body, av: x.av }, clock());
+      return { ...parsed, id: x.id, opprettet: x.opprettet, av: x.av, sistSendt: x.sistSendt, siste: x.siste };
+    })) });
+  }));
+  r.delete('/paaminnelser/:id', handle(async (req, res) => res.json({ paaminnelser: withNext(await remove(reminders, req.params.id)) })));
+  r.post('/paaminnelser/:id/send', handle(async (req, res) => { const sendt = await sms.sendNow(req.params.id); res.json({ paaminnelser: withNext(await reminders.read()), sendt }); }));
   return r;
 }
 export const husetRoutes = createHusetRoutes();

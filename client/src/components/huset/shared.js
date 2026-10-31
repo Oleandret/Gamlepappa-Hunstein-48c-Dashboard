@@ -1,14 +1,29 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '../../lib/api.js';
 
-// Felles for Huset-fanen: avvik, gjøremål, husregler og statistikk deler data og stil.
+// Felles for Trivsel-fanen: avvik, gjøremål, påminnelser, husregler og statistikk deler data og stil.
 
 export const ME_KEY = 'nexora.avvik.registrertAv';
 export const time = t => new Date(t).toLocaleString('nb-NO', { timeZone: 'Europe/Oslo', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 export const dayLabel = d => new Date(`${d}T12:00:00Z`).toLocaleDateString('nb-NO', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' });
 export const osloDate = t => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Oslo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t));
 export const addDays = (date, n) => { const d = new Date(`${date}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
-export const RECURRENCE_LABEL = { ingen: 'Én gang', daglig: 'Hver dag', ukentlig: 'Hver uke', 'annenhver-uke': 'Annenhver uke', maanedlig: 'Hver måned' };
+export const RECURRENCE_LABEL = { ingen: 'Én gang', daglig: 'Hver dag', ukentlig: 'Hver uke', 'annenhver-uke': 'Annenhver uke', maanedlig: 'Hver måned', 'en-gang': 'Én gang' };
+/** Standard-SMS ved avvik; samme tekst som serveren bygger (avvikSms i routes/avvik.js), uten lenken serveren legger til sist. */
+export const avvikSmsIntro = person => `Hei ${person}, Gamlepappa har registrert ett avvik idag som går på trivsel i huset. Og håper du kan fikse:`;
+export const avvikSmsText = ({ person, beskrivelse, forslag, registrertAv }) => [`${avvikSmsIntro(person || 'NAVN')} ${(beskrivelse || '').trim()}`, forslag?.trim() ? `Forslag: ${forslag.trim()}` : '', `Registrert av ${registrertAv || '…'}.`].filter(Boolean).join('\n');
+export const WEEKDAY_LABEL = ['', 'mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag', 'søndag'];
+export const clockLabel = t => (t || '').replace(':', '.');
+/** «hver onsdag kl. 18.00», «den 1. hver måned kl. 09.00», «hver dag kl. 08.00», «tirsdag 5. nov. kl. 09.00». */
+export function scheduleLabel(r) {
+  const kl = `kl. ${clockLabel(r.klokkeslett)}`;
+  if (r.gjentakelse === 'ukentlig') return `hver ${WEEKDAY_LABEL[r.ukedag] || 'uke'} ${kl}`;
+  if (r.gjentakelse === 'maanedlig') return `den ${r.dag}. hver måned ${kl}`;
+  if (r.gjentakelse === 'en-gang') return `${r.dato ? dayLabel(r.dato) : 'én gang'} ${kl}`;
+  return `hver dag ${kl}`;
+}
+/** Når påminnelsen om et gjøremål går: «på fristdagen kl. 08.00», «dagen før kl. 19.00», «3 dager før kl. 08.00». */
+export const taskReminderLabel = p => p ? `${p.dagerFor === 0 ? 'på fristdagen' : p.dagerFor === 1 ? 'dagen før' : `${p.dagerFor} dager før`} kl. ${clockLabel(p.klokkeslett)}${p.purring ? ', purring hver dag når forfalt' : ''}` : 'ingen';
 
 export const chip = active => [
   'avvik-chip px-3 py-1.5 rounded-full text-xs border transition-colors',
@@ -56,6 +71,7 @@ export function useHuset() {
       if (d.rule) setHuset(prev => prev && { ...prev, rules: [d.rule, ...prev.rules] });
       if (d.rules) setHuset(prev => prev && { ...prev, rules: d.rules });
       if (d.tasks) setHuset(prev => prev && { ...prev, tasks: d.tasks });
+      if (d.paaminnelser) setHuset(prev => prev && { ...prev, paaminnelser: d.paaminnelser });
       return d;
     } catch (e) { setError(e.message); return null; }
     finally { setBusy(false); }
@@ -64,6 +80,8 @@ export function useHuset() {
   return {
     loaded: Boolean(avvik && huset), avvik: avvik?.items || [], rules: huset?.rules || [], tasks: huset?.tasks || [],
     residents: avvik?.residents || huset?.residents || [], categories: avvik?.categories || [], recurrence: huset?.recurrence || [],
+    paaminnelser: huset?.paaminnelser || [], reminderRecurrence: huset?.reminderRecurrence || ['daglig', 'ukentlig', 'maanedlig', 'en-gang'], maxDaysBefore: huset?.maxDaysBefore ?? 14,
+    smsKanal: huset?.smsKanal === true, smsMottakere: huset?.smsMottakere || [],
     today: huset?.today || osloDate(Date.now()), error, setError, busy, send, reload: load
   };
 }

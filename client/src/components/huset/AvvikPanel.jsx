@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Check, RotateCcw, Trash2, Plus, Lightbulb } from 'lucide-react';
-import { chip, field, primaryButton, iconButton, time } from './shared.js';
+import { Check, RotateCcw, Trash2, Plus, Lightbulb, MessageSquare } from 'lucide-react';
+import { chip, field, primaryButton, iconButton, time, avvikSmsText } from './shared.js';
 
 // Ferdige forslag til forbedring per kategori, så det går raskt å foreslå noe på mobil.
 const SUGGESTIONS = {
@@ -20,6 +20,7 @@ const VARSEL = {
   sendt: p => `SMS sendt til ${p}`,
   feilet: p => `SMS til ${p} feilet`,
   varsel_av: p => `Ingen SMS: ${p} har SMS-varsel av`,
+  valgt_bort: () => 'Ingen SMS (valgt bort)',
   mangler_telefon: p => `Ingen SMS: mangler telefonnummer for ${p}`,
   ikke_satt_opp: () => 'Ingen SMS: iPhone-SMS er ikke satt opp'
 };
@@ -31,6 +32,9 @@ export function AvvikPanel({ h, me, setMe, standalone }) {
   const [forslag, setForslag] = useState('');
   const [foreslaRegel, setForeslaRegel] = useState(false);
   const [regelId, setRegelId] = useState('');
+  // SMS til den avviket gjelder er standard; teksten kan skrives om før den sendes (null = standardteksten).
+  const [sendSms, setSendSms] = useState(true);
+  const [smsTekst, setSmsTekst] = useState(null);
   const [filterPerson, setFilterPerson] = useState('');
   const [visLoste, setVisLoste] = useState(false);
   const [notice, setNotice] = useState('');
@@ -44,10 +48,11 @@ export function AvvikPanel({ h, me, setMe, standalone }) {
 
   async function submit(e) {
     e.preventDefault();
-    const d = await h.send('/avvik', 'POST', { person, kategori, beskrivelse, registrertAv: me, forslag, foreslaRegel, regelId: regelId || undefined });
+    const d = await h.send('/avvik', 'POST', { person, kategori, beskrivelse, registrertAv: me, forslag, foreslaRegel, regelId: regelId || undefined, sendSms, smsTekst: sendSms && smsTekst !== null && smsTekst.trim() ? smsTekst.trim() : undefined });
     if (d) {
-      setBeskrivelse(''); setPerson(''); setForslag(''); setForeslaRegel(false); setRegelId('');
-      setNotice(d.rule ? 'Avviket er registrert, og forslaget ligger under Husregler til godkjenning.' : 'Avviket er registrert.');
+      setBeskrivelse(''); setPerson(''); setForslag(''); setForeslaRegel(false); setRegelId(''); setSmsTekst(null); setSendSms(true);
+      const sms = !sendSms ? ' Ingen SMS sendes.' : d.item?.varsel?.status === 'sender' ? ` SMS til ${d.item.person} sendes fra iPhonen nå.` : '';
+      setNotice((d.rule ? 'Avviket er registrert, og forslaget ligger under Husregler til godkjenning.' : 'Avviket er registrert.') + sms);
     }
   }
   const setStatus = (id, status) => h.send(`/avvik/${encodeURIComponent(id)}`, 'PATCH', { status });
@@ -96,6 +101,15 @@ export function AvvikPanel({ h, me, setMe, standalone }) {
           </div>}
           <textarea value={forslag} onChange={e => setForslag(e.target.value)} maxLength={500} rows={2} placeholder="Hva kan vi gjøre annerledes?" className={`${field} w-full`} />
           <label className="text-xs text-nx-mute flex items-center gap-2"><input type="checkbox" checked={foreslaRegel} disabled={!forslag.trim()} onChange={e => setForeslaRegel(e.target.checked)} />Foreslå som ny husregel</label>
+        </div>
+        <div className="rounded-xl border border-nx-line/60 p-3 space-y-2">
+          <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={sendSms} onChange={e => setSendSms(e.target.checked)} /><MessageSquare size={14} aria-hidden="true" className="text-nx-cyan" />Send SMS til {person || 'personen'} om avviket</label>
+          {sendSms && <>
+            <textarea aria-label="SMS-tekst" value={smsTekst ?? avvikSmsText({ person, beskrivelse, forslag, registrertAv: me })} onChange={e => setSmsTekst(e.target.value)} maxLength={1000} rows={4} className={`${field} w-full text-xs`} />
+            <p className="text-xs text-nx-mute">{smsTekst === null ? 'Standardteksten følger det du skriver over. ' : ''}Sendes fra iPhonen når avviket registreres{smsTekst === null ? ', med lenke til avvikene til slutt' : ''}.{smsTekst !== null && <> <button type="button" className="underline" onClick={() => setSmsTekst(null)}>Tilbake til standardteksten</button></>}</p>
+            {!h.smsKanal && <p className="text-xs text-nx-amber">SMS fra iPhonen er ikke satt opp på serveren, så ingen SMS går før det er i orden.</p>}
+            {h.smsKanal && person && !h.smsMottakere.includes(person) && <p className="text-xs text-nx-amber">{person} har ikke mobilnummer registrert (Beboere), så SMS-en kan ikke sendes.</p>}
+          </>}
         </div>
         <button type="submit" disabled={h.busy || !person || !me || !beskrivelse.trim()} className={primaryButton}>
           <Plus size={14} aria-hidden="true" />Registrer avvik

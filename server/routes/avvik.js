@@ -29,25 +29,32 @@ export function parseAvvik(body, now = new Date()) {
   const forslag = text(body?.forslag);
   if (forslag.length > MAX_TEXT) throw new Error(`Forslaget kan være maks ${MAX_TEXT} tegn`);
   const regelId = typeof body?.regelId === 'string' && /^[\w-]{1,100}$/.test(body.regelId) ? body.regelId : null;
-  return { id: randomUUID(), person, registrertAv, kategori, beskrivelse, forslag, regelId, opprettet: now.toISOString(), status: 'apen', lost: null };
+  // SMS til den avviket gjelder er standard; den som registrerer kan ta det bort eller skrive om teksten.
+  const sms = body?.sendSms !== false;
+  const smsTekst = typeof body?.smsTekst === 'string' ? body.smsTekst.trim().slice(0, MAX_SMS) : '';
+  return { id: randomUUID(), person, registrertAv, kategori, beskrivelse, forslag, regelId, opprettet: now.toISOString(), status: 'apen', lost: null, sms, smsTekst: smsTekst || null };
 }
 
-/** SMS-teksten til den avviket gjelder. */
-export function avvikSms(item) {
-  return `Hei ${item.person}! Nytt avvik i Huset (${item.kategori}): ${item.beskrivelse}${item.forslag ? ` Forslag: ${item.forslag}` : ''} Registrert av ${item.registrertAv}.`;
+const MAX_SMS = 1000;
+/** Standardteksten i SMS-en til den avviket gjelder; beskrivelsen og forslaget følger etter. */
+export const avvikSmsIntro = person => `Hei ${person}, Gamlepappa har registrert ett avvik idag som går på trivsel i huset. Og håper du kan fikse:`;
+/** SMS-teksten: egen tekst hvis den som registrerte skrev om, ellers standardteksten. */
+export function avvikSms(item, origin = '') {
+  if (item.smsTekst) return item.smsTekst;
+  return [`${avvikSmsIntro(item.person)} ${item.beskrivelse}`, item.forslag ? `Forslag: ${item.forslag}` : '', `Registrert av ${item.registrertAv}.`, origin ? `${origin}/avvik` : ''].filter(Boolean).join('\n');
 }
 
 /**
- * SMS til den avviket gjelder, hvis personen har telefon og SMS-varsel på.
+ * SMS til den avviket gjelder, hvis SMS er valgt på avviket og personen har telefon.
  * Returnerer varselstatusen som lagres på avviket.
  */
-export async function notifyAvvik(item, { residents = defaultResidents, messaging = defaultMessaging, clock = () => new Date() } = {}) {
+export async function notifyAvvik(item, { residents = defaultResidents, messaging = defaultMessaging, clock = () => new Date(), origin = () => process.env.AUTH_PUBLIC_ORIGIN || '' } = {}) {
   const at = () => clock().toISOString();
+  if (item.sms === false) return { kanal: 'sms', status: 'valgt_bort', at: at() };
   if (!messaging.channels().sms) return { kanal: 'sms', status: 'ikke_satt_opp', at: at() };
   const b = (await residents.list()).find(r => r.navn === item.person);
   if (!b?.telefon) return { kanal: 'sms', status: 'mangler_telefon', at: at() };
-  if (!b.smsVarsel) return { kanal: 'sms', status: 'varsel_av', at: at() };
-  try { await messaging.sendSms(b.telefon, avvikSms(item)); return { kanal: 'sms', status: 'sendt', at: at() }; }
+  try { await messaging.sendSms(b.telefon, avvikSms(item, origin())); return { kanal: 'sms', status: 'sendt', at: at() }; }
   catch (e) { return { kanal: 'sms', status: 'feilet', feil: String(e.message || 'ukjent feil').slice(0, 200), at: at() }; }
 }
 
@@ -80,9 +87,9 @@ export function createAvvikRoutes({ read = () => getNamespace(NS), update = fn =
         await proposeRule(rule).catch(() => { rule = null; });
       }
       // SMS sendes i bakgrunnen (telefonen bruker noen sekunder); resultatet lagres på avviket.
-      const varsling = { kanal: 'sms', status: 'sender', at: clock().toISOString() };
+      const varsling = { kanal: 'sms', status: item.sms ? 'sender' : 'valgt_bort', at: clock().toISOString() };
       const saved = await update(prev => list(prev).map(a => a.id === item.id ? { ...a, varsel: varsling } : a)).catch(() => items);
-      Promise.resolve().then(() => notify(item)).then(varsel => {
+      Promise.resolve().then(() => item.sms && notify(item)).then(varsel => {
         // Status og navn i loggen, aldri telefonnummer eller meldingstekst.
         if (varsel) console.info(`[avvik] sms til ${item.person}: ${varsel.status}${varsel.feil ? ` (${varsel.feil})` : ''}`);
         return varsel && update(prev => list(prev).map(a => a.id === item.id ? { ...a, varsel } : a));

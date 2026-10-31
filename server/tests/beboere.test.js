@@ -91,6 +91,7 @@ test('residents can only reach Huset, need CSRF to write, and are never owners',
   assert.equal(isOwner({ user: allowed.user }), false);
   assert.equal((await run('/avvik')).status, 'next');
   assert.equal((await run('/huset/gjoremal', 'POST')).status, 403, 'missing CSRF');
+  assert.equal((await run('/huset/paaminnelser/x/send', 'POST', { 'x-csrf-token': 'csrf-fixture' })).status, 'next', 'påminnelser er en del av Trivsel');
   for (const path of ['/heating/settings', '/homey/devices', '/huset/admin', '/config/links', '/chat/x']) assert.equal((await run(path)).status, 403, path);
   assert.equal(isOwner({ user: { method: 'google', email: 'oleandretorjussen@gmail.com' } }), true);
   assert.equal(isOwner({ user: { method: 'google', email: 'annen@example.com' } }), false);

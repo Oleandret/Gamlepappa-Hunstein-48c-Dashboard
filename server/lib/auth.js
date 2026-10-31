@@ -18,8 +18,8 @@ export function authenticate(header, configured) {
   return null;
 }
 const attempts = new Map();
-// Residents (own login) may only use Huset: avvik, gjøremål and husregler. Never contacts, heating or devices.
-const RESIDENT_PATHS = /^\/(session|logout|avvik(\/.*)?|huset|huset\/(regler|gjoremal)(\/.*)?)$/;
+// Residents (own login) may only use Trivsel: avvik, gjøremål, påminnelser and husregler. Never contacts, heating or devices.
+const RESIDENT_PATHS = /^\/(session|logout|avvik(\/.*)?|huset|huset\/(regler|gjoremal|paaminnelser)(\/.*)?)$/;
 export function accessControl(req, res, next, { residentSession = req => residents.session(req) } = {}) {
   // Explicit demo is isolated from real Homey/MCP/AI and needs no permanent credential.
   const demo = process.env.DEMO_MODE === 'true' && process.env.NODE_ENV !== 'production';
