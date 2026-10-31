@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {vncSocketUrl,keysymForChar,keysymForKey,KEY_BAR,XK,vncStatusText} from '../../client/src/lib/vnc.js';
+import {vncSocketUrl,keysymForChar,keysymForKey,KEY_BAR,XK,vncStatusText,loadVncLogin,saveVncLogin,forgetVncLogin} from '../../client/src/lib/vnc.js';
 test('VNC socket url goes through /iphone on the dashboard origin, wss on https',()=>{
  assert.equal(vncSocketUrl('stue',{protocol:'https:',host:'dash.example'}),'wss://dash.example/iphone/api/mac/vnc?mac=stue');
  assert.equal(vncSocketUrl('a b',{protocol:'http:',host:'localhost:5173'}),'ws://localhost:5173/iphone/api/mac/vnc?mac=a%20b');
@@ -17,4 +17,21 @@ test('quality presets and the data-rate label',async()=>{
  for(const [,,q,c] of VNC_QUALITIES){assert.ok(q>=0&&q<=9);assert.ok(c>=0&&c<=9);}
  assert.equal(validVncQuality('skarp'),'skarp');assert.equal(validVncQuality('x'),'normal');assert.equal(validVncQuality(null),'normal');
  assert.equal(rateLabel(0),'0 B/s');assert.equal(rateLabel(12345),'12 kB/s');assert.equal(rateLabel(1_300_000),'1,3 MB/s');assert.equal(rateLabel(NaN),'');
+});
+
+test('device-remembered VNC login: saved, loaded, rejected when malformed, forgotten', () => {
+  const store = new Map();
+  const storage = { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, v), removeItem: k => store.delete(k) };
+  assert.equal(loadVncLogin('stue', storage), null);
+  assert.equal(saveVncLogin('stue', { username: 'oleandretorjussen', password: 'hemmelig' }, storage), true);
+  assert.deepEqual(loadVncLogin('stue', storage), { username: 'oleandretorjussen', password: 'hemmelig' });
+  assert.equal(loadVncLogin('kino', storage), null, 'per Mac');
+  store.set('nexora.vnc.login.kino', '{"username":"x"}');
+  assert.equal(loadVncLogin('kino', storage), null, 'uten passord');
+  store.set('nexora.vnc.login.eufy', 'ikke json');
+  assert.equal(loadVncLogin('eufy', storage), null);
+  forgetVncLogin('stue', storage);
+  assert.equal(loadVncLogin('stue', storage), null);
+  const broken = { getItem: () => { throw new Error('privat'); }, setItem: () => { throw new Error('privat'); }, removeItem: () => { throw new Error('privat'); } };
+  assert.equal(loadVncLogin('stue', broken), null); assert.equal(saveVncLogin('stue', { username: 'a', password: 'b' }, broken), false); forgetVncLogin('stue', broken);
 });

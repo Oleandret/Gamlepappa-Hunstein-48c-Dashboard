@@ -30,6 +30,25 @@ export function keysymForKey(key) {
 export const KEY_BAR = [['esc', XK.Escape], ['tab', XK.Tab], ['⌘', XK.Super_L, true], ['⌃', XK.Control_L, true], ['⌥', XK.Alt_L, true], ['⏎', XK.Return], ['⌫', XK.BackSpace], ['←', XK.Left], ['→', XK.Right], ['↑', XK.Up], ['↓', XK.Down]];
 
 export const VNC_USER_KEY = macId => `nexora.vnc.user.${macId}`;
+export const VNC_LOGIN_KEY = macId => `nexora.vnc.login.${macId}`;
+
+/**
+ * Innlogging husket på denne enheten (nettleserens localStorage) etter første vellykkede innlogging,
+ * så en slipper å taste passordet hver gang på hver enhet. Gatewayens lagrede innlogging
+ * (MAC_…_VNC_USER/PASSWORD på Railway) går foran når den finnes.
+ */
+export function loadVncLogin(macId, storage = globalThis.localStorage) {
+  try {
+    const v = JSON.parse(storage.getItem(VNC_LOGIN_KEY(macId)) || 'null');
+    return v && typeof v.username === 'string' && typeof v.password === 'string' && v.password ? { username: v.username, password: v.password } : null;
+  } catch { return null; }
+}
+export function saveVncLogin(macId, { username, password }, storage = globalThis.localStorage) {
+  try { storage.setItem(VNC_LOGIN_KEY(macId), JSON.stringify({ username, password })); return true; } catch { return false; }
+}
+export function forgetVncLogin(macId, storage = globalThis.localStorage) {
+  try { storage.removeItem(VNC_LOGIN_KEY(macId)); } catch { /* privat modus */ }
+}
 
 /** Lesbar status for forbindelsen. */
 export function vncStatusText(status, detail = '') {
