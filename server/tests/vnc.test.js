@@ -11,3 +11,10 @@ test('keysyms: latin-1 as is, unicode with the 0x01000000 prefix, specials mappe
  assert.ok(KEY_BAR.some(([label,sym,sticky])=>label==='⌘'&&sym===XK.Super_L&&sticky));
  assert.equal(vncStatusText('error','Feil passord'),'Feil passord');assert.equal(vncStatusText('connected'),'Tilkoblet');
 });
+test('quality presets and the data-rate label',async()=>{
+ const {VNC_QUALITIES,validVncQuality,rateLabel}=await import('../../client/src/lib/vnc.js');
+ assert.deepEqual(VNC_QUALITIES.map(q=>q[0]),['rask','normal','skarp']);
+ for(const [,,q,c] of VNC_QUALITIES){assert.ok(q>=0&&q<=9);assert.ok(c>=0&&c<=9);}
+ assert.equal(validVncQuality('skarp'),'skarp');assert.equal(validVncQuality('x'),'normal');assert.equal(validVncQuality(null),'normal');
+ assert.equal(rateLabel(0),'0 B/s');assert.equal(rateLabel(12345),'12 kB/s');assert.equal(rateLabel(1_300_000),'1,3 MB/s');assert.equal(rateLabel(NaN),'');
+});
