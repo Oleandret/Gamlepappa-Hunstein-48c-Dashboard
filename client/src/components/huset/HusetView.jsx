@@ -9,6 +9,7 @@ import { BeborePanel } from './BeborePanel.jsx';
 import { SmsPanel } from './SmsPanel.jsx';
 import { PaaminnelserPanel } from './PaaminnelserPanel.jsx';
 import { SkrytPanel } from './SkrytPanel.jsx';
+import { VigiloPanel } from './VigiloPanel.jsx';
 import { VeiledningerView } from './VeiledningerView.jsx';
 
 // Grafene lastes bare når statistikken åpnes, så mobilsiden holder seg lett.
@@ -37,7 +38,7 @@ export function HusetView({ standalone = false, initialTab = 'statistikk', user 
     ['skryt', 'Skryt', null],
     ['regler', 'Husregler', proposals ? `${proposals} forslag` : null],
     ['veiledninger', 'Veiledninger', null],
-    ...(owner ? [['beboere', 'Beboere', null], ['sms', 'Send SMS med iPhone', null]] : [])
+    ...(owner ? [['vigilo', 'Vigilo', null], ['beboere', 'Beboere', null], ['sms', 'Send SMS med iPhone', null]] : [])
   ];
   const props = { h, me, setMe, standalone };
 
@@ -64,6 +65,7 @@ export function HusetView({ standalone = false, initialTab = 'statistikk', user 
       {h.loaded && tab === 'skryt' && <SkrytPanel {...props} owner={owner} />}
       {h.loaded && tab === 'regler' && <HusreglerPanel {...props} />}
       {owner && tab === 'beboere' && <BeborePanel standalone={standalone} />}
+      {owner && tab === 'vigilo' && <VigiloPanel standalone={standalone} />}
       {owner && tab === 'sms' && <SmsPanel />}
       {tab === 'veiledninger' && <VeiledningerView standalone={standalone} embedded />}
     </div>

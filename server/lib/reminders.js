@@ -6,6 +6,7 @@ import { residents as defaultResidents } from './residents.js';
 import { RESIDENTS } from '../routes/avvik.js';
 import { osloToday, osloClock } from './osloTime.js';
 import { smsReminders } from './smsReminders.js';
+import { vigilo } from './vigilo.js';
 
 const SETTINGS = '_paaminnelser', LOG = '_paaminnelseLogg';
 export const DEFAULT_SETTINGS = { aktiv: false, klokkeslett: '07:30', sistKjort: null };
@@ -72,7 +73,7 @@ let timer;
 export function startReminderWorker() {
   if (timer) return;
   // Daglig oppsummering først, så planlagte påminnelser og gjøremål; telefonen tar én SMS om gangen.
-  const loop = () => { reminders.tick().catch(() => console.warn('[paaminnelser] kjøring feilet')).then(() => smsReminders.tick()).catch(() => console.warn('[paaminnelser] planlagte feilet')).finally(() => { timer = setTimeout(loop, 60_000); timer.unref(); }); };
+  const loop = () => { reminders.tick().catch(() => console.warn('[paaminnelser] kjøring feilet')).then(() => smsReminders.tick()).catch(() => console.warn('[paaminnelser] planlagte feilet')).then(() => vigilo.tick()).catch(() => console.warn('[vigilo] daglig lesing feilet')).finally(() => { timer = setTimeout(loop, 60_000); timer.unref(); }); };
   timer = setTimeout(loop, 30_000); timer.unref();
 }
 export function stopReminderWorker() { clearTimeout(timer); timer = null; }
