@@ -8,12 +8,12 @@ import './styles/index.css';
 // Google-innloggingen sender alltid tilbake til '/'; gå videre til mobilsiden hvis det var der man startet.
 try {
   const returnTo = sessionStorage.getItem('dashboard.returnTo');
-  if (window.location.pathname === '/' && ['/avvik', '/huset', '/paaminnelser', '/skryt', '/veiledninger'].includes(returnTo)) window.history.replaceState(null, '', returnTo);
+  if (window.location.pathname === '/' && ['/avvik', '/huset', '/paaminnelser', '/skryt', '/vigilo', '/veiledninger'].includes(returnTo)) window.history.replaceState(null, '', returnTo);
   sessionStorage.removeItem('dashboard.returnTo');
 } catch { /* ignore */ }
 
 const path = window.location.pathname.replace(/\/+$/, '');
-const mobilePage = { '/avvik': 'avvik', '/huset': 'gjoremal', '/paaminnelser': 'paaminnelser', '/skryt': 'skryt', '/veiledninger': 'veiledninger' }[path];
+const mobilePage = { '/avvik': 'avvik', '/huset': 'gjoremal', '/paaminnelser': 'paaminnelser', '/skryt': 'skryt', '/vigilo': 'vigilo', '/veiledninger': 'veiledninger' }[path];
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

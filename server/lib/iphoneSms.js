@@ -1,10 +1,12 @@
 import { readRpcResponse } from './mcpClient.js';
+import { createPhoneRemote, phoneRemote as defaultPhoneRemote } from './phoneRemote.js';
 
 /**
  * SMS fra iPhonen («Mini sin iPhone») via mobile-mcp (iphone-remote /mcp),
  * som styrer Meldinger-appen slik en person ville gjort (sms:-adresser
  * går ikke; iphone-remote og mobile-mcp åpner bare http/https):
- *  Meldinger → «Ny melding» → skriv nummeret i «Til:» → skriv teksten i
+ *  Meldinger (åpnes via gatewayens /api/launch, altså WebDriverAgent; go-ios' «launch»
+ *  slutter å virke når DTServiceHub på telefonen går tom for filhåndtak) → «Ny melding» → skriv nummeret i «Til:» → skriv teksten i
  *  «Melding» → trykk Send → sjekk at Send-knappen er borte (sendt).
  * Knapper og felt finnes etter navn (lest av telefonen, iOS 16 på norsk).
  * Én melding om gangen: telefonen tåler én styrende part.
@@ -56,32 +58,15 @@ export const countFailed = els => (Array.isArray(els) ? els : []).filter(el => /
 
 const validNumber = to => { if (!/^\+\d{8,15}$/.test(to)) throw new Error('Ugyldig telefonnummer'); return to; };
 
-export function createIphoneSms({ env = process.env, fetchImpl = fetch, sleep = ms => new Promise(r => setTimeout(r, ms)) } = {}) {
-  let cookie = null, device = null, queue = Promise.resolve(), nextId = 1;
-  const remote = () => env.IPHONE_REMOTE_URL.replace(/\/+$/, '');
-
-  async function login() {
-    const r = await fetchImpl(`${remote()}/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, redirect: 'manual', signal: AbortSignal.timeout(15000),
-      body: JSON.stringify({ username: env.IPHONE_REMOTE_USER, password: env.IPHONE_REMOTE_PASSWORD }) });
-    await r.body?.cancel();
-    const set = typeof r.headers.getSetCookie === 'function' ? r.headers.getSetCookie() : [r.headers.get('set-cookie')].filter(Boolean);
-    if (!r.ok || !set.length) throw new Error('Innlogging hos iphone-remote feilet');
-    cookie = set.map(c => c.split(';')[0]).join('; ');
-  }
-  async function remotePost(path, body) {
-    if (!cookie) await login();
-    const send = () => fetchImpl(`${remote()}${path}`, { method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(20000),
-      headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify(body) });
-    let r = await send();
-    if (r.status === 401) { await r.body?.cancel(); await login(); r = await send(); }
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.error || `iphone-remote svarte ${r.status} på ${path}`);
-    return j;
-  }
+export function createIphoneSms({ env = process.env, fetchImpl = fetch, sleep = ms => new Promise(r => setTimeout(r, ms)), remote = env === process.env && fetchImpl === fetch ? defaultPhoneRemote : createPhoneRemote({ env, fetchImpl }) } = {}) {
+  let device = null, nextId = 1;
+  const remoteUrl = () => env.IPHONE_REMOTE_URL.replace(/\/+$/, '');
+  const login = () => remote.login();
+  const remotePost = (path, body) => remote.post(path, body);
 
   async function tool(name, args = {}) {
     const id = nextId++;
-    const r = await fetchImpl(env.IPHONE_MCP_URL || `${remote()}/mcp`, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(60000),
+    const r = await fetchImpl(env.IPHONE_MCP_URL || `${remoteUrl()}/mcp`, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(60000),
       headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', authorization: `Bearer ${env.IPHONE_MCP_TOKEN}`, 'mcp-protocol-version': '2025-06-18' },
       body: JSON.stringify({ jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: args } }) });
     if (!r.ok) { await r.body?.cancel(); throw new Error(`Telefonens MCP svarte HTTP ${r.status}`); }
@@ -135,7 +120,8 @@ export function createIphoneSms({ env = process.env, fetchImpl = fetch, sleep = 
     const id = await phone(); step('Fant telefonen via MCP');
     await remotePost('/api/unlock', {}).then(() => step('Låste opp telefonen'), () => step('Kunne ikke låse opp (fortsetter)'));
     try {
-      await tool('mobile_launch_app', { device: id, packageName: MESSAGES_APP });
+      // Åpnes via WebDriverAgent; faller tilbake til mobile-mcp hvis gatewayen er eldre.
+      await remote.launch(MESSAGES_APP).catch(() => tool('mobile_launch_app', { device: id, packageName: MESSAGES_APP }));
       const compose = await conversationList(id);
       if (!compose) throw new Error('Fant ikke «Ny melding» i Meldinger');
       step('Åpnet Meldinger');
@@ -182,15 +168,11 @@ export function createIphoneSms({ env = process.env, fetchImpl = fetch, sleep = 
     configured: () => iphoneSmsConfigured(env),
     send(to, text, { onStep = () => {} } = {}) {
       if (!iphoneSmsConfigured(env)) return Promise.reject(new Error('SMS via iPhonen er ikke satt opp'));
-      const job = queue.catch(() => {}).then(() => sendNow(to, text, onStep));
-      queue = job;
-      return job;
+      return remote.serial(() => sendNow(to, text, onStep));
     },
     check({ onStep = () => {} } = {}) {
       if (!iphoneSmsConfigured(env)) return Promise.reject(new Error('SMS via iPhonen er ikke satt opp'));
-      const job = queue.catch(() => {}).then(() => checkNow(onStep));
-      queue = job;
-      return job;
+      return remote.serial(() => checkNow(onStep));
     }
   };
 }
