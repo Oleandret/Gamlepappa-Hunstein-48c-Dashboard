@@ -47,29 +47,50 @@ export function screenKind(nodes) {
   return 'ukjent';
 }
 
-/** Meldingene på en listeskjerm: hver celle blir én melding med tekstlinjene sine. */
-export function extractMessages(tree, barn, children = DEFAULT_SETTINGS.barn) {
-  const out = [];
-  const walk = node => {
-    if (short(node?.type) === 'Cell') {
-      const linjer = textsOf(node);
-      if (linjer.length) {
-        const text = linjer.join('\n');
-        const named = children.find(c => new RegExp(`\\b${c.split(' ')[0]}\\b`, 'i').test(text));
-        const b = barn || named || 'Ukjent';
-        out.push({ id: createHash('sha1').update(`${b}\n${text}`).digest('hex').slice(0, 16), barn: b, linjer, tekst: text });
-      }
-      return;
-    }
-    for (const c of node?.children || []) walk(c);
-  };
-  walk(tree);
-  return out;
+// Slik Vigilo (foreldreappen) ser ut, lest 2026-10-31: øverst en barnevelger («<barnets navn>, Utvid»
+// → utvidet viser «…, Lukk» og de andre barna som celler), så meldingscellene med tekstene tittel, avsender,
+// « - utdrag» og dato (uleste celler heter «Uleste»), nederst fanene Nyheter/Meldinger/Fravær. En åpnet melding
+// har «Tilbake» øverst, «Tittel: …», avsender, hele teksten og «28. okt. 2026 - 15:58».
+const DATE_RE = /^\d{1,2}\.\s*[a-zæøå]+\.?(\s+\d{4})?$/i;
+const DATETIME_RE = /^\d{1,2}\.\s*[a-zæøå]+\.?\s+\d{4}\s*-\s*\d{2}:\d{2}$/i;
+const CHROME = /^(unngå sensitiv informasjon|send|legg til vedlegg|tilbake|meldinger|opprett)$/i;
+const firstName = navn => String(navn || '').split(' ')[0];
+export const isChildCell = n => n.type === 'Cell' && /, (Utvid|Lukk)$/.test(n.label);
+export const childSelector = nodes => nodes.find(isChildCell) || null;
+export const childOption = (nodes, barn) => nodes.find(n => n.type === 'Cell' && !/, (Utvid|Lukk)$/.test(n.label) && new RegExp(`^${firstName(barn)}\\b`, 'i').test(n.label)) || null;
+export const backButton = nodes => find(nodes, /^(tilbake|back)$/i, ['Button']);
+export const messagesTab = nodes => nodes.filter(n => /^meldinger$/i.test(n.label) && ['Other', 'Button', 'Tab'].includes(n.type) && n.y > 300).sort((a, b) => b.y - a.y)[0] || null;
+/** På meldingslisten: barnevelgeren øverst og «Meldinger» som tittel (velgeren finnes også under Nyheter og Fravær). */
+export const onMessageList = nodes => Boolean(childSelector(nodes)) && nodes.some(n => /^meldinger$/i.test(n.label) && n.y < 120);
+const hasMessageCells = nodes => nodes.some(n => n.type === 'Cell' && !isChildCell(n));
+
+/** Én meldingscelle fra listen: tittel, avsender, utdrag og dato; id fra barn + tittel + avsender + dato. */
+export function parseMessageCell(cell, barn) {
+  const texts = textsOf(cell.node || cell);
+  if (!texts.length) return null;
+  const dato = texts.find(t => DATE_RE.test(t)) || '';
+  const rest = texts.filter(t => t !== dato);
+  const tittel = rest[0] || '', avsender = rest[1] || '';
+  const utdrag = rest.slice(2).map(t => t.replace(/^\s*-\s*/, '')).join(' ').trim();
+  const b = barn || 'Ukjent';
+  return { id: createHash('sha1').update(`${b}\n${tittel}\n${avsender}\n${dato}`).digest('hex').slice(0, 16), barn: b, tittel, avsender, dato, utdrag, ulest: /^uleste?$/i.test(cell.label || ''), x: cell.x, y: cell.y };
+}
+/** Meldingene på listeskjermen (barnevelgeren er ikke en melding). */
+export function extractMessages(tree, barn) {
+  return flatten(tree).filter(n => n.type === 'Cell' && !isChildCell(n) && Number.isFinite(n.y)).map(c => parseMessageCell(c, barn)).filter(m => m && m.tittel);
+}
+/** En åpnet melding: hele teksten (den lengste teksten som ikke er tittel/avsender/dato/appens egne ord) og tidspunktet. */
+export function parseMessageDetail(tree) {
+  const texts = textsOf(tree);
+  const tittel = (texts.find(t => /^tittel:/i.test(t)) || '').replace(/^tittel:\s*/i, '');
+  const tidspunkt = texts.find(t => DATETIME_RE.test(t)) || '';
+  const body = texts.filter(t => t !== tidspunkt && !/^tittel:/i.test(t) && !CHROME.test(t) && !DATE_RE.test(t)).sort((a, b) => b.length - a.length);
+  return { tittel, tidspunkt, innhold: (body[0] || '').trim() };
 }
 
 /** SMS om nye meldinger: én linje per melding, kortet ned. */
 export function vigiloSms(messages, origin = '') {
-  const lines = messages.slice(0, 6).map(m => `• ${m.barn}: ${m.linjer.filter(l => l.length > 2).join(' – ').slice(0, 140)}`);
+  const lines = messages.slice(0, 6).map(m => `• ${m.barn}: ${m.tittel}${m.avsender ? ` (${m.avsender})` : ''}${m.innhold || m.utdrag ? ` – ${(m.innhold || m.utdrag).replace(/\s+/g, ' ').slice(0, 120)}` : ''}`);
   return [`Vigilo: ${messages.length} ny${messages.length === 1 ? ' melding' : 'e meldinger'} fra skolen.`, ...lines, messages.length > 6 ? `… og ${messages.length - 6} til.` : '', origin ? `${origin}/vigilo` : ''].filter(Boolean).join('\n');
 }
 
@@ -89,38 +110,75 @@ export function createVigilo({ env = process.env, remote = defaultRemote, messag
   const log = async (limit = 10) => list(await read(LOG)).slice(0, limit);
 
   // Selve lesingen på telefonen. step(tekst) logger, record(navn, tre) tar vare på tekstene på skjermen.
-  async function readPhone(s, step, record) {
+  // known: id-er som alt er lest, så bare nye meldinger åpnes.
+  const MAX_OPEN = 8;
+  async function readPhone(s, step, record, known) {
     const tree = async () => { const t = await remote.source(); return { tree: t, nodes: flatten(t) }; };
     const tapNode = n => remote.tap(Math.round(n.x), Math.round(n.y));
     await remote.unlock().then(() => step('Låste opp telefonen'), () => step('Kunne ikke låse opp (fortsetter)'));
     await remote.launch(VIGILO_BUNDLE); step('Åpnet Vigilo');
     await sleep(4000);
     let cur = await tree(); record('start', cur.tree);
-    if (screenKind(cur.nodes) === 'pin') {
-      const pin = String(env.VIGILO_PIN || '');
-      if (!/^\d{4,8}$/.test(pin)) throw new Error('Vigilo ber om pinkode. Sett VIGILO_PIN (4 siffer) på serveren.');
-      for (const d of pin) { const key = find(cur.nodes, new RegExp(`^${d}$`), ['Key', 'Button']); if (!key) throw new Error(`Fant ikke tasten ${d} på pin-skjermen`); await tapNode(key); await sleep(250); }
-      step('Tastet pinkoden');
-      await sleep(3500);
-      cur = await tree(); record('etter pin', cur.tree);
-      if (screenKind(cur.nodes) === 'pin') throw new Error('Pinkoden ble ikke godtatt av Vigilo');
-    }
-    if (screenKind(cur.nodes) === 'innlogging') throw new Error('Vigilo viser innloggingsskjermen. Logg inn i appen på telefonen én gang, så husker den det.');
-    // Til meldingene, hvis det finnes en knapp/fane for det.
-    const nav = find(cur.nodes, /^(meldinger|beskjeder|innboks|messages)$/i, ['Button', 'Other', 'StaticText', 'Cell', 'Tab']) || find(cur.nodes, /meldinger|beskjeder|innboks/i, ['Button', 'Tab']);
-    if (nav) { await tapNode(nav); step(`Gikk til «${nav.label}»`); await sleep(2500); cur = await tree(); record('meldinger', cur.tree); }
-    else step('Fant ingen «Meldinger»-fane – leser skjermen som den er');
-    // Ett barn om gangen når appen har en velger med barnas navn, ellers alt på én skjerm.
-    const found = [];
-    const switches = s.barn.map(b => [b, find(cur.nodes, new RegExp(`^${b.split(' ')[0]}\\b`, 'i'), ['Button', 'Other', 'StaticText', 'Cell', 'Tab'])]).filter(([, n]) => n);
-    if (switches.length >= 2) {
-      for (const [barn, n] of switches) {
-        await tapNode(n); await sleep(2500);
-        const t = await tree(); record(barn, t.tree);
-        const m = extractMessages(t.tree, barn, s.barn); found.push(...m); step(`${barn}: ${m.length} meldinger på skjermen`);
+    // Fram til meldingslisten: pinkode, lukk en åpen melding (Tilbake), og fanen «Meldinger» om nødvendig.
+    for (let i = 0; i < 6 && !onMessageList(cur.nodes); i++) {
+      const kind = screenKind(cur.nodes);
+      if (kind === 'pin') {
+        const pin = String(env.VIGILO_PIN || '');
+        if (!/^\d{4,8}$/.test(pin)) throw new Error('Vigilo ber om pinkode. Sett VIGILO_PIN (4 siffer) på serveren.');
+        for (const d of pin) { const key = find(cur.nodes, new RegExp(`^${d}$`), ['Key', 'Button']); if (!key) throw new Error(`Fant ikke tasten ${d} på pin-skjermen`); await tapNode(key); await sleep(250); }
+        step('Tastet pinkoden'); await sleep(3500);
+        cur = await tree(); record('etter pin', cur.tree);
+        if (screenKind(cur.nodes) === 'pin') throw new Error('Pinkoden ble ikke godtatt av Vigilo');
+        continue;
       }
-    } else {
-      const m = extractMessages(cur.tree, null, s.barn); found.push(...m); step(`${m.length} meldinger på skjermen`);
+      if (kind === 'innlogging') throw new Error('Vigilo viser innloggingsskjermen. Logg inn i appen på telefonen én gang, så husker den det.');
+      const back = backButton(cur.nodes), tab = messagesTab(cur.nodes);
+      if (back && !childSelector(cur.nodes)) { await tapNode(back); step('Lukket en åpen melding'); }
+      else if (tab) { await tapNode(tab); step('Gikk til «Meldinger»'); }
+      else throw new Error('Fant ikke meldingslisten i Vigilo (ingen barnevelger, «Tilbake» eller «Meldinger»-fane)');
+      await sleep(2500); cur = await tree(); record('på vei til meldinger', cur.tree);
+    }
+    if (!onMessageList(cur.nodes)) throw new Error('Fant ikke meldingslisten i Vigilo');
+    // Listen laster litt etter at skjermen vises.
+    for (let i = 0; i < 4 && !hasMessageCells(cur.nodes); i++) { await sleep(2000); cur = await tree(); }
+    const found = [];
+    for (const barn of s.barn) {
+      // Velg barnet i velgeren øverst, hvis det ikke alt er valgt.
+      let sel = childSelector(cur.nodes);
+      if (!new RegExp(`^${firstName(barn)}\\b`, 'i').test(sel.label)) {
+        await tapNode(sel); await sleep(2000); cur = await tree();
+        const opt = childOption(cur.nodes, barn);
+        if (!opt) { step(`Fant ikke ${barn} i barnevelgeren – hopper over`); const close = childSelector(cur.nodes); if (close) { await tapNode(close); await sleep(1500); cur = await tree(); } continue; }
+        await tapNode(opt); await sleep(2500); cur = await tree();
+        for (let i = 0; i < 6 && !hasMessageCells(cur.nodes); i++) { await sleep(2000); cur = await tree(); }   // listen laster
+        sel = childSelector(cur.nodes);
+        if (!sel || !new RegExp(`^${firstName(barn)}\\b`, 'i').test(sel.label)) { step(`Klarte ikke å bytte til ${barn}`); continue; }
+      }
+      record(barn, cur.tree);
+      const list = extractMessages(cur.tree, barn);
+      const fresh = list.filter(m => !known.has(m.id) || !known.get(m.id).apnet);
+      step(`${barn}: ${list.length} meldinger i listen, ${fresh.length} nye`);
+      // Åpne hver ny melding, les hele teksten, og gå tilbake til listen.
+      let opened = 0;
+      for (const m of fresh) {
+        if (opened >= MAX_OPEN) { step(`Åpner maks ${MAX_OPEN} per kjøring; resten neste gang`); break; }
+        let here = extractMessages(cur.tree, barn).find(x => x.id === m.id);
+        // Celler nederst (bak fanelinjen) eller utenfor skjermen: rull listen opp til cellen er godt synlig.
+        for (let i = 0; i < 4 && here && here.y > 620; i++) { await remote.swipe(188, 560, 188, 200, 0.4); await sleep(1500); cur = await tree(); here = extractMessages(cur.tree, barn).find(x => x.id === m.id); }
+        if (!here || here.y > 700 || here.y < 150) { step(`«${m.tittel}» er ikke synlig i listen – tas neste gang`); continue; }
+        await remote.tap(Math.round(here.x), Math.round(here.y)); await sleep(2500);
+        let d = await tree();
+        if (backButton(d.nodes) && !childSelector(d.nodes)) {
+          const detail = parseMessageDetail(d.tree);
+          record(`${barn}: ${m.tittel}`, d.tree);
+          Object.assign(m, { innhold: detail.innhold, tidspunkt: detail.tidspunkt, apnet: true });
+          opened++;
+          await tapNode(backButton(d.nodes)); await sleep(2000); cur = await tree();
+          if (!childSelector(cur.nodes)) { const b = backButton(cur.nodes); if (b) { await tapNode(b); await sleep(2000); cur = await tree(); } }
+          if (!childSelector(cur.nodes)) throw new Error(`Kom ikke tilbake til listen etter «${m.tittel}»`);
+        } else { step(`Fikk ikke åpnet «${m.tittel}»`); cur = d; }
+      }
+      found.push(...list.map(({ x, y, ...m }) => m));
     }
     return found;
   }
@@ -147,11 +205,13 @@ export function createVigilo({ env = process.env, remote = defaultRemote, messag
     const record = (navn, tree) => screens.push({ navn, tekster: textsOf(tree).slice(0, MAX_SCREEN_TEXTS) });
     const entry = { at: now().toISOString(), kilde: source, status: 'ok', nye: 0, antall: 0, varsler: [], steg: steps, skjermer: screens, feil: null };
     try {
-      const found = await remote.serial(async () => { try { return await readPhone(s, step, record); } finally { await remote.home().catch(() => {}); } });
-      const known = new Set(list(await read(MESSAGES)).map(m => m.id));
+      const known = new Map(list(await read(MESSAGES)).map(m => [m.id, m]));
+      const found = await remote.serial(async () => { try { return await readPhone(s, step, record, known); } finally { await remote.home().catch(() => {}); } });
       const nye = found.filter(m => !known.has(m.id)).map(m => ({ ...m, funnet: now().toISOString() }));
+      // Meldinger som ikke lot seg åpne sist, men ble åpnet nå: fyll inn innholdet.
+      const fylt = found.filter(m => known.has(m.id) && !known.get(m.id).apnet && m.apnet);
       entry.antall = found.length; entry.nye = nye.length;
-      if (nye.length) await update(MESSAGES, prev => [...nye, ...list(prev)].slice(0, MAX_MESSAGES));
+      if (nye.length || fylt.length) await update(MESSAGES, prev => [...nye, ...list(prev).map(p => { const f = fylt.find(x => x.id === p.id); return f ? { ...p, ...f, funnet: p.funnet } : p; })].slice(0, MAX_MESSAGES));
       step(nye.length ? `${nye.length} nye meldinger lagret` : 'Ingen nye meldinger');
       entry.varsler = await notify(nye, s);
       for (const v of entry.varsler) step(`SMS til ${v.navn}: ${v.status}${v.feil ? ` (${v.feil})` : ''}`);
