@@ -11,7 +11,7 @@ export const addDays = (date, n) => { const d = new Date(`${date}T00:00:00Z`); d
 export const RECURRENCE_LABEL = { ingen: 'Én gang', daglig: 'Hver dag', ukentlig: 'Hver uke', 'annenhver-uke': 'Annenhver uke', maanedlig: 'Hver måned', 'en-gang': 'Én gang' };
 /** Standard-SMS ved avvik; samme tekst som serveren bygger (avvikSms i routes/avvik.js), uten lenken serveren legger til sist. */
 export const avvikSmsIntro = person => `Hei ${person}, Gamlepappa har registrert ett avvik idag som går på trivsel i huset. Og håper du kan fikse:`;
-export const avvikSmsText = ({ person, beskrivelse, forslag, registrertAv }) => [`${avvikSmsIntro(person || 'NAVN')} ${(beskrivelse || '').trim()}`, forslag?.trim() ? `Forslag: ${forslag.trim()}` : '', `Registrert av ${registrertAv || '…'}.`].filter(Boolean).join('\n');
+export const avvikSmsText = ({ person, beskrivelse, positivt, forslag, registrertAv }) => [`${avvikSmsIntro(person || 'NAVN')} ${(beskrivelse || '').trim()}`, positivt?.trim() ? `Og noe bra du har gjort: ${positivt.trim()}` : '', forslag?.trim() ? `Forslag: ${forslag.trim()}` : '', `Registrert av ${registrertAv || '…'}.`].filter(Boolean).join('\n');
 export const WEEKDAY_LABEL = ['', 'mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag', 'søndag'];
 export const clockLabel = t => (t || '').replace(':', '.');
 /** «hver onsdag kl. 18.00», «den 1. hver måned kl. 09.00», «hver dag kl. 08.00», «tirsdag 5. nov. kl. 09.00». */

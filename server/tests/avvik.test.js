@@ -18,13 +18,16 @@ function harness() {
 }
 
 test('rejects unknown residents, categories and empty descriptions', () => {
-  const ok = { person: 'Ylva', registrertAv: 'Ole Andre', kategori: 'Kjøkken', beskrivelse: 'Oppvasken ble stående' };
+  const ok = { person: 'Ylva', registrertAv: 'Ole Andre', kategori: 'Kjøkken', beskrivelse: 'Oppvasken ble stående', positivt: 'Lagde kjempegod middag i går' };
   assert.equal(parseAvvik(ok).status, 'apen');
+  assert.equal(parseAvvik(ok).positivt, 'Lagde kjempegod middag i går');
+  assert.throws(() => parseAvvik({ ...ok, positivt: ' ' }), /noe positivt/);
+  assert.throws(() => parseAvvik({ ...ok, positivt: 'x'.repeat(501) }), /positive kan være maks/);
   assert.throws(() => parseAvvik({ ...ok, person: 'Ukjent' }), /hvem avviket gjelder/);
   assert.throws(() => parseAvvik({ ...ok, registrertAv: '' }), /registrerer/);
   assert.throws(() => parseAvvik({ ...ok, kategori: 'Hemmelig' }), /kategori/);
-  assert.throws(() => parseAvvik({ ...ok, beskrivelse: '   ' }), /hva som skjedde/);
-  assert.throws(() => parseAvvik({ ...ok, beskrivelse: 'x'.repeat(501) }), /maks/);
+  assert.throws(() => parseAvvik({ ...ok, positivt: 'Er flink til å hjelpe til', beskrivelse: '   ' }), /hva som skjedde/);
+  assert.throws(() => parseAvvik({ ...ok, positivt: 'Er flink til å hjelpe til', beskrivelse: 'x'.repeat(501) }), /maks/);
 });
 
 test('creates, resolves, reopens and deletes an avvik', async () => {
@@ -33,7 +36,7 @@ test('creates, resolves, reopens and deletes an avvik', async () => {
     const empty = await h.req('');
     assert.deepEqual(empty.body.items, []);
     assert.equal(empty.body.residents.length, 7);
-    const created = await h.req('', 'POST', { person: 'Vetle', registrertAv: 'Ingvild', kategori: 'Lys og strøm', beskrivelse: '  Lyset sto  på i kjelleren ' });
+    const created = await h.req('', 'POST', { person: 'Vetle', registrertAv: 'Ingvild', kategori: 'Lys og strøm', positivt: 'Er flink til å hjelpe til', beskrivelse: '  Lyset sto  på i kjelleren ' });
     assert.equal(created.status, 201);
     assert.equal(created.body.item.beskrivelse, 'Lyset sto på i kjelleren');
     const id = created.body.item.id;

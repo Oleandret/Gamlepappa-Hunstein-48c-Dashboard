@@ -29,6 +29,7 @@ export function AvvikPanel({ h, me, setMe, standalone }) {
   const [person, setPerson] = useState('');
   const [kategori, setKategori] = useState('Annet');
   const [beskrivelse, setBeskrivelse] = useState('');
+  const [positivt, setPositivt] = useState('');   // må med: noe bra personen har gjort
   const [forslag, setForslag] = useState('');
   const [foreslaRegel, setForeslaRegel] = useState(false);
   const [regelId, setRegelId] = useState('');
@@ -48,9 +49,9 @@ export function AvvikPanel({ h, me, setMe, standalone }) {
 
   async function submit(e) {
     e.preventDefault();
-    const d = await h.send('/avvik', 'POST', { person, kategori, beskrivelse, registrertAv: me, forslag, foreslaRegel, regelId: regelId || undefined, sendSms, smsTekst: sendSms && smsTekst !== null && smsTekst.trim() ? smsTekst.trim() : undefined });
+    const d = await h.send('/avvik', 'POST', { person, kategori, beskrivelse, positivt, registrertAv: me, forslag, foreslaRegel, regelId: regelId || undefined, sendSms, smsTekst: sendSms && smsTekst !== null && smsTekst.trim() ? smsTekst.trim() : undefined });
     if (d) {
-      setBeskrivelse(''); setPerson(''); setForslag(''); setForeslaRegel(false); setRegelId(''); setSmsTekst(null); setSendSms(true);
+      setBeskrivelse(''); setPositivt(''); setPerson(''); setForslag(''); setForeslaRegel(false); setRegelId(''); setSmsTekst(null); setSendSms(true);
       const sms = !sendSms ? ' Ingen SMS sendes.' : d.item?.varsel?.status === 'sender' ? ` SMS til ${d.item.person} sendes fra iPhonen nå.` : '';
       setNotice((d.rule ? 'Avviket er registrert, og forslaget ligger under Husregler til godkjenning.' : 'Avviket er registrert.') + sms);
     }
@@ -71,6 +72,10 @@ export function AvvikPanel({ h, me, setMe, standalone }) {
         <label className="block">
           <span className="text-xs text-nx-mute">Hva skjedde?</span>
           <textarea value={beskrivelse} onChange={e => setBeskrivelse(e.target.value)} maxLength={500} rows={3} required placeholder="F.eks. lot lyset stå på i kjelleren hele natta" className={`${field} w-full mt-1`} />
+        </label>
+        <label className="block">
+          <span className="text-xs text-nx-mute">Og noe positivt {person || 'personen'} har gjort (må med)</span>
+          <textarea value={positivt} onChange={e => setPositivt(e.target.value)} maxLength={500} rows={2} required placeholder="F.eks. lagde kjempegod middag i går" className={`${field} w-full mt-1`} />
         </label>
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
@@ -105,16 +110,17 @@ export function AvvikPanel({ h, me, setMe, standalone }) {
         <div className="rounded-xl border border-nx-line/60 p-3 space-y-2">
           <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={sendSms} onChange={e => setSendSms(e.target.checked)} /><MessageSquare size={14} aria-hidden="true" className="text-nx-cyan" />Send SMS til {person || 'personen'} om avviket</label>
           {sendSms && <>
-            <textarea aria-label="SMS-tekst" value={smsTekst ?? avvikSmsText({ person, beskrivelse, forslag, registrertAv: me })} onChange={e => setSmsTekst(e.target.value)} maxLength={1000} rows={4} className={`${field} w-full text-xs`} />
+            <textarea aria-label="SMS-tekst" value={smsTekst ?? avvikSmsText({ person, beskrivelse, positivt, forslag, registrertAv: me })} onChange={e => setSmsTekst(e.target.value)} maxLength={1000} rows={4} className={`${field} w-full text-xs`} />
             <p className="text-xs text-nx-mute">{smsTekst === null ? 'Standardteksten følger det du skriver over. ' : ''}Sendes fra iPhonen når avviket registreres, med en tilfeldig liten vits{smsTekst === null ? ' og lenke til avvikene' : ''} til slutt.{smsTekst !== null && <> <button type="button" className="underline" onClick={() => setSmsTekst(null)}>Tilbake til standardteksten</button></>}</p>
             {!h.smsKanal && <p className="text-xs text-nx-amber">SMS fra iPhonen er ikke satt opp på serveren, så ingen SMS går før det er i orden.</p>}
             {h.smsKanal && person && !h.smsMottakere.includes(person) && <p className="text-xs text-nx-amber">{person} har ikke mobilnummer registrert (Beboere), så SMS-en kan ikke sendes.</p>}
           </>}
         </div>
-        <button type="submit" disabled={h.busy || !person || !me || !beskrivelse.trim()} className={primaryButton}>
+        <button type="submit" disabled={h.busy || !person || !me || !beskrivelse.trim() || !positivt.trim()} className={primaryButton}>
           <Plus size={14} aria-hidden="true" />Registrer avvik
         </button>
         {!person && <p className="text-xs text-nx-mute">Velg hvem avviket gjelder.</p>}
+        {person && beskrivelse.trim() && !positivt.trim() && <p className="text-xs text-nx-mute">Skriv også noe positivt {person} har gjort før avviket kan sendes.</p>}
         {notice && <p role="status" className="text-xs text-nx-cyan">{notice}</p>}
       </form>
 
@@ -137,6 +143,7 @@ export function AvvikPanel({ h, me, setMe, standalone }) {
               <div className="flex-1 min-w-0">
                 <p className="text-sm"><strong>{a.person}</strong> <span className="text-nx-mute">· {a.kategori}</span></p>
                 <p className={`text-sm mt-0.5 break-words ${a.status === 'lost' ? 'line-through' : ''}`}>{a.beskrivelse}</p>
+                {a.positivt && <p className="text-xs mt-1 text-nx-green/90 break-words">Bra: {a.positivt}</p>}
                 {a.regelId && ruleById[a.regelId] && <p className="text-xs text-nx-mute mt-1">Husregel: {ruleById[a.regelId].tekst}</p>}
                 {a.forslag && <p className="text-xs mt-1 text-nx-cyan/90 break-words">Forslag: {a.forslag}</p>}
                 <p className="text-xs text-nx-mute mt-1">Registrert av {a.registrertAv}, {time(a.opprettet)}{a.lost ? ` · løst ${time(a.lost)}` : ''}</p>

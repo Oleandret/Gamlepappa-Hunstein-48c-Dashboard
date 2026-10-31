@@ -27,13 +27,17 @@ export function parseAvvik(body, now = new Date()) {
   if (!CATEGORIES.includes(kategori)) throw new Error('Ukjent kategori');
   if (!beskrivelse) throw new Error('Skriv hva som skjedde');
   if (beskrivelse.length > MAX_TEXT) throw new Error(`Beskrivelsen kan være maks ${MAX_TEXT} tegn`);
+  // Et avvik må alltid ha med noe positivt om personen, så det ikke bare blir kritikk.
+  const positivt = text(body?.positivt);
+  if (!positivt) throw new Error('Skriv også noe positivt om hva personen har gjort');
+  if (positivt.length > MAX_TEXT) throw new Error(`Det positive kan være maks ${MAX_TEXT} tegn`);
   const forslag = text(body?.forslag);
   if (forslag.length > MAX_TEXT) throw new Error(`Forslaget kan være maks ${MAX_TEXT} tegn`);
   const regelId = typeof body?.regelId === 'string' && /^[\w-]{1,100}$/.test(body.regelId) ? body.regelId : null;
   // SMS til den avviket gjelder er standard; den som registrerer kan ta det bort eller skrive om teksten.
   const sms = body?.sendSms !== false;
   const smsTekst = typeof body?.smsTekst === 'string' ? body.smsTekst.trim().slice(0, MAX_SMS) : '';
-  return { id: randomUUID(), person, registrertAv, kategori, beskrivelse, forslag, regelId, opprettet: now.toISOString(), status: 'apen', lost: null, sms, smsTekst: smsTekst || null };
+  return { id: randomUUID(), person, registrertAv, kategori, beskrivelse, positivt, forslag, regelId, opprettet: now.toISOString(), status: 'apen', lost: null, sms, smsTekst: smsTekst || null };
 }
 
 const MAX_SMS = 1000;
@@ -44,7 +48,7 @@ export const avvikSmsIntro = person => `Hei ${person}, Gamlepappa har registrert
  * tilfeldig liten vits, så det ikke blir vondt å få et avvik, og så lenken til avvikene.
  */
 export function avvikSms(item, origin = '', { vits = tilfeldigVits() } = {}) {
-  const tekst = item.smsTekst || [`${avvikSmsIntro(item.person)} ${item.beskrivelse}`, item.forslag ? `Forslag: ${item.forslag}` : '', `Registrert av ${item.registrertAv}.`].filter(Boolean).join('\n');
+  const tekst = item.smsTekst || [`${avvikSmsIntro(item.person)} ${item.beskrivelse}`, item.positivt ? `Og noe bra du har gjort: ${item.positivt}` : '', item.forslag ? `Forslag: ${item.forslag}` : '', `Registrert av ${item.registrertAv}.`].filter(Boolean).join('\n');
   return [tekst, vits ? `\nDagens vits: ${vits}` : '', origin ? `${origin}/avvik` : ''].filter(Boolean).join('\n');
 }
 

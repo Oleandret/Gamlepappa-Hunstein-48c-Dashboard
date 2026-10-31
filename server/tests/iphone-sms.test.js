@@ -87,6 +87,7 @@ test('avvik notification: only to the person concerned, honest statuses',async()
  assert.equal((await notifyAvvik(item,{messaging,residents:residents({telefon:'+4799999999',smsVarsel:false})})).status,'sendt');
  assert.equal((await notifyAvvik({...item,sms:false},{messaging,residents:residents({telefon:'+4799999999'})})).status,'valgt_bort');
  assert.equal(avvikSms({...item,smsTekst:'Egen tekst'},'',{vits:'Vits'}),'Egen tekst\n\nDagens vits: Vits');
+ assert.match(avvikSms({...item,positivt:'Lagde god middag'},'',{vits:'Vits'}),/fikse: Oppvasken ble stående\nOg noe bra du har gjort: Lagde god middag\nRegistrert av Ole Andre\./);
  assert.match(avvikSms({...item,forslag:'Ta den med en gang'},'https://huset.test',{vits:'Vits'}),/\nForslag: Ta den med en gang\nRegistrert av Ole Andre\.\n\nDagens vits: Vits\nhttps:\/\/huset\.test\/avvik$/);
  assert.equal((await notifyAvvik(item,{messaging,residents:residents({})})).status,'mangler_telefon');
  assert.equal((await notifyAvvik(item,{messaging:{...messaging,channels:()=>({sms:false})},residents:residents({})})).status,'ikke_satt_opp');
@@ -96,9 +97,9 @@ test('avvik notification: only to the person concerned, honest statuses',async()
 test('route stores the notification result on the avvik',async()=>{
  let store;const done=new Promise(r=>{globalThis.__done=r;});
  const app=express().use(express.json()).use('/avvik',createAvvikRoutes({read:async()=>store,update:async fn=>(store=fn(structuredClone(store))),clock:()=>new Date('2026-10-28T08:00:00Z'),notify:async()=>{setTimeout(()=>globalThis.__done(),20);return {kanal:'sms',status:'sendt',at:'x'};}}));
- const srv=app.listen(0);try{const r=await fetch(`http://127.0.0.1:${srv.address().port}/avvik`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({person:'Ylva',registrertAv:'Ole Andre',kategori:'Kjøkken',beskrivelse:'Test'})});
+ const srv=app.listen(0);try{const r=await fetch(`http://127.0.0.1:${srv.address().port}/avvik`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({person:'Ylva',registrertAv:'Ole Andre',kategori:'Kjøkken',positivt: 'Er flink til å hjelpe til', beskrivelse:'Test'})});
   const b=await r.json();assert.equal(b.item.varsel.status,'sender');await done;assert.equal(store[0].varsel.status,'sendt');
-  const off=await (await fetch(`http://127.0.0.1:${srv.address().port}/avvik`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({person:'Ylva',registrertAv:'Ole Andre',kategori:'Kjøkken',beskrivelse:'Uten SMS',sendSms:false})})).json();
+  const off=await (await fetch(`http://127.0.0.1:${srv.address().port}/avvik`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({person:'Ylva',registrertAv:'Ole Andre',kategori:'Kjøkken',positivt: 'Er flink til å hjelpe til', beskrivelse:'Uten SMS',sendSms:false})})).json();
   assert.equal(off.item.varsel.status,'valgt_bort');assert.equal(off.item.sms,false);assert.equal(store[0].varsel.status,'valgt_bort');}finally{srv.close();}
 });
 

@@ -66,12 +66,12 @@ test('completing a recurring task logs who did it and moves the due date', async
 
 test('an avvik suggestion can be proposed as a house rule', async t => {
   const call = harness(t);
-  const res = await call('/avvik', 'POST', { person: 'Ylva', registrertAv: 'Ingvild', kategori: 'Kjøkken', beskrivelse: 'Oppvasken sto over natta', forslag: 'Oppvasken tas samme kveld', foreslaRegel: true });
+  const res = await call('/avvik', 'POST', { person: 'Ylva', registrertAv: 'Ingvild', kategori: 'Kjøkken', positivt: 'Er flink til å hjelpe til', beskrivelse: 'Oppvasken sto over natta', forslag: 'Oppvasken tas samme kveld', foreslaRegel: true });
   assert.equal(res.status, 201);
   assert.equal(res.body.item.forslag, 'Oppvasken tas samme kveld');
   assert.equal(res.body.rule.status, 'forslag');
   const rules = (await call('/huset')).body.rules;
   assert.deepEqual(rules.map(r => [r.tekst, r.status, r.fraAvvik]), [['Oppvasken tas samme kveld', 'forslag', res.body.item.id]]);
-  const plain = await call('/avvik', 'POST', { person: 'Ylva', registrertAv: 'Ingvild', beskrivelse: 'Uten forslag', foreslaRegel: true });
+  const plain = await call('/avvik', 'POST', { person: 'Ylva', registrertAv: 'Ingvild', positivt: 'Er flink til å hjelpe til', beskrivelse: 'Uten forslag', foreslaRegel: true });
   assert.equal(plain.body.rule, null);
 });
