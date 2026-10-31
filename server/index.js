@@ -178,3 +178,9 @@ for (const signal of ['SIGTERM','SIGINT']) process.on(signal, () => {
   server.close(async () => { await shutdown(); process.exit(0); });
   setTimeout(() => process.exit(1), 15000).unref();
 });
+
+// WebSocket-oppgraderinger: bare Skjermdeling (VNC) under /iphone, resten avvises.
+server.on('upgrade', (req, socket, head) => {
+  if ((req.url || '').startsWith('/iphone/')) return iphone.upgrade(req, socket, head);
+  socket.destroy();
+});

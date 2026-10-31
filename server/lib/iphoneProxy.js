@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { Readable } from 'node:stream';
+import http from 'node:http';
+import https from 'node:https';
 
 /**
  * Iphone-fanen: iphone-remote (eget Railway-prosjekt) vises under /iphone/ på
@@ -15,14 +17,16 @@ import { Readable } from 'node:stream';
  *    skrives om til /iphone/… så de ikke treffer dashboardets eget /api.
  *  - Macen (mac-agent via samme iphone-remote) går samme vei: /iphone/api/mac/… og
  *    siden /iphone/mac.html.
+ *  - Skjermdeling (VNC) i nettleseren er en WebSocket: wss://…/iphone/api/mac/vnc?mac=<id>.
+ *    Oppgraderingen videresendes til iphone-remote med samme billett- og øktsjekk (`upgrade`).
  */
 const TICKET_COOKIE = 'gp_iphone';
 const TICKET_TTL_MS = 12 * 3600_000;
 const SECRET = randomBytes(32);
 const sign = exp => createHmac('sha256', SECRET).update(String(exp)).digest('base64url');
 
-export function iphoneConfigured(env = process.env) {
-  try { return Boolean(env.IPHONE_REMOTE_USER && env.IPHONE_REMOTE_PASSWORD && new URL(env.IPHONE_REMOTE_URL).protocol === 'https:'); }
+export function iphoneConfigured(env = process.env, { allowHttp = false } = {}) {
+  try { const p = new URL(env.IPHONE_REMOTE_URL).protocol; return Boolean(env.IPHONE_REMOTE_USER && env.IPHONE_REMOTE_PASSWORD && (p === 'https:' || (allowHttp && p === 'http:'))); }
   catch { return false; }
 }
 
@@ -49,9 +53,19 @@ export function upstreamPath(path) {
   return null;
 }
 
+/** WebSocket-sti hos iphone-remote for en oppgradering under /iphone, eller null. Bare VNC-broen slippes gjennom. */
+export function upgradeTarget(reqUrl) {
+  const u = new URL(reqUrl || '/', 'http://x');
+  if (u.pathname !== '/iphone/api/mac/vnc') return null;
+  const mac = u.searchParams.get('mac');
+  if (mac !== null && !/^[a-z0-9]{1,32}$/i.test(mac)) return null;
+  return `/api/mac/vnc${mac ? `?mac=${encodeURIComponent(mac)}` : ''}`;
+}
+
 export function createIphoneProxy({ env = process.env, fetchImpl = fetch, isProd = env.NODE_ENV === 'production' } = {}) {
   let upstreamCookie = null, loggingIn = null;
   const base = () => env.IPHONE_REMOTE_URL.replace(/\/+$/, '');
+  const configured = () => iphoneConfigured(env, { allowHttp: !isProd });   // http mot iphone-remote bare utenfor produksjon (lokal gateway)
 
   async function login() {
     if (!loggingIn) loggingIn = (async () => {
@@ -81,7 +95,7 @@ export function createIphoneProxy({ env = process.env, fetchImpl = fetch, isProd
   // Under /api (accessControl): gir billett til administrator.
   sessionRoute.post('/session', (req, res) => {
     if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Administrator kreves' });
-    if (!iphoneConfigured(env)) return res.json({ configured: false });
+    if (!configured()) return res.json({ configured: false });
     res.cookie(TICKET_COOKIE, makeTicket(), { httpOnly: true, secure: isProd, sameSite: 'strict', path: '/iphone', maxAge: TICKET_TTL_MS });
     res.json({ configured: true, path: '/iphone/' });
   });
@@ -91,7 +105,7 @@ export function createIphoneProxy({ env = process.env, fetchImpl = fetch, isProd
     // Egne sikkerhetshoder: siden kan bare vises i dashboardet (samme opphav) og trenger innebygde skript.
     res.set({ 'X-Frame-Options': 'SAMEORIGIN', 'Cache-Control': 'no-store',
       'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'none'; form-action 'self'" });
-    if (!iphoneConfigured(env)) return res.status(503).type('text').send('Iphone-fjernstyring er ikke satt opp på serveren.');
+    if (!configured()) return res.status(503).type('text').send('Iphone-fjernstyring er ikke satt opp på serveren.');
     if (!validTicket(readCookie(req, TICKET_COOKIE))) return res.status(401).type('text').send('Åpne Iphone-fanen i dashboardet på nytt.');
     const path = upstreamPath(req.path);
     if (path === null) return res.status(404).type('text').send('Ikke funnet');
@@ -115,5 +129,45 @@ export function createIphoneProxy({ env = process.env, fetchImpl = fetch, isProd
     }
   });
 
-  return { sessionRoute, proxy };
+  // WebSocket (Skjermdeling/VNC): samme sjekker som proxyen, så selve oppgraderingen rett mot iphone-remote.
+  function openUpstream(req, target) {
+    return new Promise((resolve, reject) => {
+      const u = new URL(base());
+      const r = (u.protocol === 'https:' ? https : http).request({
+        host: u.hostname, port: u.port || (u.protocol === 'https:' ? 443 : 80), path: target, method: 'GET', timeout: 15000,
+        headers: { host: u.host, connection: 'Upgrade', upgrade: 'websocket', 'sec-websocket-version': '13', 'sec-websocket-key': req.headers['sec-websocket-key'],
+          ...(req.headers['sec-websocket-protocol'] ? { 'sec-websocket-protocol': req.headers['sec-websocket-protocol'] } : {}), cookie: upstreamCookie }
+      });
+      r.on('upgrade', (res, up, upHead) => resolve({ res, up, upHead }));
+      r.on('response', res => { res.resume(); resolve({ res }); });
+      r.on('timeout', () => r.destroy(new Error('timeout')));
+      r.on('error', reject);
+      r.end();
+    });
+  }
+  async function upgrade(req, socket, head) {
+    const deny = (status, text) => { try { socket.end(`HTTP/1.1 ${status} ${text}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`); } catch { /* lukket */ } };
+    const target = upgradeTarget(req.url);
+    if (target === null) return deny(404, 'Not Found');
+    if (!configured()) return deny(503, 'Service Unavailable');
+    if (!validTicket(readCookie(req, TICKET_COOKIE))) return deny(401, 'Unauthorized');
+    if (!req.headers['sec-websocket-key']) return deny(400, 'Bad Request');
+    try {
+      if (!upstreamCookie) await login();
+      let o = await openUpstream(req, target);
+      if (!o.up && o.res.statusCode === 401) { upstreamCookie = null; await login(); o = await openUpstream(req, target); }
+      if (!o.up) return deny(o.res.statusCode === 401 ? 502 : o.res.statusCode || 502, 'Upgrade Failed');
+      const h = o.res.headers;
+      socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${h['sec-websocket-accept']}\r\n${h['sec-websocket-protocol'] ? `Sec-WebSocket-Protocol: ${h['sec-websocket-protocol']}\r\n` : ''}\r\n`);
+      socket.setNoDelay(true); o.up.setNoDelay(true);
+      if (o.upHead?.length) socket.write(o.upHead);
+      if (head?.length) o.up.write(head);
+      o.up.pipe(socket).pipe(o.up);
+      o.up.on('error', () => socket.destroy()); socket.on('error', () => o.up.destroy());
+    } catch {
+      deny(502, 'Bad Gateway');
+    }
+  }
+
+  return { sessionRoute, proxy, upgrade };
 }
