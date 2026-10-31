@@ -4,7 +4,7 @@ import RFB from '@novnc/novnc';
 import { X, Keyboard, Maximize2, Minimize2, ExternalLink, RefreshCw } from 'lucide-react';
 import { macName, macVncUrl } from '../lib/macs.js';
 import { macApi } from '../lib/macRemote.js';
-import { vncSocketUrl, keysymForChar, keysymForKey, KEY_BAR, XK, VNC_USER_KEY, vncStatusText, VNC_QUALITIES, VNC_QUALITY_KEY, validVncQuality, rateLabel } from '../lib/vnc.js';
+import { vncSocketUrl, keysymForChar, keysymForKey, KEY_BAR, XK, VNC_USER_KEY, vncStatusText, VNC_QUALITIES, VNC_QUALITY_KEY, validVncQuality, rateLabel, loadVncLogin, saveVncLogin, forgetVncLogin } from '../lib/vnc.js';
 import { useFullscreen } from '../lib/useFullscreen.js';
 
 /**
@@ -34,7 +34,9 @@ export function MacVnc({ macId, onClose }) {
   const [quality, setQuality] = useState(() => { try { return validVncQuality(localStorage.getItem(VNC_QUALITY_KEY)); } catch { return 'normal'; } });
   const [rate, setRate] = useState(0);
   const [storedLogin, setStoredLogin] = useState(false);
+  const [deviceLogin, setDeviceLogin] = useState(() => Boolean(loadVncLogin(macId)));   // passord husket på denne enheten
   const skipStored = useRef(false);   // lagret innlogging ble avvist: spør i stedet neste gang
+  const typed = useRef(null);         // innlogging tastet nå; lagres på enheten når Macen godtar den
 
   // Koble til (på nytt ved «attempt»): hent lagret innlogging, åpne WebSocket (med byte-teller) og start noVNC.
   useEffect(() => {
@@ -43,12 +45,14 @@ export function MacVnc({ macId, onClose }) {
     setStatus('connecting'); setDetail(''); setRate(0);
     let rfb, ws, timer, cancelled = false, bytes = 0;
     (async () => {
-      let creds = null;
+      // Innlogging: først gatewayens (Railway), så den som er husket på denne enheten, ellers spørres det.
+      let creds = null, source = '';
       if (!skipStored.current) {
-        try { const c = await macApi('/vnc-credentials', undefined, macId); if (c.configured) creds = { username: c.username, password: c.password }; } catch { /* spør i stedet */ }
+        try { const c = await macApi('/vnc-credentials', undefined, macId); if (c.configured) { creds = { username: c.username, password: c.password }; source = 'gateway'; } } catch { /* spør i stedet */ }
+        if (!creds) { const d = loadVncLogin(macId); if (d) { creds = d; source = 'enhet'; } }
       }
       if (cancelled) return;
-      setStoredLogin(Boolean(creds));
+      setStoredLogin(source === 'gateway'); setDeviceLogin(Boolean(loadVncLogin(macId)));
       try {
         ws = new WebSocket(vncSocketUrl(macId, window.location));
         ws.binaryType = 'arraybuffer';
@@ -60,11 +64,17 @@ export function MacVnc({ macId, onClose }) {
       rfb.showDotCursor = true; rfb.background = '#000'; rfb.focusOnClick = true;
       const [, , q, c] = VNC_QUALITIES.find(x => x[0] === quality) || VNC_QUALITIES[1];
       rfb.qualityLevel = q; rfb.compressionLevel = c;
-      rfb.addEventListener('connect', () => setStatus('connected'));
+      rfb.addEventListener('connect', () => {
+        setStatus('connected');
+        // Macen godtok det som ble tastet: husk det på denne enheten til neste gang.
+        if (typed.current) { setDeviceLogin(saveVncLogin(macId, typed.current)); typed.current = null; }
+      });
       rfb.addEventListener('credentialsrequired', () => setStatus('credentials'));
       rfb.addEventListener('securityfailure', e => {
         if (creds) skipStored.current = true;
-        setStatus('error'); setDetail(`${creds ? 'Lagret innlogging' : 'Innlogging'} avvist${e.detail?.reason ? `: ${e.detail.reason}` : ''}`);
+        if (source === 'enhet') { forgetVncLogin(macId); setDeviceLogin(false); }   // husket passord virker ikke lenger
+        typed.current = null;
+        setStatus('error'); setDetail(`${creds ? (source === 'gateway' ? 'Lagret innlogging i gatewayen' : 'Passordet husket på denne enheten') : 'Innlogging'} avvist${e.detail?.reason ? `: ${e.detail.reason}` : ''}`);
       });
       rfb.addEventListener('disconnect', e => setStatus(s => (s === 'error' ? s : e.detail?.clean ? 'closed' : 'error')));
       rfbRef.current = rfb;
@@ -87,9 +97,11 @@ export function MacVnc({ macId, onClose }) {
   const submitCredentials = e => {
     e.preventDefault();
     try { localStorage.setItem(VNC_USER_KEY(macId), user); } catch { /* privat modus */ }
+    typed.current = { username: user, password };
     rfbRef.current?.sendCredentials({ username: user, password });
     setPassword(''); setStatus('connecting');
   };
+  const forget = () => { forgetVncLogin(macId); setDeviceLogin(false); setDetail('Passordet er glemt på denne enheten.'); };
 
   // Tastetrykk: klebrige modifikatorer holdes nede rundt tasten og slippes etterpå.
   const press = useCallback(keysym => {
@@ -145,7 +157,7 @@ export function MacVnc({ macId, onClose }) {
           <form onSubmit={submitCredentials} className="absolute inset-0 flex items-center justify-center bg-black/70 p-4">
             <div className="panel p-4 w-full max-w-xs space-y-2">
               <p className="panel-title">Logg inn på {macName(macId)}</p>
-              <p className="text-xs text-nx-mute">Brukernavn og passord på Macen (det du logger inn med der). Passordet lagres ikke her; vil du slippe å taste, legg det i gatewayen (MAC_…_VNC_USER/PASSWORD på Railway).</p>
+              <p className="text-xs text-nx-mute">Brukernavn og passord på Macen (det du logger inn med der). Når Macen godtar det, huskes det på denne enheten, så du slipper å taste neste gang. Vil du ha det på alle enheter, legg det i gatewayen (MAC_…_VNC_PASSWORD på Railway).</p>
               <input value={user} onChange={e => setUser(e.target.value)} placeholder="Brukernavn" autoCapitalize="off" autoCorrect="off" autoComplete="username" aria-label="Brukernavn"
                 className="w-full rounded-lg border border-nx-line/60 bg-nx-bg px-2.5 py-2 text-sm text-nx-text" />
               <input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="Passord" autoComplete="current-password" aria-label="Passord" autoFocus
@@ -157,6 +169,7 @@ export function MacVnc({ macId, onClose }) {
         {(status === 'error' || status === 'closed') && (
           <div className="absolute inset-x-0 bottom-0 p-3 text-center text-xs text-nx-mute bg-black/70">
             {status === 'error' ? `${vncStatusText('error', detail)}. ${skipStored.current ? 'Prøv på nytt for å logge inn manuelt.' : 'Skjermdeling må være slått på på Macen (Systeminnstillinger → Generelt → Deling).'}` : 'Forbindelsen er avsluttet.'}
+            {deviceLogin && <> <button type="button" onClick={forget} className="underline">Glem passordet på denne enheten</button></>}
           </div>
         )}
       </div>
