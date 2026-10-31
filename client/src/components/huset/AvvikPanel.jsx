@@ -106,7 +106,7 @@ export function AvvikPanel({ h, me, setMe, standalone }) {
           <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={sendSms} onChange={e => setSendSms(e.target.checked)} /><MessageSquare size={14} aria-hidden="true" className="text-nx-cyan" />Send SMS til {person || 'personen'} om avviket</label>
           {sendSms && <>
             <textarea aria-label="SMS-tekst" value={smsTekst ?? avvikSmsText({ person, beskrivelse, forslag, registrertAv: me })} onChange={e => setSmsTekst(e.target.value)} maxLength={1000} rows={4} className={`${field} w-full text-xs`} />
-            <p className="text-xs text-nx-mute">{smsTekst === null ? 'Standardteksten følger det du skriver over. ' : ''}Sendes fra iPhonen når avviket registreres{smsTekst === null ? ', med lenke til avvikene til slutt' : ''}.{smsTekst !== null && <> <button type="button" className="underline" onClick={() => setSmsTekst(null)}>Tilbake til standardteksten</button></>}</p>
+            <p className="text-xs text-nx-mute">{smsTekst === null ? 'Standardteksten følger det du skriver over. ' : ''}Sendes fra iPhonen når avviket registreres, med en tilfeldig liten vits{smsTekst === null ? ' og lenke til avvikene' : ''} til slutt.{smsTekst !== null && <> <button type="button" className="underline" onClick={() => setSmsTekst(null)}>Tilbake til standardteksten</button></>}</p>
             {!h.smsKanal && <p className="text-xs text-nx-amber">SMS fra iPhonen er ikke satt opp på serveren, så ingen SMS går før det er i orden.</p>}
             {h.smsKanal && person && !h.smsMottakere.includes(person) && <p className="text-xs text-nx-amber">{person} har ikke mobilnummer registrert (Beboere), så SMS-en kan ikke sendes.</p>}
           </>}

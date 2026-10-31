@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { getNamespace, updateNamespace } from '../lib/configStore.js';
 import { residents as defaultResidents } from '../lib/residents.js';
 import { messaging as defaultMessaging } from '../lib/messaging.js';
+import { tilfeldigVits } from '../lib/vitser.js';
 
 // Avvik for bedre livskvalitet: små ting beboerne gjør feil i huset, registrert
 // så det blir bedre å bo her. Lagres i config-storen, men ikke via /api/config,
@@ -38,10 +39,13 @@ export function parseAvvik(body, now = new Date()) {
 const MAX_SMS = 1000;
 /** Standardteksten i SMS-en til den avviket gjelder; beskrivelsen og forslaget følger etter. */
 export const avvikSmsIntro = person => `Hei ${person}, Gamlepappa har registrert ett avvik idag som går på trivsel i huset. Og håper du kan fikse:`;
-/** SMS-teksten: egen tekst hvis den som registrerte skrev om, ellers standardteksten. */
-export function avvikSms(item, origin = '') {
-  if (item.smsTekst) return item.smsTekst;
-  return [`${avvikSmsIntro(item.person)} ${item.beskrivelse}`, item.forslag ? `Forslag: ${item.forslag}` : '', `Registrert av ${item.registrertAv}.`, origin ? `${origin}/avvik` : ''].filter(Boolean).join('\n');
+/**
+ * SMS-teksten: egen tekst hvis den som registrerte skrev om, ellers standardteksten. Til slutt en
+ * tilfeldig liten vits, så det ikke blir vondt å få et avvik, og så lenken til avvikene.
+ */
+export function avvikSms(item, origin = '', { vits = tilfeldigVits() } = {}) {
+  const tekst = item.smsTekst || [`${avvikSmsIntro(item.person)} ${item.beskrivelse}`, item.forslag ? `Forslag: ${item.forslag}` : '', `Registrert av ${item.registrertAv}.`].filter(Boolean).join('\n');
+  return [tekst, vits ? `\nDagens vits: ${vits}` : '', origin ? `${origin}/avvik` : ''].filter(Boolean).join('\n');
 }
 
 /**
