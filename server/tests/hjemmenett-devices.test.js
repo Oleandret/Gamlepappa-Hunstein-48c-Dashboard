@@ -49,6 +49,13 @@ test('portal room names map to 3D rooms, unknown rooms stay unplaced',()=>{
  assert.equal(roomIdForName('Teknisk rom bak kjøkken'),null);
  assert.equal(roomIdForName('Treningsrom'),'u-bassbod');
  assert.equal(roomIdForName('Soverom'),null);
+ assert.equal(roomIdForName('Kineo'),'u-kino');
+ assert.equal(roomIdForName('1.etg Entre'),'f1-gang');
+ assert.equal(roomIdForName('2.ETG entre'),'f2-gang');
+ assert.equal(roomIdForName('Bod basseng inngang'),'u-bassbod');
+ assert.equal(roomIdForName('Hovedinngangen utvendig'),null);
+ assert.equal(roomIdForName('Hage'),null);
+ assert.equal(roomIdForName('Soverom/Stue'),null);
  assert.equal(roomIdForName(null),null);
 });
 
