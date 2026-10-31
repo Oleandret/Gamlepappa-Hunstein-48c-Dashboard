@@ -33,7 +33,7 @@ export const field = 'bg-nx-panel/60 border border-nx-line/70 rounded-xl px-3 py
 export const primaryButton = 'avvik-submit inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-md text-xs font-mono uppercase tracking-[0.18em] bg-nx-cyan/15 text-nx-cyan disabled:opacity-40';
 export const iconButton = 'p-2 rounded-md text-nx-mute hover:text-nx-cyan disabled:opacity-40';
 
-async function call(path, options = {}) {
+export async function call(path, options = {}) {
   const r = await apiFetch(`/api${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...options.headers } });
   const d = await r.json().catch(() => ({}));
   if (r.status === 403) throw new Error('Du har ikke rettighet til å endre dette');
