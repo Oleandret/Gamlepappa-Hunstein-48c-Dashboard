@@ -24,6 +24,8 @@ export function SkrytPanel({ h, me, setMe, standalone, owner }) {
 
   const load = useCallback(() => call('/skryt').then(d => { setData(d); setPremie(d.premie); setError(''); }).catch(e => setError(e.message)), []);
   useEffect(() => { load(); }, [load]);
+  // SMS-en sendes i bakgrunnen (telefonen bruker noen sekunder): hent status på nytt til den er avgjort.
+  useEffect(() => { if (!data?.items.some(s => s.varsel?.status === 'sender')) return; const t = setTimeout(load, 6000); return () => clearTimeout(t); }, [data, load]);
 
   async function send(path, method, body) {
     setBusy(true); setError('');
