@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { Search, ArrowLeftRight, LayoutGrid, X, CornerDownLeft, XSquare, Copy, ClipboardPaste, Undo2, Lock, Sun, Send, Keyboard, AppWindow, ScreenShare } from 'lucide-react';
 import { openIphoneSession, macApi, macType, macKey, macVideoQuality, macPointerAction, keyEventAction, eventModifiers } from '../lib/macRemote.js';
 import { VIDEO_QUALITIES, validQuality } from '../lib/macVideoQuality.js';
-import { DEFAULT_MAC, macName, macVncUrl } from '../lib/macs.js';
+import { DEFAULT_MAC, macName } from '../lib/macs.js';
+import { MacVnc } from './MacVnc.jsx';
 import { pointInScreen } from '../lib/macGestures.js';
 import { useFullscreen, FAKE_FULLSCREEN_STYLE } from '../lib/useFullscreen.js';
 import { FullscreenButton } from './FullscreenButton.jsx';
@@ -255,20 +256,20 @@ export function MacQualitySelect({ remote, compact = false, className = '' }) {
 }
 
 /**
- * «Skjermdeling»: åpner macOS' innebygde VNC-klient (Skjermdeling.app) mot Macen, med full skjerm og
- * lyd/utklippstavle som agenten ikke har. Virker bare når nettleseren står på en Mac på tailnettet og
- * Skjermdeling er slått på på mål-Macen (Systeminnstillinger → Generelt → Deling).
+ * «Skjermdeling»: åpner Macen i noVNC i nettleseren (MacVnc) over hele vinduet – også på mobil.
+ * Macens innebygde Skjermdeling må være slått på (Systeminnstillinger → Generelt → Deling).
+ * I noVNC-visningen finnes også en lenke til Skjermdeling-appen for den som sitter ved en Mac.
  */
 export function MacVncLink({ macId, compact = false, className = '' }) {
-  const href = macVncUrl(macId);
-  if (!href) return null;
-  const title = `Åpne ${macName(macId)} i Skjermdeling (VNC, full skjerm). Krever en Mac på tailnettet, og at Skjermdeling er slått på på ${macName(macId)}.`;
-  return (
-    <a href={href} title={title} aria-label={compact ? `Åpne ${macName(macId)} i Skjermdeling` : undefined}
+  const [open, setOpen] = useState(false);
+  const title = `Åpne ${macName(macId)} i Skjermdeling (VNC) i nettleseren. Krever at Skjermdeling er slått på på ${macName(macId)}.`;
+  return (<>
+    <button type="button" onClick={() => setOpen(true)} title={title} aria-label={compact ? `Åpne ${macName(macId)} i Skjermdeling` : undefined}
       className={compact ? `p-1 text-nx-mute hover:text-nx-cyan ${className}` : `chip inline-flex items-center gap-1.5 ${className}`}>
-      <ScreenShare size={compact ? 14 : 14} />{!compact && ' Skjermdeling'}
-    </a>
-  );
+      <ScreenShare size={14} />{!compact && ' Skjermdeling'}
+    </button>
+    {open && <MacVnc macId={macId} onClose={() => setOpen(false)} />}
+  </>);
 }
 
 /** Statuslinje: tillatelser som mangler, låst skjerm, app i front. */
