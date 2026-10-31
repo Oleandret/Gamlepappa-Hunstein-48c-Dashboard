@@ -52,7 +52,7 @@ export function ActionPlan({ rows, devices, zones = {}, siteId = 'hunstein' }) {
         <div><h2 id="action-plan-title">Tiltaksplan</h2><p>Forslag beregnet fra det som skjer i huset akkurat nå. Ingenting slås av herfra.</p></div>
         <span className={`presence-pill ${!presence.known ? 'unknown' : presence.anyoneHome ? 'home' : 'away'}`}>
           {!presence.known ? (presence.configured ? 'Hjemme: ukjent' : 'Hjemme: ikke satt opp') : presence.anyoneHome
-            ? `Hjemme: ${presence.people.filter(p => p.home).map(p => p.person).join(', ')}` : 'Ingen er hjemme'}
+            ? `Hjemme: ${presence.people.filter(p => p.home).map(p => p.state === 'recent' ? `${p.person} (nylig)` : p.person).join(', ')}` : 'Ingen er hjemme'}
         </span>
       </div>
       {!presence.configured && <p className="saving-notice">Velg familiens mobiler under <strong>3D-hus → Nettverk → «Vis i Hjemme»</strong>, så kan planen foreslå hva som kan slås av når ingen er hjemme.</p>}

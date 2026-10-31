@@ -33,7 +33,13 @@ const ALIASES = [
   [/teknisk rom (i )?kjeller/i, 'u-tekrom'],
   [/teknisk rom bak kj.kken/i, null],
   [/bad til basseng|bassengbad/i, 'u-bassbad'],
-  [/terr?asse.*3\.? ?etg/i, 'f2-terrasse']
+  [/bod basseng/i, 'u-bassbod'],
+  [/terr?asse.*3\.? ?etg/i, 'f2-terrasse'],
+  [/kineo/i, 'u-kino'],                       // skrivefeil i portalen
+  [/1\.? ?etg\.? entr/i, 'f1-gang'],
+  [/2\.? ?etg\.? entr/i, 'f2-gang'],
+  // Utendørs og tvetydige navn: ingen etasje å gjette på.
+  [/utvendig|^hage$|^hovedetasjen$|^soverom$|soverom\/stue/i, null]
 ];
 
 const cache = new Map();
