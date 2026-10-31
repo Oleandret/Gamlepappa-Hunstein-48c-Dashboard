@@ -43,7 +43,7 @@ export function VigiloPanel({ standalone }) {
     <div className="grid grid-cols-12 gap-3 lg:gap-4">
       <section className={`col-span-12 panel space-y-4 self-start ${pad} ${standalone ? 'order-2' : 'lg:col-span-5'}`}>
         <h2 className="panel-title flex items-center gap-2"><School size={16} className="text-nx-cyan" aria-hidden="true" />Vigilo · daglig lesing</h2>
-        <p className="text-xs text-nx-mute">Telefonen åpner Vigilo, taster pinkoden, leser meldingene til barna og sender SMS om nye meldinger til de som er valgt. Pinkoden ligger på serveren som <code>VIGILO_PIN</code>, aldri her.</p>
+        <p className="text-xs text-nx-mute">Telefonen åpner Vigilo, taster pinkoden, velger hvert barn, åpner hver ny melding og lagrer hele teksten her, og sender SMS om nye meldinger til de som er valgt. Pinkoden ligger på serveren som <code>VIGILO_PIN</code>, aldri her.</p>
         <p className="text-xs">iphone-remote: <strong>{data.configured ? 'satt opp' : 'ikke satt opp'}</strong> · Pinkode: <strong>{data.pinSet ? 'satt' : 'mangler (VIGILO_PIN)'}</strong> · SMS: <strong>{data.kanaler.sms ? 'satt opp' : 'ikke satt opp'}</strong></p>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={settings.aktiv} onChange={e => setSettings(s => ({ ...s, aktiv: e.target.checked }))} />Les Vigilo automatisk hver dag</label>
         <label className="block"><span className="text-xs text-nx-mute">Klokkeslett (norsk tid)</span><input type="time" value={settings.klokkeslett} onChange={e => setSettings(s => ({ ...s, klokkeslett: e.target.value }))} className={`${field} w-full mt-1`} /></label>
@@ -81,8 +81,9 @@ export function VigiloPanel({ standalone }) {
           <h3 className="text-xs uppercase tracking-[0.14em] text-nx-mute">{dayLabel(day)}</h3>
           <ul className="mt-1 divide-y divide-nx-line/40">
             {items.map(m => <li key={m.id} className="py-2.5">
-              <p className="text-sm"><strong>{m.barn}</strong>{m.linjer[0] && <span className="text-nx-mute"> · {m.linjer[0]}</span>}</p>
-              {m.linjer.slice(1).map((l, i) => <p key={i} className="text-sm mt-0.5 break-words">{l}</p>)}
+              <p className="text-sm"><strong>{m.barn}</strong> · {m.tittel || m.linjer?.[0]}{m.ulest && <span className="ml-2 text-xs text-nx-amber">ulest i appen</span>}</p>
+              <p className="text-xs text-nx-mute mt-0.5">{[m.avsender, m.tidspunkt || m.dato].filter(Boolean).join(' · ')}{!m.apnet && m.tittel ? ' · bare utdraget (åpnes neste gang)' : ''}</p>
+              <p className="text-sm mt-1 whitespace-pre-line break-words">{m.innhold || m.utdrag || m.linjer?.slice(1).join('\n')}</p>
               <p className="text-xs text-nx-mute mt-0.5">Lest {time(m.funnet)}</p>
             </li>)}
           </ul>
