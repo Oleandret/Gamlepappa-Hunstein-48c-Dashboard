@@ -10,7 +10,8 @@ export const MACS = [
   { id: 'stue', name: 'Mac i stua', short: 'Stua', vnc: '100.121.133.90' },
   { id: 'eufy', name: 'Eufy-Macen', short: 'Eufy', vnc: '192.168.10.207' },
   { id: 'andreas', name: 'Andreas-iMac', short: 'Andreas', vnc: '192.168.10.42' },
-  { id: 'halsaneset', name: 'Mac på Halsaneset', short: 'Halsaneset', vnc: '100.66.190.70' }
+  { id: 'halsaneset', name: 'Mac på Halsaneset', short: 'Halsaneset', vnc: '100.66.190.70' },
+  { id: 'kino', name: 'Kino-Macen', short: 'Kino', vnc: '192.168.10.8' }
 ];
 export const DEFAULT_MAC = MACS[0].id;
 export const validMac = id => MACS.some(m => m.id === id) ? id : DEFAULT_MAC;
