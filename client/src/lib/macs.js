@@ -1,15 +1,15 @@
 /**
  * Macene som kan fjernstyres via iphone-remote. id er gatewayens navn (MAC_<ID>_HOST der;
  * «soverom» er gatewayens standard uten mac=). Legges en ny Mac til i gatewayen, legges den til her.
- * `vnc` er adressen Skjermdeling (macOS' innebygde VNC, port 5900) nås på fra tailnettet: Macens egen
- * Tailscale-adresse, eller for Macene uten Tailscale (Eufy, Andreas) en videresending på Soverom-Macen
- * (no.byggkon.mobile.forward-<navn>-vnc, port 5907/5942 → 192.168.10.x:5900).
+ * `vnc` er adressen Skjermdeling-appen (vnc://) bruker fra en Mac på tailnettet: Macens egen Tailscale-adresse,
+ * eller for Macene uten Tailscale (Eufy, Andreas) LAN-adressen, som nås via subnet-ruten 192.168.10.0/24 fra
+ * «soverom-router». noVNC i nettleseren bruker ikke denne; den går via gatewayen.
  */
 export const MACS = [
   { id: 'soverom', name: 'Mac på Soverom', short: 'Soverom', vnc: '100.91.248.127' },
   { id: 'stue', name: 'Mac i stua', short: 'Stua', vnc: '100.121.133.90' },
-  { id: 'eufy', name: 'Eufy-Macen', short: 'Eufy', vnc: '100.91.248.127:5907' },
-  { id: 'andreas', name: 'Andreas-iMac', short: 'Andreas', vnc: '100.91.248.127:5942' },
+  { id: 'eufy', name: 'Eufy-Macen', short: 'Eufy', vnc: '192.168.10.207' },
+  { id: 'andreas', name: 'Andreas-iMac', short: 'Andreas', vnc: '192.168.10.42' },
   { id: 'halsaneset', name: 'Mac på Halsaneset', short: 'Halsaneset', vnc: '100.66.190.70' }
 ];
 export const DEFAULT_MAC = MACS[0].id;
