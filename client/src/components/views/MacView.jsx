@@ -1,13 +1,14 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { ExternalLink, RefreshCw, Globe, Activity, Sun, Monitor } from 'lucide-react';
 import { MACS, validMac } from '../../lib/macs.js';
-import { useMacRemote, MacScreen, MacButtons, MacKeyboard, MacApps, MacStatusLine, MacQualitySelect, macWake } from '../MacRemote.jsx';
+import { useMacRemote, MacScreen, MacButtons, MacKeyboard, MacApps, MacStatusLine, MacQualitySelect, MacVncLink, macWake } from '../MacRemote.jsx';
 import { PhoneSessionNotice } from '../PhoneRemote.jsx';
 
 /**
  * Mac: fjernstyring av Macene (Soverom, stua; velger øverst) i dashboardets egen stil, bygd som Iphone-fanen.
  * Snarveier til venstre, skjermen så stor som plassen tillater i midten, og tastatur,
- * «Åpne», apper og aktivitet til høyre. «Eget vindu» åpner mac-siden i iphone-remote.
+ * «Åpne», apper og aktivitet til høyre. «Eget vindu» åpner mac-siden i iphone-remote;
+ * «Skjermdeling» åpner Macen i macOS' egen VNC-klient (full skjerm) når en sitter ved en Mac.
  */
 const time = t => new Date(t).toLocaleTimeString('nb-NO', { timeZone: 'Europe/Oslo', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
@@ -55,6 +56,7 @@ export function MacView() {
             <button className="chip inline-flex items-center gap-1.5" onClick={remote.reconnect}><RefreshCw size={14} /> Koble til skjermen på nytt</button>
             <a className="chip inline-flex items-center gap-1.5" href={`/iphone/mac.html?mac=${macId}`} target="_blank" rel="noopener"><ExternalLink size={14} /> Eget vindu</a>
           </>}
+          <MacVncLink macId={macId} />
         </div>
       </header>
 
