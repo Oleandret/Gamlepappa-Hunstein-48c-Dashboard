@@ -36,3 +36,16 @@ export function vncStatusText(status, detail = '') {
   return { idle: '', connecting: 'Kobler til …', credentials: 'Logg inn på Macen', connected: 'Tilkoblet', closed: 'Frakoblet',
     error: detail || 'Fikk ikke kontakt med Skjermdeling på Macen' }[status] ?? '';
 }
+
+/** Bildekvalitet i noVNC: [id, navn, JPEG-kvalitet 0–9, komprimering 0–9]. Virker bare når Macen bruker Tight/JPEG-koding. */
+export const VNC_QUALITIES = [['rask', 'Rask', 2, 9], ['normal', 'Normal', 6, 6], ['skarp', 'Skarp', 9, 1]];
+export const VNC_QUALITY_KEY = 'nexora.vnc.quality';
+export const validVncQuality = v => (VNC_QUALITIES.some(q => q[0] === v) ? v : 'normal');
+
+/** Datamengde per sekund som lesbar tekst: «12 kB/s», «1,3 MB/s». */
+export function rateLabel(bytesPerSecond) {
+  if (!Number.isFinite(bytesPerSecond) || bytesPerSecond < 0) return '';
+  if (bytesPerSecond >= 1e6) return `${(bytesPerSecond / 1e6).toFixed(1).replace('.', ',')} MB/s`;
+  if (bytesPerSecond >= 1e3) return `${Math.round(bytesPerSecond / 1e3)} kB/s`;
+  return `${Math.round(bytesPerSecond)} B/s`;
+}

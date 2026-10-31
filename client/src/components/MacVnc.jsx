@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import RFB from '@novnc/novnc';
 import { X, Keyboard, Maximize2, Minimize2, ExternalLink, RefreshCw } from 'lucide-react';
 import { macName, macVncUrl } from '../lib/macs.js';
-import { vncSocketUrl, keysymForChar, keysymForKey, KEY_BAR, XK, VNC_USER_KEY, vncStatusText } from '../lib/vnc.js';
+import { macApi } from '../lib/macRemote.js';
+import { vncSocketUrl, keysymForChar, keysymForKey, KEY_BAR, XK, VNC_USER_KEY, vncStatusText, VNC_QUALITIES, VNC_QUALITY_KEY, validVncQuality, rateLabel } from '../lib/vnc.js';
 import { useFullscreen } from '../lib/useFullscreen.js';
 
 /**
@@ -13,8 +14,10 @@ import { useFullscreen } from '../lib/useFullscreen.js';
  * ett fingertrykk er klikk, dra er mus, langt trykk er høyreklikk, to fingre ruller
  * (noVNC sine egne bevegelser). «Tastatur» henter fram mobilens tastatur gjennom et skjult
  * felt; tasteraden gir spesialtastene, ⌘/⌃/⌥ holdes til neste tast.
- * Brukernavn og passord på Macen spørres det om når Macen ber om det (ARD/VNC-innlogging);
- * bare brukernavnet huskes, i nettleseren.
+ * Brukernavn og passord på Macen hentes fra gatewayen når de er lagret der (MAC_<ID>_VNC_USER/PASSWORD),
+ * ellers spørres det om dem når Macen ber om det (ARD/VNC-innlogging); bare brukernavnet huskes, i nettleseren.
+ * Kvalitetsvelgeren setter noVNC sitt JPEG-/komprimeringsnivå (virker når Macen bruker Tight-koding), og
+ * måleren viser mottatt datamengde per sekund, så en ser om valget gjør noe.
  */
 const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform || '');
 
@@ -28,24 +31,55 @@ export function MacVnc({ macId, onClose }) {
   const [attempt, setAttempt] = useState(0);
   const [full, toggleFull] = useFullscreen(overlayRef);
 
-  // Koble til (på nytt ved «attempt»).
+  const [quality, setQuality] = useState(() => { try { return validVncQuality(localStorage.getItem(VNC_QUALITY_KEY)); } catch { return 'normal'; } });
+  const [rate, setRate] = useState(0);
+  const [storedLogin, setStoredLogin] = useState(false);
+  const skipStored = useRef(false);   // lagret innlogging ble avvist: spør i stedet neste gang
+
+  // Koble til (på nytt ved «attempt»): hent lagret innlogging, åpne WebSocket (med byte-teller) og start noVNC.
   useEffect(() => {
     const target = screenRef.current;
     if (!target) return;
-    setStatus('connecting'); setDetail('');
-    let rfb;
-    try {
-      rfb = new RFB(target, vncSocketUrl(macId, window.location), { shared: true, wsProtocols: [] });
-    } catch (e) { setStatus('error'); setDetail(e.message); return; }
-    rfb.scaleViewport = true; rfb.resizeSession = false; rfb.clipViewport = false;
-    rfb.showDotCursor = true; rfb.background = '#000'; rfb.focusOnClick = true;
-    rfb.addEventListener('connect', () => setStatus('connected'));
-    rfb.addEventListener('credentialsrequired', () => setStatus('credentials'));
-    rfb.addEventListener('securityfailure', e => { setStatus('error'); setDetail(e.detail?.reason ? `Innlogging avvist: ${e.detail.reason}` : 'Innlogging avvist'); });
-    rfb.addEventListener('disconnect', e => setStatus(s => (s === 'error' ? s : e.detail?.clean ? 'closed' : 'error')));
-    rfbRef.current = rfb;
-    return () => { rfbRef.current = null; try { rfb.disconnect(); } catch { /* allerede nede */ } };
+    setStatus('connecting'); setDetail(''); setRate(0);
+    let rfb, ws, timer, cancelled = false, bytes = 0;
+    (async () => {
+      let creds = null;
+      if (!skipStored.current) {
+        try { const c = await macApi('/vnc-credentials', undefined, macId); if (c.configured) creds = { username: c.username, password: c.password }; } catch { /* spør i stedet */ }
+      }
+      if (cancelled) return;
+      setStoredLogin(Boolean(creds));
+      try {
+        ws = new WebSocket(vncSocketUrl(macId, window.location));
+        ws.binaryType = 'arraybuffer';
+        ws.addEventListener('message', e => { bytes += e.data?.byteLength || 0; });
+        timer = setInterval(() => { setRate(bytes / 2); bytes = 0; }, 2000);
+        rfb = new RFB(target, ws, { shared: true, credentials: creds || undefined });
+      } catch (e) { setStatus('error'); setDetail(e.message); return; }
+      rfb.scaleViewport = true; rfb.resizeSession = false; rfb.clipViewport = false;
+      rfb.showDotCursor = true; rfb.background = '#000'; rfb.focusOnClick = true;
+      const [, , q, c] = VNC_QUALITIES.find(x => x[0] === quality) || VNC_QUALITIES[1];
+      rfb.qualityLevel = q; rfb.compressionLevel = c;
+      rfb.addEventListener('connect', () => setStatus('connected'));
+      rfb.addEventListener('credentialsrequired', () => setStatus('credentials'));
+      rfb.addEventListener('securityfailure', e => {
+        if (creds) skipStored.current = true;
+        setStatus('error'); setDetail(`${creds ? 'Lagret innlogging' : 'Innlogging'} avvist${e.detail?.reason ? `: ${e.detail.reason}` : ''}`);
+      });
+      rfb.addEventListener('disconnect', e => setStatus(s => (s === 'error' ? s : e.detail?.clean ? 'closed' : 'error')));
+      rfbRef.current = rfb;
+    })();
+    return () => { cancelled = true; clearInterval(timer); rfbRef.current = null; try { rfb?.disconnect(); } catch { /* allerede nede */ } try { if (!rfb) ws?.close(); } catch { /* ikke åpnet */ } };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [macId, attempt]);
+
+  // Kvalitet kan byttes mens økta går; noVNC sender nye kodingsvalg til Macen.
+  useEffect(() => {
+    try { localStorage.setItem(VNC_QUALITY_KEY, quality); } catch { /* privat modus */ }
+    const rfb = rfbRef.current; if (!rfb) return;
+    const [, , q, c] = VNC_QUALITIES.find(x => x[0] === quality) || VNC_QUALITIES[1];
+    rfb.qualityLevel = q; rfb.compressionLevel = c;
+  }, [quality, status]);
 
   useEffect(() => { const prev = document.body.style.overflow; document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = prev; }; }, []);
   useEffect(() => { const on = e => { if (e.key === 'Escape' && status !== 'connected') onClose(); }; document.addEventListener('keydown', on); return () => document.removeEventListener('keydown', on); }, [status, onClose]);
@@ -78,7 +112,16 @@ export function MacVnc({ macId, onClose }) {
       <div className="flex items-center gap-1.5 overflow-x-auto px-2 py-1.5 bg-nx-bg/95 border-b border-nx-line/60 text-xs shrink-0">
         <span className="font-semibold whitespace-nowrap">{macName(macId)}</span>
         <span className={`whitespace-nowrap ${status === 'connected' ? 'text-nx-green' : status === 'error' ? 'text-nx-amber' : 'text-nx-mute'}`}>{vncStatusText(status, detail)}</span>
+        {status === 'connected' && <span className="whitespace-nowrap font-mono text-[10px] text-nx-mute" title="Mottatt datamengde per sekund">{rateLabel(rate)}</span>}
         <span className="flex-1" />
+        {status === 'connected' && (
+          <select value={quality} onChange={e => setQuality(validVncQuality(e.target.value))} aria-label="Bildekvalitet"
+            title="Bildekvalitet: Rask = mer komprimert og mindre data, Skarp = best bilde. Virker når Macen bruker JPEG-koding; følg med på måleren."
+            className="chip !py-1 !px-2 bg-nx-bg text-xs cursor-pointer">
+            {VNC_QUALITIES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+          </select>
+        )}
+        {status === 'connected' && storedLogin && <span className="sr-only">Logget inn med lagret innlogging</span>}
         {status === 'connected' && <button onClick={() => inputRef.current?.focus()} className="chip !py-1 !px-2 inline-flex items-center gap-1 whitespace-nowrap" title="Hent fram tastaturet"><Keyboard size={13} /> Tastatur</button>}
         {(status === 'error' || status === 'closed') && <button onClick={() => setAttempt(a => a + 1)} className="chip !py-1 !px-2 inline-flex items-center gap-1 whitespace-nowrap"><RefreshCw size={13} /> Koble til på nytt</button>}
         {isMac && macVncUrl(macId) && <a href={macVncUrl(macId)} className="chip !py-1 !px-2 inline-flex items-center gap-1 whitespace-nowrap" title="Åpne i Skjermdeling-appen på denne Macen"><ExternalLink size={13} /> Appen</a>}
@@ -102,7 +145,7 @@ export function MacVnc({ macId, onClose }) {
           <form onSubmit={submitCredentials} className="absolute inset-0 flex items-center justify-center bg-black/70 p-4">
             <div className="panel p-4 w-full max-w-xs space-y-2">
               <p className="panel-title">Logg inn på {macName(macId)}</p>
-              <p className="text-xs text-nx-mute">Brukernavn og passord på Macen (det du logger inn med der). Passordet lagres ikke.</p>
+              <p className="text-xs text-nx-mute">Brukernavn og passord på Macen (det du logger inn med der). Passordet lagres ikke her; vil du slippe å taste, legg det i gatewayen (MAC_…_VNC_USER/PASSWORD på Railway).</p>
               <input value={user} onChange={e => setUser(e.target.value)} placeholder="Brukernavn" autoCapitalize="off" autoCorrect="off" autoComplete="username" aria-label="Brukernavn"
                 className="w-full rounded-lg border border-nx-line/60 bg-nx-bg px-2.5 py-2 text-sm text-nx-text" />
               <input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="Passord" autoComplete="current-password" aria-label="Passord" autoFocus
@@ -113,7 +156,7 @@ export function MacVnc({ macId, onClose }) {
         )}
         {(status === 'error' || status === 'closed') && (
           <div className="absolute inset-x-0 bottom-0 p-3 text-center text-xs text-nx-mute bg-black/70">
-            {status === 'error' ? `${vncStatusText('error', detail)}. Skjermdeling må være slått på på Macen (Systeminnstillinger → Generelt → Deling).` : 'Forbindelsen er avsluttet.'}
+            {status === 'error' ? `${vncStatusText('error', detail)}. ${skipStored.current ? 'Prøv på nytt for å logge inn manuelt.' : 'Skjermdeling må være slått på på Macen (Systeminnstillinger → Generelt → Deling).'}` : 'Forbindelsen er avsluttet.'}
           </div>
         )}
       </div>
