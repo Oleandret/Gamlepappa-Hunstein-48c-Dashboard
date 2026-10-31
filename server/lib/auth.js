@@ -19,7 +19,7 @@ export function authenticate(header, configured) {
 }
 const attempts = new Map();
 // Residents (own login) may only use Trivsel: avvik, gjøremål, påminnelser and husregler. Never contacts, heating or devices.
-const RESIDENT_PATHS = /^\/(session|logout|avvik(\/.*)?|huset|huset\/(regler|gjoremal|paaminnelser)(\/.*)?)$/;
+const RESIDENT_PATHS = /^\/(session|logout|avvik(\/.*)?|skryt(\/.*)?|huset|huset\/(regler|gjoremal|paaminnelser)(\/.*)?)$/;
 export function accessControl(req, res, next, { residentSession = req => residents.session(req) } = {}) {
   // Explicit demo is isolated from real Homey/MCP/AI and needs no permanent credential.
   const demo = process.env.DEMO_MODE === 'true' && process.env.NODE_ENV !== 'production';
@@ -54,7 +54,7 @@ export function accessControl(req, res, next, { residentSession = req => residen
   if (session && !['GET','HEAD'].includes(req.method) && !googleAuth.csrfValid(req, session)) return res.status(403).json({ error: 'Last siden på nytt og prøv igjen', code: 'CSRF_REQUIRED' });
   if (!rateLimited(req, res)) return;
   if (!['GET','HEAD'].includes(req.method) && !(req.method === 'POST' && req.path === '/logout')) {
-    const required = /^\/(homey|chat)\//.test(req.path) || /^\/(avvik|huset)(\/|$)/.test(req.path) && !/^\/huset\/admin(\/|$)/.test(req.path) || /^\/experience\/scenes\/[^/]+\/(run|undo)$/.test(req.path) ? 'operator' : 'admin';
+    const required = /^\/(homey|chat)\//.test(req.path) || /^\/(avvik|skryt|huset)(\/|$)/.test(req.path) && !/^\/huset\/admin(\/|$)/.test(req.path) && req.path !== '/skryt/premie' || /^\/experience\/scenes\/[^/]+\/(run|undo)$/.test(req.path) ? 'operator' : 'admin';
     if (role === 'viewer' || (required === 'admin' && role !== 'admin')) return res.status(403).json({error:'Mangler rettighet'});
   }
   req.user = { role, method: session ? 'google' : demo ? 'demo' : 'bearer', ...(session ? { csrfToken: session.csrfToken, email: session.email } : {}) };

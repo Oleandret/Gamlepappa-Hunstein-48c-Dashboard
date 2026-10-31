@@ -1,5 +1,6 @@
 import {historyRoutes} from './routes/history.js';
 import {avvikRoutes} from './routes/avvik.js';
+import {skrytRoutes} from './routes/skryt.js';
 import {husetRoutes} from './routes/huset.js';
 import {beboerRoutes} from './routes/beboere.js';
 import {residents} from './lib/residents.js';
@@ -86,6 +87,7 @@ app.use('/api/history',historyRoutes);
 app.use('/api/room-photos',roomPhotoRoutes);
 app.use('/api/house3d/changes',house3dChangeRoutes);
 app.use('/api/avvik',avvikRoutes);
+app.use('/api/skryt',skrytRoutes);
 app.use('/api/huset/admin',beboerRoutes);
 app.use('/api/huset',husetRoutes);
 app.get('/api/heating/history/status', (_req,res)=>res.json(heatingLogStatus));
