@@ -1,6 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import express from 'express';
 import {createIphoneSms,findSendButton,findComposeButton,findRecipientField,findBodyField,parseElements,iphoneSmsConfigured} from '../lib/iphoneSms.js';
 import {notifyAvvik,avvikSms,createAvvikRoutes} from '../routes/avvik.js';
+import {VITSER,tilfeldigVits} from '../lib/vitser.js';
 const env={IPHONE_REMOTE_URL:'https://remote.example',IPHONE_REMOTE_USER:'ole',IPHONE_REMOTE_PASSWORD:'pw',IPHONE_MCP_TOKEN:'t'};
 // Elementene slik Meldinger på telefonen (iOS 16, norsk) faktisk viser dem.
 const el=(type,label,x,y,w,h,identifier=null)=>({type,label,name:identifier||label,identifier,coordinates:{x,y,width:w,height:h}});
@@ -79,12 +80,14 @@ test('avvik notification: only to the person concerned, honest statuses',async()
  const sent=[];const messaging={channels:()=>({sms:true}),sendSms:async(to,t)=>sent.push([to,t])};
  const residents=(o)=>({list:async()=>[{navn:'Ylva',...o},{navn:'Ole Andre',telefon:'+4711111111',smsVarsel:true}]});
  assert.equal((await notifyAvvik(item,{messaging,residents:residents({telefon:'+4799999999',smsVarsel:true})})).status,'sendt');
- assert.deepEqual(sent,[['+4799999999',avvikSms(item)]]);assert.match(sent[0][1],/^Hei Ylva, Gamlepappa har registrert ett avvik idag som går på trivsel i huset\. Og håper du kan fikse: Oppvasken ble stående\nRegistrert av Ole Andre\.$/);
+ assert.match(sent[0][1],/^Hei Ylva, Gamlepappa har registrert ett avvik idag som går på trivsel i huset\. Og håper du kan fikse: Oppvasken ble stående\nRegistrert av Ole Andre\.\n\nDagens vits: .+ – .+$/);
+ assert.equal(avvikSms(item,'',{vits:'Vits'}),'Hei Ylva, Gamlepappa har registrert ett avvik idag som går på trivsel i huset. Og håper du kan fikse: Oppvasken ble stående\nRegistrert av Ole Andre.\n\nDagens vits: Vits');
+ assert.ok(VITSER.length>=20);assert.ok(VITSER.includes(tilfeldigVits(()=>0)));assert.equal(tilfeldigVits(()=>0.999999),VITSER.at(-1));assert.ok(VITSER.every(v=>v.length<=160));
  // SMS-varsel-innstillingen gjelder de daglige påminnelsene; avviket får SMS så lenge det er valgt på avviket.
  assert.equal((await notifyAvvik(item,{messaging,residents:residents({telefon:'+4799999999',smsVarsel:false})})).status,'sendt');
  assert.equal((await notifyAvvik({...item,sms:false},{messaging,residents:residents({telefon:'+4799999999'})})).status,'valgt_bort');
- assert.equal(avvikSms({...item,smsTekst:'Egen tekst'}),'Egen tekst');
- assert.match(avvikSms({...item,forslag:'Ta den med en gang'},'https://huset.test'),/\nForslag: Ta den med en gang\nRegistrert av Ole Andre\.\nhttps:\/\/huset\.test\/avvik$/);
+ assert.equal(avvikSms({...item,smsTekst:'Egen tekst'},'',{vits:'Vits'}),'Egen tekst\n\nDagens vits: Vits');
+ assert.match(avvikSms({...item,forslag:'Ta den med en gang'},'https://huset.test',{vits:'Vits'}),/\nForslag: Ta den med en gang\nRegistrert av Ole Andre\.\n\nDagens vits: Vits\nhttps:\/\/huset\.test\/avvik$/);
  assert.equal((await notifyAvvik(item,{messaging,residents:residents({})})).status,'mangler_telefon');
  assert.equal((await notifyAvvik(item,{messaging:{...messaging,channels:()=>({sms:false})},residents:residents({})})).status,'ikke_satt_opp');
  const fail=await notifyAvvik(item,{messaging:{...messaging,sendSms:async()=>{throw new Error('Fant ikke Send-knappen i Meldinger')}},residents:residents({telefon:'+4799999999',smsVarsel:true})});assert.equal(fail.status,'feilet');assert.match(fail.feil,/Send-knappen/);
